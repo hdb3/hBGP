@@ -1,0 +1,71 @@
+cabal-version:       2.4
+name:                BGPutils
+version:             0.2.0.0
+homepage:            https://github.com/hdb3/router
+license:             Apache-2.0
+author:              Nicholas Hart
+maintainer:          nic@hdb3.net
+copyright:           Nicholas Hart
+category:            Network
+
+common deps
+  build-depends:       base ^>=4.12.0.0, bgplib ^>=0.1.2.1, time ^>=1.8.0.2, bytestring ^>=0.10.8.2, binary ^>=0.8.6.0, random ^>=1.1, bgprib ^>=0.1.1.1, iproute ^>=1.7.7, hashable ^>=1.2.7.0, containers ^>=0.6.0.1
+  other-extensions:    FlexibleContexts, FlexibleInstances, DataKinds, GeneralizedNewtypeDeriving, BangPatterns, OverloadedStrings
+  ghc-options: -O2
+  default-language:    Haskell2010
+
+common exe-deps
+  import:              deps
+  build-depends:       BGPutils
+  hs-source-dirs:      app
+  default-language:    Haskell2010
+
+library
+  import:              deps
+  exposed-modules:     BGPutils, Overlap, State, Report, Prefix, Overlap2, RibDef, RIBData, MapRib, IP4Prefix, OverlapProto, Comm, ASPathReader, ASPathUtils
+  hs-source-dirs:      lib
+
+executable ASPathReaderMain
+  import:              exe-deps
+  main-is:             ASPathReaderMain.hs
+
+executable Reader
+  import:              exe-deps
+  main-is:             Reader.hs
+
+executable RibReader
+  import:              exe-deps
+  main-is:             RibReader.hs
+
+executable RibTest
+  import:              exe-deps
+  main-is:             Reader.hs
+
+--executable ASReader
+--  import:              exe-deps
+--  main-is:             ASReader.hs
+
+executable ASSegCount
+  import:              exe-deps
+  main-is:             ASSegCount.hs
+
+executable Benchmark
+  import:              exe-deps
+  main-is:             Benchmark.hs
+  build-depends:       random-shuffle ^>=0.0.4
+
+executable BGPMessageDecoder
+  import:              exe-deps
+  main-is:             BGPMessageDecoder.hs
+
+executable OverlapReader
+  import:              exe-deps
+  main-is:             OverlapReader.hs
+
+executable ReadBGPMsgs
+  import:              exe-deps
+  main-is:             ReadBGPMsgs.hs
+
+executable ASOrigin
+  import:              exe-deps
+  main-is:             ASOrigin.hs

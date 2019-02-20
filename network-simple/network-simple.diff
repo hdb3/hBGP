@@ -1,0 +1,155 @@
+diff --git a/network-simple.cabal b/network-simple.cabal
+index a857c0c..8fbf5d0 100644
+--- a/network-simple.cabal
++++ b/network-simple.cabal
+@@ -1,33 +1,14 @@
++cabal-version:       2.4
+ name:                network-simple
+-version:             0.4.3
++version:             0.4.3.1
+ homepage:            https://github.com/k0001/network-simple
+ bug-reports:         https://github.com/k0001/network-simple/issues
+-license:             BSD3
+-license-file:        LICENSE
+ author:              Renzo Carbonara
+ maintainer:          renλren.zone
+ copyright:           Copyright (c) Renzo Carbonara 2013-2018
+ category:            Network
+ build-type:          Simple
+-cabal-version:       >=1.8
+ synopsis:            Simple network sockets usage patterns.
+-description:
+-  This module exports functions that abstract simple network socket
+-  usage patterns.
+-  .
+-  See the @changelog.md@ file in the source distribution to learn about any
+-  important changes between versions.
+-extra-source-files:
+-  changelog.md
+-  README.md
+-  PEOPLE
+-  examples/echo-tcp.hs
+-  examples/chat-tcp.hs
+-
+-
+-source-repository head
+-    type: git
+-    location: git://github.com/k0001/network-simple.git
+ 
+ library
+   hs-source-dirs:    src
+@@ -35,7 +16,9 @@ library
+   other-modules:     Network.Simple.Internal
+   build-depends:     base         (>=4.7 && < 5)
+                    , network      (>=2.3)
++                   , network-bsd
+                    , bytestring
+                    , transformers
+                    , safe-exceptions
+-                   , socks
++                   --, socks
++  default-language:    Haskell2010
+diff --git a/src/Network/Simple/TCP.hs b/src/Network/Simple/TCP.hs
+index e53f09a..a1e3a60 100644
+--- a/src/Network/Simple/TCP.hs
++++ b/src/Network/Simple/TCP.hs
+@@ -29,7 +29,6 @@ module Network.Simple.TCP (
+   -- * Client side
+   -- $client-side
+     connect
+-  , connectSOCKS5
+ 
+   -- * Server side
+   -- $server-side
+@@ -50,7 +49,6 @@ module Network.Simple.TCP (
+   , bindSock
+   , listenSock
+   , connectSock
+-  , connectSockSOCKS5
+   , closeSock
+ 
+   -- * Note to Windows users
+@@ -76,8 +74,6 @@ import qualified Data.ByteString.Lazy           as BSL
+ import           Data.List                      (transpose, partition)
+ import           Data.Word                      (byteSwap16)
+ import qualified Network.Socket                 as NS
+-import qualified Network.Socks5.Lowlevel        as NS5
+-import qualified Network.Socks5.Types           as NS5
+ import qualified Network.Socket.ByteString      as NSB
+ import qualified Network.Socket.ByteString.Lazy as NSBL
+ import qualified System.IO                      as IO
+@@ -149,29 +145,6 @@ connect
+   -> m r
+ connect host port = Ex.bracket (connectSock host port) (closeSock . fst)
+ 
+--- | Like 'connect', but connects to the destination server through a SOCKS5
+--- proxy.
+-connectSOCKS5
+-  :: (MonadIO m, Ex.MonadMask m)
+-  => NS.HostName -- ^ SOCKS5 proxy server hostname or IP address.
+-  -> NS.ServiceName -- ^ SOCKS5 proxy server service port name or number.
+-  -> NS.HostName
+-  -- ^ Destination server hostname or IP address. We connect to this host
+-  -- /through/ the SOCKS5 proxy specified in the previous arguments.
+-  --
+-  -- Note that if hostname resolution on this 'NS.HostName' is necessary, it
+-  -- will happen on the proxy side for security reasons, not locally.
+-  -> NS.ServiceName -- ^ Destination server service port name or number.
+-  -> ((NS.Socket, NS.SockAddr, NS.SockAddr) -> m r)
+-  -- ^ Computation taking 'NS.Socket' connected to the SOCKS5 server (through
+-  -- which we can interact with the destination server), the address of that
+-  -- SOCKS5 server, and the address of the destination server, in that order.
+-  -> m r
+-connectSOCKS5 phn psn dhn dsn k =
+-  connect phn psn $ \(psock, paddr) -> do
+-     daddr <- connectSockSOCKS5 psock dhn dsn
+-     k (psock, paddr, daddr)
+-
+ --------------------------------------------------------------------------------
+ 
+ -- $server-side
+@@ -388,44 +361,6 @@ closeSock s = liftIO $ do
+ 
+ --------------------------------------------------------------------------------
+ 
+--- | Given a 'NS.Socket' connected to a SOCKS5 proxy server, establish a
+--- connection to the specified destination server through that proxy.
+-connectSockSOCKS5
+-  :: MonadIO m
+-  => NS.Socket
+-  -- ^ Socket connected to the SOCKS5 proxy server.
+-  --
+-  -- After a successful use of 'connectSockSOCKS5', all traffic exchanged
+-  -- through this socket will be between ourselves and the destination server.
+-  -> NS.HostName
+-  -- ^ Destination server hostname or IP address. We connect to this host
+-  -- /through/ the SOCKS5 proxy specified in the previous arguments.
+-  --
+-  -- Note that if hostname resolution on this 'NS.HostName' is necessary, it
+-  -- will happen on the proxy side for security reasons, not locally.
+-  -> NS.ServiceName -- ^ Destination server service port name or number.
+-  -> m NS.SockAddr -- ^ Address of the destination server.
+-connectSockSOCKS5 psock dhn dsn = liftIO $ do
+-   dpn :: NS.PortNumber <- do
+-     pn <- getServicePortNumber' dsn
+-     -- The @socks5@ library seems to be broken and use port numbers
+-     -- in the wrong byte order. Here we work around that.
+-     pure (fromIntegral (byteSwap16 (fromInteger (toInteger pn))))
+-   let dsa = NS5.SocksAddress (NS5.SocksAddrDomainName (B8.pack dhn)) dpn
+-   NS5.establish psock [NS5.SocksMethodNone] >>= \case
+-     NS5.SocksMethodNone -> do
+-       NS5.rpc_ psock (NS5.Connect dsa) >>= \case
+-         (NS5.SocksAddrIPV4 ha, p) -> pure (NS.SockAddrInet p ha)
+-         (NS5.SocksAddrIPV6 ha, p) -> pure (NS.SockAddrInet6 p 0 ha 0)
+-         _ -> err "Impossible reply from SOCKS5 server"
+-     r -> err ("Unsupported reply from SOCKS5 server: " ++ show r)
+- where
+-   err :: String -> IO a
+-   err s = fail ("Network.Simple.TCP.connectSockSOCKS5: " ++ s)
+-
+-
+-
+---------------------------------------------------------------------------------
+ -- Utils
+ 
+ -- | Read up to a limited number of bytes from a socket.

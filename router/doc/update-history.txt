@@ -1,0 +1,5 @@
+
+tag 1.2 freezes an old appraoch which was not well supportingmultiple active ans passive sessions.
+This was based on ActPassive.hs
+1.2 also feezes a verion of Session manager which resolves a problem using the base Network Simple library, where sockets can disappear in forked threads.
+It is intended to simplify the version of Session to remove per peer application configuration in favour of the application bundle performing self customisation based on the connected IP addresses only.  It is still possible to bundle a complete state object with the application to ensure that it has all neded context top operate.

@@ -1,0 +1,60 @@
+Building and running bgpd and zebrad
+
+(Ubuntu/debian base)
+
+clone quagga : git clone git://git.savannah.nongnu.org/quagga.git -b 1.2.4 ???
+or download: http://download.savannah.gnu.org/releases/quagga/
+
+deps: autoconf automake libtool make gawk libreadline-dev  libc-ares-dev texinfo dejagnu  groff libsnmp-dev  libcap-dev texi2html pkg-config
+configure: ./configure --sysconfdir=/etc/quagga --localstatedir=/var/run/quagga
+
+use the debian recipe to create the quagga user 
+
+(quagga-core.preinst)
+
+    #!/bin/bash
+    set -eu
+
+    # create quaggavty group
+    addgroup --system quaggavty > /dev/null
+
+    # create quagga group
+    addgroup --system quagga > /dev/null
+
+    # create quagga user
+    adduser \
+      --system \
+      --ingroup quagga \
+      --home /run/quagga/ \
+      --no-create-home \
+      --gecos "Quagga routing suite" \
+      quagga  > /dev/null
+
+    # add quagga user to the quaggavty group
+    adduser quagga quaggavty
+    
+    #DEBHELPER#
+
+create the state file: /var/run/quagga
+
+mkdir /var/run/quagga
+chown quagga:quagga /var/run/quagga
+
+NB: this can be automated at boot time (because /run is likely tmpfs...), with this file:
+
+/usr/lib/tmpfiles.d/zebra.conf:
+d /run/quagga 0755 quagga quagga -
+
+create a bare zebra config file:(zebra.conf)
+
+    hostname Router
+    password zebra
+    log stdout
+
+run zebra as su:
+sudo ./zebra/zebra -f zebra.conf
+
+the zserv service is now available via /var/run/quagga/zserv.api
+
+(Note: if built with --enable-tcp-zebra it is available on the TCP port 2600)o
+(NOte2: quagga must be patched if you want to be able to contact the zebra port 2600 on an interface other than loopback)

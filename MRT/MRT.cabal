@@ -1,0 +1,56 @@
+cabal-version:       2.4
+
+name:                MRT
+version:             0.1.0.1
+synopsis:            Haskell MRT format library (RFC6396)
+homepage:            https://github.com/hdb3/MRT
+license:             Apache-2.0
+author:              Nicholas Hart
+maintainer:          nic@hdb3.net
+copyright:           Nicholas Hart
+category:            Network
+
+common deps
+  build-depends:       base ^>=4.12.0.0, bytestring ^>=0.10.8.2, bluster ^>=0.1.0.0, MRT, containers
+  hs-source-dirs:      app
+  default-language:    Haskell2010
+  ghc-options: -O2
+
+library
+  exposed-modules:     ClusterMetrics, MRTformat, MRTquest, MRTrib, Overlap, PrefixGroupMetrics, FilterMoreSpecifics, MRTlib, MRTRibAnalysis, MRTXRib, PrefixTree
+  build-depends:       base ^>=4.12.0.0, bytestring ^>=0.10.8.2, bluster ^>=0.1.0.0, zlib, iproute, attoparsec-binary, base16-bytestring, attoparsec, hashable, containers, farmhash, array, bgplib, bgprib
+  hs-source-dirs:      lib
+  default-language:    Haskell2010
+  ghc-options: -O2
+
+executable MRTPrefix-test
+  import:              deps
+  main-is:             MRTPrefix-test.hs
+
+executable MRTRibAnalysis-test
+  import:              deps
+  main-is:             MRTRibAnalysis-test.hs
+
+executable FMStest
+  import:              deps
+  main-is:             FMStest.hs
+
+executable MRTformat-test
+  import:              deps
+  main-is:             MRTformat-test.hs
+
+executable MRTquest-test
+  import:              deps
+  main-is:             MRTquest-test.hs
+
+executable MRTrib-test
+  import:              deps
+  main-is:             MRTrib-test.hs
+
+executable MRTXRib-test
+  import:              deps
+  main-is:             MRTXRib-test.hs
+
+executable PrefixTree-test
+  import:              deps
+  main-is:             PrefixTree-test.hs

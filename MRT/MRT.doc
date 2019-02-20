@@ -1,0 +1,26 @@
+
+MRTlib
+-----
+MRTlib provides binary decoding of MRT messages, typically derived from files.
+MRTlib uses Attoparsec.
+The top level parser is 'rawMRTParse' (rawMRTParse :: Parser [MRTRecord]).
+The function mrtParse :: BS.ByteString -> [MRTRecord] wraps rawMRTParse to provide a parser for ByteStrings from e.g. getContents.
+The objects produced by rawMRTParse/mrtParse correspond exactly to the protocol messages defined in RFC6396,
+in particular both the route table dump message type TABLE_DUMP_V2 and the BGP message stream type BGP4MP.
+It could be expected that a typical MRT message source would consist of a stream of just one such message type.
+
+MRTrib
+-----
+
+MRTrib builds on MRTlib, specifically on the TABLE_DUMP_V2 message type.
+The core function 'mrtToPeerMap :: [MRTRecord] -> PeerMap' reads a complete stream of TABLE_DUMP_V2 messages and creates a PeerMap structure.
+'mrtToPeerMap' consumes only the IPv4 and IPv6 RIB entry message subtypes - it's output is a per-peer association list of RIB pairs, with distinct IPv4 and IPv6 RIBs.
+In this context 'RIB' is a collection of IP prefixes and BGP attribute strings, indexed over the BGP attribute string.  There may be either or both of IPv4 and IPv6 RIBs associated with every peer.
+A complementary function is access to the TABLE_DUMP_V2 'Peer Index Table' message subtype, which should preceed any other TABLE_DUMP_V2 message.  The peers present in the 'PeerMap' produced by mrtToPeerMap should correspond to those referenced in this 'Peer Index Table', the index value in 'PeerMap' corresponding to the zero-origin position in the list contained in the 'Peer Index Table'.  (The only other content of 'Peer Index Table' is a 'view name' and the BGPID of the MRT source).
+Helper functions provide for summary of the content of these strutures:
+'reportPeerTable :: MRTRecord -> String' and 'reportPeerMap :: PeerMap -> String'.
+
+Two useful support functions bind together the peer table and the peer ribs:
+getPeerTable :: [MRTRecord] -> PeerTable
+buildPeerTable :: MRTRecord -> PeerMap -> PeerTable
+

@@ -1,0 +1,60 @@
+
+files:
+  - Prefixes.hs
+    extended with IPrefix which stores Prefixes compactly as single 64bit words
+
+  - 
+
+  - BGPData.hs
+    defines persistent data hierarchies: GlobalData / PeerData / RouteData
+    supports comparison of route costs via Ord instance
+    PeerData and RouteData initialised based on BGP received content
+
+  - PrefixTable.hs
+    this is the 'LocRIB'
+    it is indexed on the actual prefix, including length (this format is called IPrefix)
+    prefixes are inserted in blocks, a block having all the same path
+    however, reoute selection is per prefix evne though mostly will follow the prefix blocks as received
+    therefore as the PrefixTable is updated it must collect the prefixes changed, grouped by route,
+    and return them for posting to adjRIBout.
+    There is a special case operation which will generate a complete copy of the RIB as an update.
+    
+  - PathTable.hs
+    repository for all routes
+    builds on BGPData structures
+    holds the RouteData for each route
+    indexed on a hash on the raw received path attributes
+    referenced by the prefix table
+    routes for a specific peer can be identified by the refernced peerdatao
+
+  - AdjRIBOut.hs
+    per peer structure for holding queuied updates
+    uses Data.Sequence implmentatuion of a fifo
+    references IPrefix and RouteId
+
+
+function:
+routes consist of paths and prefixes
+the BGP speaker maintains a local route table (LocRIB), and selection for inclusion in LocRIB
+drives dissemination to peers.
+basic operation:
+  as routes are received they are inserted into the global Rib (PathTable), indexed on the path, 
+  this is done on prefix blocks, which is how the routes are exchanged.
+
+implicit route withdrawal
+a new route implicitly withdraws all old routes for the specified prefix
+this might not matter if the new route is acceptable, however, if the new route is not acceptable
+to the BGP speaker then it must still remove the old route from its tables
+Therefore when applying a filter the rejected routes must be handled correctly - if they are currently winners in LocRIB then
+withdraw messages must be sent.
+
+prefix table
+insertion
+for a single prefix in a group:
+ insert/update - if the prefix is new, simple insert, return the used route, update the map
+                 if the prefix exists then do a route update, possibly return the new preferred route, update the map
+route update function - always saves the new route in the RIB (is a soft error if it exists already)
+                        runs selection over the routes in the RIB, which may result in a new winner
+                        returns the new winner, if there is one (or at least return Bool to say that there was a new winner)
+operations on the route list:
+update :; List -> Route -> (List, Maybe Route)
