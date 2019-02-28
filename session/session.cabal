@@ -1,7 +1,7 @@
 cabal-version:       2.4
 
 name:                session
-version:             0.1.0.2
+version:             0.1.1.0
 synopsis:            application/protocol agnostic Haskell network daemon framework
 license:             Apache-2.0
 license-file:        LICENSE
