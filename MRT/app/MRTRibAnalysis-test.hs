@@ -40,7 +40,7 @@ doRIBv4 ribDB = do
         putStrLn $ showMRTRibV4 v4table
         putStrLn $ showMetrics v4table
 
-doRIBv6 :: MRTRibV4 -> IO ()
+doRIBv6 :: MRTRibV6 -> IO ()
 doRIBv6 ribDB6 = do
         comparePeerStats ribDB6
         putStrLn $ showMRTRibV6 ribDB6
