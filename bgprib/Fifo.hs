@@ -61,6 +61,10 @@ showFifo m = do
 
 -- calls with timeouts....
 
+-- TODO - remove, implement timeouts externally!
+-- yes, it would be nice to be able to express the safeness of interrupting these functions....
+
+
 dequeueTimeout :: Int -> Fifo t -> IO [t]
 dequeueTimeout t mvar = do
      resMaybe <- timeout t (dequeue mvar)

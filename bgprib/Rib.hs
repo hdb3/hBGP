@@ -90,21 +90,24 @@ queryRib rib prefix = do
     rib' <- readMVar rib
     return $ queryPrefixTable (prefixTable rib') prefix 
 
--- overloaded in a very non-Haskell way - requesting zero updates actually returns everything!
-pullAllUpdates :: Int -> PeerData -> Rib -> IO [AdjRIBEntry]
-pullAllUpdates t peer rib = do
+pullAllUpdates :: PeerData -> Rib -> IO [AdjRIBEntry]
+pullAllUpdates peer rib = do
     (Rib' _ arot) <- readMVar rib
-    dequeueTimeout t (arot Data.Map.! peer)
+    dequeueAll (arot Data.Map.! peer) 
 -- TODO write and use the function 'getAdjRibForPeer'
 
 
+-- deprecated - do any timeout externally!
+pullAllUpdatesTimeout :: Int -> PeerData -> Rib -> IO [AdjRIBEntry]
+pullAllUpdatesTimeout t peer rib = do
+    (Rib' _ arot) <- readMVar rib
+    dequeueTimeout t (arot Data.Map.! peer)
 
+-- function not currently used anywhere....
 pullUpdates :: Int -> PeerData -> Rib -> IO [AdjRIBEntry]
 pullUpdates n peer rib = do
     (Rib' _ arot) <- readMVar rib
-    if n == 0
-    then dequeueAll (arot Data.Map.! peer) 
-    else  dequeueN n (arot Data.Map.! peer) 
+    dequeueN n (arot Data.Map.! peer) 
 
 getLocRib :: Rib -> IO PrefixTable
 getLocRib rib = do

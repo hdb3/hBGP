@@ -12,6 +12,7 @@ import Data.Maybe(fromJust,isJust,fromMaybe)
 import Data.Either(either)
 import qualified Data.Map.Strict as Data.Map
 import System.Posix.Temp(mkstemp)
+import System.Timeout(timeout)
 
 import BGPRib
 import BGPlib
@@ -293,17 +294,33 @@ runFSM g@Global{..} sock maybePeerConfig  = do
         when running
             ( sendLoop handle rib peer timer )
 
+
     sendQueuedUpdates handle rib peer timeout = do
-        updates <- pullAllUpdates (1000000 * timeout) peer rib
-        if null updates then
-            bgpSnd handle BGPKeepalive
-        else do routes <- lookupRoutes rib peer updates
-                -- putStr $ "Ready to send routes to " ++ show (peerIPv4 peer)
-                if 11 > length updates then do
-                    putStr $ "sending routes to " ++ show (peerIPv4 peer)
-                    print $ map fst updates
-                else do
-                    putStr $ "sending routes to " ++ show (peerIPv4 peer)
-                    print $ map fst (take 10 updates)
-                    putStrLn $ "and " ++ show (length updates - 10) ++ " more"
-                mapM_ (bgpSnd handle) routes
+        routes <- getRoutes
+        showRoutes routes
+        mapM_ (bgpSnd handle) routes
+        where
+        getRoutes =  do
+            updates <- pullAllUpdates (1000000 * timeout) peer rib
+            rx <- lookupRoutes rib peer updates
+            return $ if null rx then [BGPKeepalive] else rx
+        showRoutes rx = do
+            if 11 > length rx then do
+                putStr $ "sending routes to " ++ show (peerIPv4 peer)
+                -- nned a display function which unpacks the Update message succinctly
+                -- print $ map fst rx
+            else if rx /= [BGPKeepalive] then do
+                putStr $ "sending routes to " ++ show (peerIPv4 peer)
+                -- print $ map fst (take 10 rx)
+                -- putStrLn $ "and " ++ show (length rx - 10) ++ " more"
+            else return ()
+
+type S = [BGPMessage]
+wrapper :: Int -> (IO S,S) -> IO S
+wrapper t (ios,s) = do
+    sMaybe <- timeout t ios
+    return $ fromMaybe s sMaybe
+
+wrapper'' t (ios,s) = fromMaybe s <$> timeout t ios
+wrapper' t (ios,s) = fmap (fromMaybe s) (timeout t ios)
+
