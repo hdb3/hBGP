@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
-module Update(processUpdate,getUpdate,ungetUpdate,ParsedUpdate(..),makeUpdate,makeUpdateSimple,igpUpdate,originateWithdraw,originateUpdate,myHash) where
+module Update(encodeUpdates,processUpdate,getUpdate,ungetUpdate,ParsedUpdate(..),makeUpdate,makeUpdateSimple,igpUpdate,originateWithdraw,originateUpdate,myHash) where
 import qualified Data.ByteString.Lazy as L
 import Data.Int
 import Data.Binary
@@ -35,6 +35,10 @@ diagoseResult (a',n',w') (a,n,w) = diagnose "attributes" a' a ++
     diagnose _ (Right _) _ = ""
     diagnose t (Left (_,n,_)) x = "Error parsing " ++ t ++ " at position " ++ show n ++ "\n" ++ toHex' x
 
+encodeUpdates :: [ParsedUpdate] -> [BGPMessage]
+encodeUpdates = map ungetUpdate
+
+-- TODO rename getUpdate/ungetUpdate encodeUpdate/decodeUpdate
 ungetUpdate :: ParsedUpdate -> BGPMessage
 ungetUpdate ParsedUpdate{..} = BGPUpdate { withdrawn = encode withdrawn , attributes = encode puPathAttributes , nlri = encode nlri } 
 
