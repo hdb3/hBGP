@@ -281,46 +281,16 @@ runFSM g@Global{..} sock maybePeerConfig  = do
                 )
             rc
 
--- TODO rename 'send loop'
-    sendLoop handle rib peer timer = do
-        running <- catch
-            ( do sendQueuedUpdates handle rib peer timer
-                 return True
-            )
-            (\(FSMException _) -> do
-                -- this is perfectly normal event when the fsm closes down as it doesn't stop the keepAliveLoop explicitly
-                return False
-            )
-        when running
-            ( sendLoop handle rib peer timer )
-
-
-    sendQueuedUpdates handle rib peer timeout = do
-        routes <- getRoutes
-        showRoutes routes
-        mapM_ (bgpSnd handle) routes
-        where
-        getRoutes =  do
-            updates <- pullAllUpdates (1000000 * timeout) peer rib
-            rx <- lookupRoutes rib peer updates
-            return $ if null rx then [BGPKeepalive] else rx
-        showRoutes rx = do
-            if 11 > length rx then do
-                putStr $ "sending routes to " ++ show (peerIPv4 peer)
-                -- nned a display function which unpacks the Update message succinctly
-                -- print $ map fst rx
-            else if rx /= [BGPKeepalive] then do
-                putStr $ "sending routes to " ++ show (peerIPv4 peer)
-                -- print $ map fst (take 10 rx)
-                -- putStrLn $ "and " ++ show (length rx - 10) ++ " more"
-            else return ()
-
-type S = [BGPMessage]
-wrapper :: Int -> (IO S,S) -> IO S
-wrapper t (ios,s) = do
-    sMaybe <- timeout t ios
-    return $ fromMaybe s sMaybe
-
-wrapper'' t (ios,s) = fromMaybe s <$> timeout t ios
-wrapper' t (ios,s) = fmap (fromMaybe s) (timeout t ios)
-
+-- loop runs until it catches the FSMException
+    sendLoop handle rib peer timer = catch
+        ( do updates <- encodeUpdates <$> msgTimeout timer ( getUpdates rib peer )
+             if null updates then
+                 bgpSnd handle BGPKeepalive
+             else do
+                 putStrLn $ show (length updates) ++ " updates for " ++ show peer
+                 mapM_ (bgpSnd handle ) updates
+             sendLoop handle rib peer timer
+        )
+        (\(FSMException _) -> return ()
+            -- this is perfectly normal event when the fsm closes down as it doesn't stop the keepAliveLoop explicitly
+        )
