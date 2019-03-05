@@ -13,3 +13,11 @@ toHex' = toHex . L.toStrict
 
 groupBy_ :: (Eq k,Hashable k) => [(k, a)] -> [(k, [a])]
 groupBy_ = Data.HashMap.Strict.toList . Data.HashMap.Strict.fromListWith (++) . Prelude.map (\(a,b) -> (a,[b]))
+
+-- group and groupBy_ perform the same functions - hopefully, for small datasets at least, group is faster - e.g. for a handful of equivalent elements
+group :: Eq a => [(a, b)] -> [(a, [b])]
+group [] = []
+group ((a,b):cx) = if null r then [ (a,s) ] else  (a,s) : group r
+    where
+    (s,r) = foldl acc ([b],[]) cx
+    acc (u,v) (x,y) = if a == x then (y:u,v) else (u,(x,y):v)
