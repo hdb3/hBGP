@@ -283,7 +283,7 @@ runFSM g@Global{..} sock maybePeerConfig  = do
 
 -- loop runs until it catches the FSMException
     sendLoop handle rib peer timer = catch
-        ( do updates <- encodeUpdates <$> msgTimeout timer ( getUpdates rib peer )
+        ( do updates <- encodeUpdates <$> msgTimeout timer ( buildUpdates rib peer )
              if null updates then
                  bgpSnd handle BGPKeepalive
              else do

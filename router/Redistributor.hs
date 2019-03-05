@@ -25,36 +25,29 @@ redistribute global@Global{..} = do
             then void $ forkIO (zservReader global (localPeer gd) ( zStreamIn, zStreamOut ))
             else putStrLn "configEnableRedistribution not enabled - not staring Zserv listener"
 
-            let routeInstall (route, Nothing) = putStrLn $ "route not in Rib!: " ++ show route
-                routeInstall (route, Just nextHop) = do putStrLn $ "install " ++ show route ++ " via " ++ show nextHop
-                                                        addRoute zStreamOut (toAddrRange $ toPrefix route) nextHop
-                routeDelete route = do putStrLn $ "delete " ++ show route
-                                       delRoute zStreamOut (toAddrRange $ toPrefix route)
+            let routeInstall (route, nextHop) = do
+                    putStrLn $ "install " ++ show route ++ " via " ++ show nextHop
+                    addRoute zStreamOut (toAddrRange $ toPrefix route) nextHop
+                routeDelete route = do
+                    putStrLn $ "delete " ++ show route
+                    delRoute zStreamOut (toAddrRange $ toPrefix route)
 
-             -- addPeer rib peerData
-             -- delPeer rib peerData
             ribUpdateListener (routeInstall,routeDelete) global ( localPeer gd ) 1
 
 
 ribUpdateListener (routeInstall,routeDelete) global@Global{..} peer timeout = do
-    updates <- pullAllUpdates (1000000 * timeout) peer rib
+    updates <- msgTimeout timeout (pullAllUpdates peer rib)
     if null updates then
         yield -- null op - could check if exit from thread is needed...
-    else do routes <- lookupRoutes rib peer updates
-            putStr "Ready to install routes"
-            if 11 > length updates then
-                print $ map fst updates
-            else do
-                print $ map fst (take 10 updates)
-                putStrLn $ "and " ++ show (length updates - 10) ++ " more"
-            let getNextHop rib pfx = do nh <- lookupNextHop rib pfx
-                                        return (pfx,nh)
-            let (update,withdraw) = foldl disc ([],[]) updates
-                disc (u,w) (pfxs,0) = (u,w++pfxs) -- withdraw has 0 for the route index
-                disc (u,w) (pfxs,_) = (u++pfxs,w) -- alternate case is an update, not withdraw - and we don't care what was the route index at the time...
-            routes <- mapM ( getNextHop rib ) update
-            mapM_ routeDelete withdraw
-            mapM_ routeInstall routes
+    else do 
+        putStrLn $ show (length updates) ++ " updates for " ++ show peer
+        putStr "Ready to install routes"
+        let (update,withdraw) = foldl disc ([],[]) updates
+            disc (u,w) (pfxs,0) = (u,w++pfxs) -- withdraw has 0 for the route index
+            disc (u,w) (pfxs,ri) = ((pfxs,ri):u,w) -- alternate case is an update, not withdraw , the routeIndex is preserved for the route lookup
+        routes <- routesFromAdjRibEntrys rib update
+        mapM_ routeDelete withdraw
+        mapM_ routeInstall routes
 
     -- rinse and repeat...
 
