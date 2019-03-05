@@ -7,11 +7,16 @@ import Data.Maybe(fromMaybe)
 import BGPlib
 import BGPRib
 
--- TODO rename buildUpdates
 buildUpdates :: Rib -> PeerData -> IO [ParsedUpdate]
-buildUpdates rib peer = do
+buildUpdates rib peer = pullAllUpdates peer rib >>= updateFromAdjRibEntrys rib peer
+
+buildUpdates' :: Rib -> PeerData -> IO [ParsedUpdate]
+buildUpdates' rib peer = do
     updates <- pullAllUpdates peer rib
-    lookupRoutes' rib peer updates
+    updateFromAdjRibEntrys rib peer updates
+--buildUpdates rib peer = do
+--    updates <- pullAllUpdates peer rib
+--    lookupRoutes' rib peer updates
 
 msgTimeout :: Int -> IO [a] -> IO [a]
 msgTimeout t f = fromMaybe [] <$> timeout (1000000 * t) f
