@@ -1,9 +1,10 @@
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards, TupleSections #-}
 module Rib where
 import Control.Concurrent
 import qualified Data.Map.Strict as Data.Map
 import Control.Monad(unless,when,void)
 import Data.List(intercalate)
+--import Data.Maybe(catMaybes)
 
 import BGPlib
 import BGPData
@@ -11,6 +12,7 @@ import PrefixTable
 import qualified PrefixTableUtils
 import Update
 import AdjRIBOut
+import Common(group_)
 
 type Rib = MVar Rib'
 -- TODO rename AdjRIB -> AdjRIBMap
@@ -89,6 +91,35 @@ queryRib :: Rib -> IPrefix -> IO (Maybe RouteData)
 queryRib rib prefix = do
     rib' <- readMVar rib
     return $ queryPrefixTable (prefixTable rib') prefix 
+
+-- adjRibQueryRib extends queryRib by checking that the current route hash matches the one saved when the AdjRIbOut entry was created
+--    this is useful because if it has changed then probably the correct action is to discard the result
+--    the special case of routeId == 0 is not hadnled differently - this would correspond to a withdraw - it should never occur in a RouteData record
+--    but it could on lookup, in which case the correct behaviour would be to discard the withdraw if the prefix is found
+--    however the caller should not use this function since there is no valid Just value which can represent the withdraw
+--    instead the caller should merely use queryRib and discard the withdraw if the return value is not Nothing
+adjRibQueryRib :: Rib -> IPrefix -> Int -> IO (Maybe RouteData)
+adjRibQueryRib rib iprefix routeHash = 
+    maybe Nothing (\route -> if routeHash == routeId route then Just route else Nothing) <$> queryRib rib iprefix
+
+lookupRoutes :: Rib -> AdjRIBEntry -> IO [(RouteData,[IPrefix])]
+lookupRoutes rib (iprefixes,routeHash) = group_ <$> mapM (\pfx -> (,pfx) <$> (adjRibQueryRib rib pfx routeHash)) iprefixes
+
+{- long long version
+lookupRoutes rib (iprefixes,routeHash) = do
+    r <- mapM f iprefixes :: IO [(Maybe RouteData,IPrefix)]
+        where
+          f pfx = do
+            mR <- adjRibQueryRib rib pfx routeHash
+            return (mR,pfx)
+    return $ Common.group_ r
+-}
+
+{- long version
+lookupRoutes rib (iprefixes,routeHash) = do
+    r <- mapM (\pfx -> (,pfx) <$> (adjRibQueryRib rib pfx routeHash)) iprefixes
+    return $ Common.group_ r
+-}
 
 pullAllUpdates :: PeerData -> Rib -> IO [AdjRIBEntry]
 pullAllUpdates peer rib = do
