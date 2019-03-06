@@ -28,7 +28,8 @@ data State = State { port :: NS.PortNumber
                    }
 
 logger :: String -> IO ()
-logger _ = return ()
+logger = putStrLn
+-- logger _ = return ()
 
 seconds :: Int
 seconds = 1000000
@@ -99,20 +100,21 @@ listener state@State{..} = do
                                                 threadDelay (10 * seconds)
                                                 listener state
                       | otherwise -> error $ errReport' errno e )
-        ( \(listeningSocket,_) -> void $ forkIO $ do NS.listen listeningSocket 100
-                                                     forever ( listenClient <$> NS.accept listeningSocket ))
+        ( \(listeningSocket,_) -> forever ( do s <- NS.accept listeningSocket
+                                               forkIO $ listenClient s ))
         eSock
     where
     
-    bindSock' port ip = let addr = NS.SockAddrInet port ip in do
+    bindSock' port ip = do
         sock <- NS.socket NS.AF_INET NS.Stream NS.defaultProtocol
         NS.setSocketOption sock NS.ReuseAddr 1
         NS.setSocketOption sock NS.NoDelay 1
-        NS.bind sock addr
+        NS.bind sock (NS.SockAddrInet port ip)
+        NS.listen sock 100
         return ( sock , addr )
 
     
-    listenClient (sock, NS.SockAddrInet _ remoteIPv4) = forkIO $ do
+    listenClient (sock, NS.SockAddrInet _ remoteIPv4) = do
             let ip = fromHostAddress remoteIPv4
             logger $ "listener - connect request from " ++ show ip
             unblocked <- raceCheckNonBlock ip

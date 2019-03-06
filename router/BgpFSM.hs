@@ -26,7 +26,9 @@ import Config
 -- better: implement a logger
 
 data FSMState = St { handle :: Handle
-                   , sock :: Socket
+                   , peerName :: SockAddr
+                   , socketName :: SockAddr
+                   --, sock :: Socket
                    , osm :: OpenStateMachine
                    , peerConfig :: PeerConfig
                    , maybePD :: Maybe PeerData
@@ -47,7 +49,10 @@ bgpFSM global@Global{..} ( sock , peerName ) =
                           do threadId <- myThreadId
                              putStrLn $ "Thread " ++ show threadId ++ " starting: peer is " ++ show peerName
 
-                             SockAddrInet _ remoteIP <- getPeerName sock
+                             let (SockAddrInet _ remoteIP) = peerName
+                             socketName <- getSocketName sock
+                             handle <- socketToHandle sock ReadWriteMode
+
                              let maybePeer = maybe
                                                  ( if configAllowDynamicPeers config then Just (fillConfig config (fromHostAddress remoteIP))
                                                    else Nothing)
@@ -55,7 +60,7 @@ bgpFSM global@Global{..} ( sock , peerName ) =
                                                  ( Data.Map.lookup (fromHostAddress remoteIP) peerMap )
                              fsmExitStatus <-
                                          catch
-                                             (runFSM global sock maybePeer )
+                                             (runFSM global socketName peerName handle maybePeer )
                                              (\(FSMException s) ->
                                                  return $ Left s)
                              -- TDOD throuuigh testing around delPeer
@@ -66,7 +71,7 @@ bgpFSM global@Global{..} ( sock , peerName ) =
                              unless (null myPD) (do print myPD
                                                     delPeer rib (head myPD))
                              print myPD
-                             close sock
+                             hClose handle
                              deregister collisionDetector
                              either
                                  (\s -> putStrLn $ "BGPfsm exception exit" ++ s)
@@ -95,15 +100,16 @@ bgpSnd h msg | 4079 > L.length (encode msg) = catchIOError ( sndRawMessage h (en
 get :: Handle -> Int -> IO BGPMessage
 get b t = fmap decodeBGPByteString (getRawMsg b t)
 
-runFSM :: Global -> Socket -> Maybe PeerConfig -> IO (Either String String)
-runFSM g@Global{..} sock maybePeerConfig  = do
+runFSM :: Global -> SockAddr -> SockAddr -> Handle -> Maybe PeerConfig -> IO (Either String String)
+runFSM g@Global{..} socketName peerName handle =
 -- The 'Maybe PeerData' allows the FSM to handle unwanted connections, i.e. send BGP Notification
 -- thereby absolving the caller from having and BGP protocol awareness
-    handle <- socketToHandle sock ReadWriteMode
     maybe (do bgpSnd handle $ BGPNotify NotificationCease _NotificationCeaseSubcodeConnectionRejected L.empty
               return  $ Left "connection rejected for unconfigured peer" )
           ( \peerConfig -> do ro <- newEmptyMVar
-                              fsm (StateConnected, St{sock = sock
+                              fsm (StateConnected, St{
+                                                       peerName = peerName
+                                                     , socketName = socketName
                                                      , handle = handle
                                                      , osm = initialiseOSM g peerConfig
                                                      , peerConfig = peerConfig
@@ -111,7 +117,6 @@ runFSM g@Global{..} sock maybePeerConfig  = do
                                                      , rcvdOpen = ro
                                                      , ribPut = Nothing
                                                      }))
-          maybePeerConfig
     where
 
     fsm :: (State,FSMState) -> IO (Either String String)
@@ -220,12 +225,12 @@ runFSM g@Global{..} sock maybePeerConfig  = do
         putStrLn "transition -> established"
         putStrLn $ "hold timer: " ++ show (getNegotiatedHoldTime osm) ++ " keep alive timer: " ++ show (getKeepAliveTimer osm)
         -- only now can we create the peer data record becasue we have the remote AS/BGPID available and confirmed
-        SockAddrInet _ localIP <- getSocketName sock
-        peerName @(SockAddrInet _ remoteIP) <- getPeerName sock
 
         let globalData = gd
             peerAS = fromIntegral $ myAutonomousSystem $ fromJust $ remoteOffer osm
             peerBGPid = bgpID $ fromJust $ remoteOffer osm
+            (SockAddrInet _ remoteIP) = peerName
+            (SockAddrInet _ localIP) = socketName
             peerIPv4 = fromHostAddress remoteIP
             localIPv4 = fromHostAddress localIP
             localPref = 0 -- TODO - source this somewhere sensible - config?
@@ -238,7 +243,7 @@ runFSM g@Global{..} sock maybePeerConfig  = do
         addPeer rib peerData
         let ribGet = buildUpdates rib peerData
             ribPut = BGPRib.ribUpdater rib peerData
-        forkIO $ sendLoop handle rib peerData  (getKeepAliveTimer osm) ribGet
+        forkIO $ sendLoop handle (getKeepAliveTimer osm) ribGet
         return (Established,st{maybePD=Just peerData , ribPut = Just ribPut})
 
     established :: F
@@ -299,15 +304,14 @@ runFSM g@Global{..} sock maybePeerConfig  = do
             rc
 
 -- loop runs until it catches the FSMException
-    sendLoop handle rib peer timer ribGet = catch
+    sendLoop handle timer ribGet = catch
         --( do updates <- encodeUpdates <$> msgTimeout timer ( buildUpdates rib peer )
         ( do updates <- encodeUpdates <$> msgTimeout timer ribGet
              if null updates then
                  bgpSnd handle BGPKeepalive
-             else do
-                 putStrLn $ show (length updates) ++ " updates for " ++ show peer
+             else
                  mapM_ (bgpSnd handle ) updates
-             sendLoop handle rib peer timer ribGet
+             sendLoop handle timer ribGet
         )
         (\(FSMException _) -> return ()
             -- this is perfectly normal event when the fsm closes down as it doesn't stop the keepAliveLoop explicitly

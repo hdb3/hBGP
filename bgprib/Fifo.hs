@@ -43,7 +43,7 @@ dequeue' mvar = do
               return (t ++ reverse h))
           maybeFifo
 
-dequeueAll = dequeue'
+dequeueAll = dequeue
 
 newFifo :: IO (Fifo t)
 newFifo = newMVar ([],[])

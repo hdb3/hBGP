@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards, TupleSections #-}
-module Route where
+module Route(buildUpdates,msgTimeout,addRouteRib,delRouteRib,buildUpdate,updateFromAdjRibEntrys,routesFromAdjRibEntrys) where
 import Control.Monad.Extra(concatMapM)
 import System.Timeout(timeout)
 import Data.Maybe(fromMaybe)
@@ -10,14 +10,6 @@ import BGPRib
 buildUpdates :: Rib -> PeerData -> IO [ParsedUpdate]
 buildUpdates rib peer = pullAllUpdates peer rib >>= updateFromAdjRibEntrys rib peer
 
-buildUpdates' :: Rib -> PeerData -> IO [ParsedUpdate]
-buildUpdates' rib peer = do
-    updates <- pullAllUpdates peer rib
-    updateFromAdjRibEntrys rib peer updates
---buildUpdates rib peer = do
---    updates <- pullAllUpdates peer rib
---    lookupRoutes' rib peer updates
-
 msgTimeout :: Int -> IO [a] -> IO [a]
 msgTimeout t f = fromMaybe [] <$> timeout (1000000 * t) f
 
@@ -26,33 +18,6 @@ addRouteRib rib peer prefix nextHop = BGPRib.ribUpdater rib peer (igpUpdate next
 
 delRouteRib :: Rib -> PeerData -> AddrRange IPv4 -> IO()
 delRouteRib rib peer prefix = BGPRib.ribUpdater rib peer (originateWithdraw [fromAddrRange prefix])
-
-
---lookupRoutes :: Rib -> PeerData -> [AdjRIBEntry] -> IO [BGPMessage]
---lookupRoutes rib peer ares = encodeUpdates <$> lookupRoutes' rib peer ares
-
-lookupRoutes' :: Rib -> PeerData -> [AdjRIBEntry] -> IO [ ParsedUpdate ]
-lookupRoutes' rib peer = concatMapM (lookupRoute rib peer)
-    where
-
-    lookupRoute :: Rib -> PeerData -> AdjRIBEntry -> IO [ ParsedUpdate ]
-    lookupRoute _ _ (iprefixes, 0 ) = return [ originateWithdraw $ toPrefixes iprefixes ]
-    lookupRoute _ _ ([], _ ) = do
-        putStrLn "empty prefix list in lookupRoute"
-        return []
-
-    lookupRoute rib peer (iprefixes, _ ) = do
-        -- TODO - fix major dysfunction!!!!!
-        -- this code assumes that prefix groups are always atomic!!!!!!
-        -- so actually this code is running with the theoretical speedup already built in!!!!!
-        -- :-((((
-        --
-        maybeRoute <- queryRib rib (head iprefixes)
-        maybe (do putStrLn "failed lookup in lookupRoute"
-                  return []
-              )
-              (return <$> buildUpdate peer iprefixes)
-              maybeRoute
 
 buildUpdate :: PeerData -> [IPrefix] -> RouteData -> [ParsedUpdate]
 -- there are three distinct 'peers' and associated PeerData potentially in scope here
@@ -95,34 +60,18 @@ buildUpdate target iprefixes RouteData{..} = if isExternal target then egpUpdate
                            pathAttributes 
                            )
 
-lookupNextHop :: Rib -> IPrefix -> IO (Maybe IPv4)
-lookupNextHop rib iprefix = do
-    maybeRoute <- queryRib rib iprefix
-    maybe (do putStrLn "failed lookup in lookupRoute"
-              return Nothing
-          )
-          (return . Just . nextHop
-          )
-          maybeRoute
-
--- ======================================================================
-
 updateFromAdjRibEntrys :: Rib -> PeerData -> [AdjRIBEntry] -> IO [ParsedUpdate]
 updateFromAdjRibEntrys rib target = concatMapM (updateFromAdjRibEntry rib target)
+    where
 
-updateFromAdjRibEntry :: Rib -> PeerData -> AdjRIBEntry -> IO [ParsedUpdate]
-updateFromAdjRibEntry rib target (iprefixes,routeHash) =
-    concatMap (\(route,iprefixes) -> buildUpdate target iprefixes route) <$> lookupRoutes rib (iprefixes,routeHash)
-
---updateFromAdjRibEntry' rib target (iprefixes,routeHash) = do
---    routes <- lookupRoutes rib (iprefixes,routeHash)
---    return $ concatMap f routes where
---        f (route,iprefixes) = buildUpdate target iprefixes route
-
-routesFromAdjRibEntry :: Rib -> AdjRIBEntry -> IO [(IPrefix,IPv4)]
-routesFromAdjRibEntry rib (iprefixes,routeHash) =
-    concatMap (\(route,iprefixes) -> map (,nextHop route) iprefixes ) <$> lookupRoutes rib (iprefixes,routeHash)
+    updateFromAdjRibEntry :: Rib -> PeerData -> AdjRIBEntry -> IO [ParsedUpdate]
+    updateFromAdjRibEntry rib target (iprefixes,routeHash) =
+        concatMap (\(route,iprefixes) -> buildUpdate target iprefixes route) <$> lookupRoutes rib (iprefixes,routeHash)
 
 routesFromAdjRibEntrys :: Rib -> [AdjRIBEntry] -> IO [(IPrefix,IPv4)]
 routesFromAdjRibEntrys rib = concatMapM (routesFromAdjRibEntry rib)
+    where
 
+    routesFromAdjRibEntry :: Rib -> AdjRIBEntry -> IO [(IPrefix,IPv4)]
+    routesFromAdjRibEntry rib (iprefixes,routeHash) =
+        concatMap (\(route,iprefixes) -> map (,nextHop route) iprefixes ) <$> lookupRoutes rib (iprefixes,routeHash)
