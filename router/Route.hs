@@ -1,6 +1,6 @@
 {-# LANGUAGE RecordWildCards, TupleSections #-}
 module Route(buildUpdates,msgTimeout,addRouteRib,delRouteRib,buildUpdate,updateFromAdjRibEntrys,routesFromAdjRibEntrys,delPeerByAddress) where
-import Control.Monad.Extra(concatMapM)
+import Control.Monad.Extra(when,concatMapM)
 import System.Timeout(timeout)
 import Data.Maybe(fromMaybe)
 import Data.Word
@@ -14,9 +14,7 @@ delPeerByAddress rib port ip = do
     if null peers then
         putStrLn $ "delPeerByAddress failed for " ++ show ip ++ ":" ++ show port
     else do
-        if length peers > 1 then
-            putStrLn $ "delPeerByAddress failed for (multiplepeers!) " ++ show ip ++ ":" ++ show port
-        else return ()
+        when ( length peers > 1 ) $ putStrLn $ "delPeerByAddress failed for (multiplepeers!) " ++ show ip ++ ":" ++ show port
         mapM_ (delPeer rib) peers
     
 buildUpdates :: Rib -> PeerData -> IO [ParsedUpdate]

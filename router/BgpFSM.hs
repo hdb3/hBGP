@@ -7,12 +7,12 @@ import qualified Data.ByteString.Lazy as L
 import Data.Binary(encode)
 import Control.Concurrent
 import Control.Exception
-import Control.Monad(when,unless)
+--import Control.Monad(when,unless)
 import Data.Maybe(fromJust,isJust,fromMaybe)
 import Data.Either(either)
 import qualified Data.Map.Strict as Data.Map
 import System.Posix.Temp(mkstemp)
-import System.Timeout(timeout)
+--import System.Timeout(timeout)
 
 import BGPRib
 import BGPlib
@@ -64,10 +64,8 @@ bgpFSM global@Global{..} ( sock , peerName ) =
                                                  return $ Left s)
                              -- TDOD throuuigh testing around delPeer
                              -- TODO REAL SOON - FIX....
-                             -- maybe (return()) (delPeer rib) maybePeer
                              hClose handle
                              deregister collisionDetector
-                             --delPeerByAddress :: Rib -> Word16 -> IPv4 -> IO ()
                              delPeerByAddress rib (fromIntegral remotePort) (fromHostAddress remoteIP)
                              either
                                  (\s -> putStrLn $ "BGPfsm exception exit" ++ s)
