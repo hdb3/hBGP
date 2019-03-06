@@ -28,7 +28,6 @@ import Config
 data FSMState = St { handle :: Handle
                    , peerName :: SockAddr
                    , socketName :: SockAddr
-                   --, sock :: Socket
                    , osm :: OpenStateMachine
                    , peerConfig :: PeerConfig
                    , maybePD :: Maybe PeerData
@@ -49,7 +48,7 @@ bgpFSM global@Global{..} ( sock , peerName ) =
                           do threadId <- myThreadId
                              putStrLn $ "Thread " ++ show threadId ++ " starting: peer is " ++ show peerName
 
-                             let (SockAddrInet _ remoteIP) = peerName
+                             let (SockAddrInet remotePort remoteIP) = peerName
                              socketName <- getSocketName sock
                              handle <- socketToHandle sock ReadWriteMode
 
@@ -66,13 +65,10 @@ bgpFSM global@Global{..} ( sock , peerName ) =
                              -- TDOD throuuigh testing around delPeer
                              -- TODO REAL SOON - FIX....
                              -- maybe (return()) (delPeer rib) maybePeer
-                             peers <- getPeersInRib rib
-                             let myPD = filter (\pd -> peerIPv4 pd == fromHostAddress remoteIP) peers
-                             unless (null myPD) (do print myPD
-                                                    delPeer rib (head myPD))
-                             print myPD
                              hClose handle
                              deregister collisionDetector
+                             --delPeerByAddress :: Rib -> Word16 -> IPv4 -> IO ()
+                             delPeerByAddress rib (fromIntegral remotePort) (fromHostAddress remoteIP)
                              either
                                  (\s -> putStrLn $ "BGPfsm exception exit" ++ s)
                                  (\s -> putStrLn $ "BGPfsm normal exit" ++ s)
@@ -229,10 +225,12 @@ runFSM g@Global{..} socketName peerName handle =
         let globalData = gd
             peerAS = fromIntegral $ myAutonomousSystem $ fromJust $ remoteOffer osm
             peerBGPid = bgpID $ fromJust $ remoteOffer osm
-            (SockAddrInet _ remoteIP) = peerName
-            (SockAddrInet _ localIP) = socketName
+            (SockAddrInet pp remoteIP) = peerName
+            (SockAddrInet lp localIP) = socketName
             peerIPv4 = fromHostAddress remoteIP
+            peerPort = fromIntegral pp
             localIPv4 = fromHostAddress localIP
+            localPort = fromIntegral lp
             localPref = 0 -- TODO - source this somewhere sensible - config?
             isExternal = peerAS /= myAS gd
             peerData = BGPRib.PeerData { .. }

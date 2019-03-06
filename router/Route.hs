@@ -1,12 +1,24 @@
 {-# LANGUAGE RecordWildCards, TupleSections #-}
-module Route(buildUpdates,msgTimeout,addRouteRib,delRouteRib,buildUpdate,updateFromAdjRibEntrys,routesFromAdjRibEntrys) where
+module Route(buildUpdates,msgTimeout,addRouteRib,delRouteRib,buildUpdate,updateFromAdjRibEntrys,routesFromAdjRibEntrys,delPeerByAddress) where
 import Control.Monad.Extra(concatMapM)
 import System.Timeout(timeout)
 import Data.Maybe(fromMaybe)
+import Data.Word
 
 import BGPlib
 import BGPRib
 
+delPeerByAddress :: Rib -> Word16 -> IPv4 -> IO ()
+delPeerByAddress rib port ip = do
+    peers <- filter (\pd -> peerIPv4 pd == ip && peerPort pd == port) <$> getPeersInRib rib
+    if null peers then
+        putStrLn $ "delPeerByAddress failed for " ++ show ip ++ ":" ++ show port
+    else do
+        if length peers > 1 then
+            putStrLn $ "delPeerByAddress failed for (multiplepeers!) " ++ show ip ++ ":" ++ show port
+        else return ()
+        mapM_ (delPeer rib) peers
+    
 buildUpdates :: Rib -> PeerData -> IO [ParsedUpdate]
 buildUpdates rib peer = pullAllUpdates peer rib >>= updateFromAdjRibEntrys rib peer
 

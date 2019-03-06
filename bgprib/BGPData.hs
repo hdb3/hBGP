@@ -22,7 +22,9 @@ data PeerData = PeerData { globalData :: GlobalData
                          ,  peerAS :: Word32
                          ,  peerBGPid :: IPv4
                          ,  peerIPv4 :: IPv4
+                         ,  peerPort :: Word16
                          ,  localIPv4 :: IPv4
+                         ,  localPort :: Word16
                          ,  localPref :: Word32
                          }
 
@@ -46,13 +48,15 @@ localPeer gd = PeerData { globalData = gd
                     , isExternal = False
                     , peerAS  = myAS gd
                     , peerBGPid = myBGPid gd
-                    ,  peerIPv4 = "127.0.0.1"
-                    ,  localIPv4 = "127.0.0.1"
-                    ,  localPref = 0
+                    , peerIPv4 = "127.0.0.1"
+                    , peerPort  = 0
+                    , localIPv4 = "127.0.0.1"
+                    , localPort = 0
+                    , localPref = 0
                     }
 
 dummyPeerData :: PeerData
-dummyPeerData = PeerData dummyGlobalData True 64513 "127.0.0.2" "127.0.0.2" "127.0.0.1" 0
+dummyPeerData = PeerData dummyGlobalData True 64513 "127.0.0.2" "127.0.0.2" 0 "127.0.0.1" 0 0
 dummyGlobalData :: GlobalData
 dummyGlobalData = GlobalData 64512 "127.0.0.1"
 
