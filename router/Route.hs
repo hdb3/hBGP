@@ -62,6 +62,7 @@ buildUpdate target iprefixes RouteData{..} = if isExternal target then egpUpdate
 
 updateFromAdjRibEntrys :: Rib -> PeerData -> [AdjRIBEntry] -> IO [ParsedUpdate]
 updateFromAdjRibEntrys rib target = concatMapM (updateFromAdjRibEntry rib target)
+    -- ToDO - Restore the capability to generate WITHDRAWs!!!!
     where
 
     updateFromAdjRibEntry :: Rib -> PeerData -> AdjRIBEntry -> IO [ParsedUpdate]
