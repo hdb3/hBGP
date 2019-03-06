@@ -13,13 +13,10 @@ data Global = Global { rib :: BGPRib.Rib
                      ,collisionDetector :: CollisionDetector
                      ,sessions :: MVar ( Data.Map.Map ThreadId PeerData )
                      ,gd :: GlobalData
-                     -- ,ld :: PeerData
                      ,listenAddress :: SockAddr
-                     --, peers :: [PeerData]
                      , delayOpenTimer :: Int
                      , initialHoldTimer :: Int
                      , config :: Config
-                     -- , defaultPeerData :: Maybe PeerData -- used to configure dynamic peers
                      }
 
 

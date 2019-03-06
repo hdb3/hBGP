@@ -75,13 +75,13 @@ buildPeerConfigs inConfig = inConfig { configOfferedCapabilities = outConfigOffe
    -- though a case could be made for leaving the fully configured ones intact...
 
 setAS :: Word32 -> [ Capability ] -> [ Capability ]
-setAS as caps = map (setAS' as) caps
+setAS as = map (setAS' as) 
 setAS' as (CapAS4 _) = CapAS4 as
 setAS' _ cap = cap
 
 fillConfig :: Config -> IPv4 -> PeerConfig
 fillConfig config ip = defaultPeerConfig { peerConfigIPv4 = ip
                                          , peerConfigOfferedCapabilities = setAS (configAS config) ( configOfferedCapabilities config )
-                                         , peerConfigRequiredCapabilities = ( configRequiredCapabilities config )
+                                         , peerConfigRequiredCapabilities = configRequiredCapabilities config
                                          }
 
