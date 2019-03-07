@@ -22,7 +22,7 @@ import BGPRib(processUpdate,encodeUpdates,GlobalData(..),PeerData(..),ParsedUpda
 import BGPlib
 import Open
 import Collision
-import qualified StdRib
+import qualified StdRib as Rib
 import Global
 import Config
 import Log
@@ -68,7 +68,7 @@ bgpFSM global@Global{..} ( sock , peerName ) =
                              -- TODO REAL SOON - FIX....
                              hClose handle
                              deregister collisionDetector
-                             StdRib.delPeerByAddress rib (fromIntegral remotePort) (fromHostAddress remoteIP)
+                             Rib.delPeerByAddress rib (fromIntegral remotePort) (fromHostAddress remoteIP)
                              either
                                  (\s -> warn $ "BGPfsm exception exit" ++ s)
                                  (\s -> trace $ "BGPfsm normal exit" ++ s)
@@ -233,14 +233,15 @@ runFSM g@Global{..} socketName peerName handle =
             localPort = fromIntegral lp
             localPref = 0 -- TODO - source this somewhere sensible - config?
             isExternal = peerAS /= myAS gd
-            peerData = BGPRib.PeerData { .. }
+            peerData = PeerData { .. }
         registerEstablished collisionDetector peerBGPid peerName
         -- VERY IMPORTANT TO USE THE NEW VALUE peerData' AS THIS IS THE ONLY ONE WHICH CONTAINS ACCURATE REMOTE IDENTITY FOR DYNAMIC PEERS!!!!
         -- it would be much better to remove the temptation to use conficured data by forcing a new type for relevant purposes, and dscarding the
         -- preconfigured values as soon as possible
-        StdRib.addPeer rib peerData
-        let ribGet = StdRib.buildUpdates rib peerData
-            ribPut = StdRib.ribUpdater rib peerData
+        -- TODO - make the addPeer function return a handle so that rib and peer data are not exposed
+        Rib.addPeer rib peerData
+        let ribGet = Rib.buildUpdates rib peerData
+            ribPut = Rib.ribUpdater rib peerData
         forkIO $ sendLoop handle (getKeepAliveTimer osm) ribGet
         return (Established,st{maybePD=Just peerData , ribPut = Just ribPut})
 
@@ -304,7 +305,7 @@ runFSM g@Global{..} socketName peerName handle =
 -- loop runs until it catches the FSMException
     sendLoop handle timer ribGet = catch
         --( do updates <- encodeUpdates <$> msgTimeout timer ( buildUpdates rib peer )
-        ( do updates <- encodeUpdates <$> StdRib.msgTimeout timer ribGet
+        ( do updates <- encodeUpdates <$> Rib.msgTimeout timer ribGet
              if null updates then
                  bgpSnd handle BGPKeepalive
              else
