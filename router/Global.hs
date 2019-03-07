@@ -17,6 +17,7 @@ data Global = Global { rib :: BGPRib.Rib
                      , delayOpenTimer :: Int
                      , initialHoldTimer :: Int
                      , config :: Config
+                     , logger :: String -> IO ()
                      }
 
 

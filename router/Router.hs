@@ -2,6 +2,7 @@
 module Main where
 
 import System.Environment(getArgs)
+import System.IO
 import Network.Socket
 import Session
 import Control.Concurrent
@@ -58,6 +59,8 @@ buildGlobal c@Config{..} = do
 
         -- TODO the map creation should be in Config...
         peerMap = Data.Map.fromList $ map (\pc -> (peerConfigIPv4 pc,pc)) configConfiguredPeers
+
+        logger = hPutStrLn stderr
 
     collisionDetector <- mkCollisionDetector
     sessions <- newMVar Data.Map.empty
