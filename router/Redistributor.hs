@@ -7,7 +7,8 @@ import Control.Monad(void)
 import BGPReader(pathReadRib)
 import BGPRib
 import BGPlib
-import StdRib
+import qualified CustomRib as Rib
+--import qualified StdRib as Rib
 import Global
 import Config
 import ZServ
@@ -37,7 +38,7 @@ redistribute global@Global{..} = do
 
 
 ribUpdateListener (routeInstall,routeDelete) global@Global{..} peer timeout = do
-    updates <- msgTimeout timeout (pullAllUpdates peer rib)
+    updates <- Rib.msgTimeout timeout (pullAllUpdates peer rib)
     if null updates then
         yield -- null op - could check if exit from thread is needed...
     else do 
@@ -45,7 +46,7 @@ ribUpdateListener (routeInstall,routeDelete) global@Global{..} peer timeout = do
         let (update,withdraw) = foldl disc ([],[]) updates
             disc (u,w) (pfxs,0) = (u,w++pfxs) -- withdraw has 0 for the route index
             disc (u,w) (pfxs,ri) = ((pfxs,ri):u,w) -- alternate case is an update, not withdraw , the routeIndex is preserved for the route lookup
-        routes <- routesFromAdjRibEntrys rib update
+        routes <- Rib.routesFromAdjRibEntrys rib update
         mapM_ routeDelete withdraw
         mapM_ routeInstall routes
 
@@ -68,9 +69,9 @@ zservReader global@Global{..} peer ( zStreamIn, zStreamOut ) = do
                               maybe (trace "--")
                                     -- (\s -> putStrLn $ "local route:" ++ show s)
                                     (\(pfx,maybeNH) -> maybe (do trace $ "delete route: " ++ show pfx
-                                                                 delRouteRib rib peer pfx )
+                                                                 Rib.delRouteRib rib peer pfx )
                                                              (\nh -> do trace $ "add route: " ++ show pfx ++ " via " ++ show nh
-                                                                        addRouteRib rib peer pfx nh)
+                                                                        Rib.addRouteRib rib peer pfx nh)
                                                              maybeNH
 
                                     )
