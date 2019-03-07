@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards, TupleSections #-}
-module Route(buildUpdates,msgTimeout,addRouteRib,delRouteRib,buildUpdate,updateFromAdjRibEntrys,routesFromAdjRibEntrys,delPeerByAddress) where
+module StdRib(buildUpdates,msgTimeout,addRouteRib,delRouteRib,buildUpdate,updateFromAdjRibEntrys,routesFromAdjRibEntrys,delPeerByAddress, BGPRib.addPeer, BGPRib.ribUpdater ) where
 import Control.Monad.Extra(when,concatMapM)
 import System.Timeout(timeout)
 import Data.Maybe(fromMaybe)

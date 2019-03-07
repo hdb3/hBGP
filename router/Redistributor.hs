@@ -7,7 +7,7 @@ import Control.Monad(void)
 import BGPReader(pathReadRib)
 import BGPRib
 import BGPlib
-import Route
+import StdRib
 import Global
 import Config
 import ZServ

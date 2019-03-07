@@ -5,26 +5,27 @@ import System.IO.Error(catchIOError)
 import System.IO(IOMode( ReadWriteMode ),Handle, hClose)
 import qualified Data.ByteString.Lazy as L
 import Data.Binary(encode)
+import Data.IP
 import Control.Concurrent
 import Control.Exception
---import Control.Monad(when,unless)
 import Data.Maybe(fromJust,isJust,fromMaybe)
 import Data.Either(either)
 import qualified Data.Map.Strict as Data.Map
 import System.Posix.Temp(mkstemp)
---import System.Timeout(timeout)
 
-import BGPRib
+--import BGPRib
+import BGPRib(processUpdate,encodeUpdates,GlobalData(..),PeerData(..),ParsedUpdate)
+-- TODO = move Update.hs, and ppssibly some or all of BGPData, from bgprib to bgplib, so that bgprib does not need to be imported here.....
+--        the needed thing in BGPData is PeerData, but what else should move to is less obvious
+--        there are some things which any BGP application needs.....
+
 import BGPlib
 import Open
 import Collision
-import Route
+import qualified StdRib
 import Global
 import Config
 import Log
-
--- TODO - modify the putStrLn's to at least report the connected peer. but..
--- better: implement a logger
 
 data FSMState = St { handle :: Handle
                    , peerName :: SockAddr
@@ -67,7 +68,7 @@ bgpFSM global@Global{..} ( sock , peerName ) =
                              -- TODO REAL SOON - FIX....
                              hClose handle
                              deregister collisionDetector
-                             delPeerByAddress rib (fromIntegral remotePort) (fromHostAddress remoteIP)
+                             StdRib.delPeerByAddress rib (fromIntegral remotePort) (fromHostAddress remoteIP)
                              either
                                  (\s -> warn $ "BGPfsm exception exit" ++ s)
                                  (\s -> trace $ "BGPfsm normal exit" ++ s)
@@ -237,9 +238,9 @@ runFSM g@Global{..} socketName peerName handle =
         -- VERY IMPORTANT TO USE THE NEW VALUE peerData' AS THIS IS THE ONLY ONE WHICH CONTAINS ACCURATE REMOTE IDENTITY FOR DYNAMIC PEERS!!!!
         -- it would be much better to remove the temptation to use conficured data by forcing a new type for relevant purposes, and dscarding the
         -- preconfigured values as soon as possible
-        addPeer rib peerData
-        let ribGet = buildUpdates rib peerData
-            ribPut = BGPRib.ribUpdater rib peerData
+        StdRib.addPeer rib peerData
+        let ribGet = StdRib.buildUpdates rib peerData
+            ribPut = StdRib.ribUpdater rib peerData
         forkIO $ sendLoop handle (getKeepAliveTimer osm) ribGet
         return (Established,st{maybePD=Just peerData , ribPut = Just ribPut})
 
@@ -303,7 +304,7 @@ runFSM g@Global{..} socketName peerName handle =
 -- loop runs until it catches the FSMException
     sendLoop handle timer ribGet = catch
         --( do updates <- encodeUpdates <$> msgTimeout timer ( buildUpdates rib peer )
-        ( do updates <- encodeUpdates <$> msgTimeout timer ribGet
+        ( do updates <- encodeUpdates <$> StdRib.msgTimeout timer ribGet
              if null updates then
                  bgpSnd handle BGPKeepalive
              else
