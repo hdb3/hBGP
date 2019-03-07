@@ -41,7 +41,6 @@ ribUpdateListener (routeInstall,routeDelete) global@Global{..} peer timeout = do
         yield -- null op - could check if exit from thread is needed...
     else do 
         putStrLn $ show (length updates) ++ " updates for " ++ show peer
-        putStr "Ready to install routes"
         let (update,withdraw) = foldl disc ([],[]) updates
             disc (u,w) (pfxs,0) = (u,w++pfxs) -- withdraw has 0 for the route index
             disc (u,w) (pfxs,ri) = ((pfxs,ri):u,w) -- alternate case is an update, not withdraw , the routeIndex is preserved for the route lookup
@@ -62,7 +61,7 @@ zservReader global@Global{..} peer ( zStreamIn, zStreamOut ) = do
     where
     loop stream = do
         msg <- Streams.read stream
-        maybe (putStrLn "end of messages")
+        maybe ( putStrLn "end of messages")
               ( \zMsg -> do 
                               -- print zMsg
                               maybe (putStrLn "--")

@@ -82,7 +82,7 @@ getZRoute _ = Nothing
 
 zservReadLoop stream = do
     msg <- Streams.read stream
-    maybe (putStrLn "end of messages")
+    maybe ( putStrLn "end of messages")
           ( \zMsg -> do print zMsg
                         zservReadLoop stream )
           msg
