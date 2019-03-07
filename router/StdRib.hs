@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards, TupleSections #-}
-module StdRib(buildUpdates,msgTimeout,addRouteRib,delRouteRib,updateFromAdjRibEntrys,routesFromAdjRibEntrys,delPeerByAddress, BGPRib.addPeer, BGPRib.ribUpdater ) where
+module StdRib(buildUpdates,msgTimeout,addRouteRib,delRouteRib,updateFromAdjRibEntrys,routesFromAdjRibEntrys,delPeerByAddress,StdRib.addPeer,StdRib.ribUpdater,RibHandle) where
 import Control.Monad.Extra(when,concatMapM)
 import System.Timeout(timeout)
 import Data.Maybe(fromMaybe)
@@ -8,6 +8,19 @@ import Data.Word
 import BGPlib
 import BGPRib
 import Log
+
+type RibHandle = (Rib,PeerData)
+
+addPeer :: Rib -> PeerData -> IO RibHandle
+addPeer rib peer = do
+    trace $ "addPeer " ++ show peer
+    BGPRib.addPeer rib peer
+    return (rib,peer)
+
+ribUpdater :: RibHandle -> ParsedUpdate -> IO()
+ribUpdater (rib,peer) update = do
+    trace $ "ribUpdater " ++ show peer ++ ":" ++ show update
+    BGPRib.ribUpdater rib peer update
 
 delPeerByAddress :: Rib -> Word16 -> IPv4 -> IO ()
 delPeerByAddress rib port ip = do
@@ -18,8 +31,8 @@ delPeerByAddress rib port ip = do
         when ( length peers > 1 ) $ warn $ "delPeerByAddress failed for (multiplepeers!) " ++ show ip ++ ":" ++ show port
         mapM_ (delPeer rib) peers
     
-buildUpdates :: Rib -> PeerData -> IO [ParsedUpdate]
-buildUpdates rib peer = pullAllUpdates peer rib >>= updateFromAdjRibEntrys rib peer
+buildUpdates :: RibHandle -> IO [ParsedUpdate]
+buildUpdates (rib,peer) = pullAllUpdates peer rib >>= updateFromAdjRibEntrys rib peer
 
 msgTimeout :: Int -> IO [a] -> IO [a]
 msgTimeout t f = fromMaybe [] <$> timeout (1000000 * t) f

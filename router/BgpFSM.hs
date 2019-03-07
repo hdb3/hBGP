@@ -13,7 +13,6 @@ import Data.Either(either)
 import qualified Data.Map.Strict as Data.Map
 import System.Posix.Temp(mkstemp)
 
---import BGPRib
 import BGPRib(processUpdate,encodeUpdates,GlobalData(..),PeerData(..),ParsedUpdate)
 -- TODO = move Update.hs, and ppssibly some or all of BGPData, from bgprib to bgplib, so that bgprib does not need to be imported here.....
 --        the needed thing in BGPData is PeerData, but what else should move to is less obvious
@@ -35,7 +34,7 @@ data FSMState = St { handle :: Handle
                    , peerConfig :: PeerConfig
                    , maybePD :: Maybe PeerData
                    , rcvdOpen :: MVar BGPMessage
-                   , ribPut :: Maybe (ParsedUpdate -> IO ()) }
+                   , ribHandle :: Maybe (Rib.RibHandle) }
 
 type F = FSMState -> IO (State, FSMState)
 
@@ -112,7 +111,7 @@ runFSM g@Global{..} socketName peerName handle =
                                                      , peerConfig = peerConfig
                                                      , maybePD = Nothing
                                                      , rcvdOpen = ro
-                                                     , ribPut = Nothing
+                                                     , ribHandle = Nothing
                                                      }))
     where
 
@@ -240,11 +239,9 @@ runFSM g@Global{..} socketName peerName handle =
         -- it would be much better to remove the temptation to use conficured data by forcing a new type for relevant purposes, and dscarding the
         -- preconfigured values as soon as possible
         -- TODO - make the addPeer function return a handle so that rib and peer data are not exposed
-        Rib.addPeer rib peerData
-        let ribGet = Rib.buildUpdates rib peerData
-            ribPut = Rib.ribUpdater rib peerData
-        forkIO $ sendLoop handle (getKeepAliveTimer osm) ribGet
-        return (Established,st{maybePD=Just peerData , ribPut = Just ribPut})
+        ribHandle <- Rib.addPeer rib peerData
+        forkIO $ sendLoop handle (getKeepAliveTimer osm) ribHandle
+        return (Established,st{maybePD=Just peerData , ribHandle = Just ribHandle})
 
     established :: F
     established st@St{..} = do
@@ -261,8 +258,7 @@ runFSM g@Global{..} socketName peerName handle =
                          idle "established - Update parse error"
                     )
                     (\parsedUpdate -> do
-                      --BGPRib.ribUpdater rib peerData parsedUpdate
-                      fromJust ribPut parsedUpdate
+                      Rib.ribUpdater (fromJust ribHandle) parsedUpdate
                       return (Established,st)
                     )
                     ( processUpdate update )
@@ -304,14 +300,13 @@ runFSM g@Global{..} socketName peerName handle =
             rc
 
 -- loop runs until it catches the FSMException
-    sendLoop handle timer ribGet = catch
-        --( do updates <- encodeUpdates <$> msgTimeout timer ( buildUpdates rib peer )
-        ( do updates <- encodeUpdates <$> Rib.msgTimeout timer ribGet
+    sendLoop handle timer rh = catch
+        ( do updates <- encodeUpdates <$> Rib.msgTimeout timer (Rib.buildUpdates rh)
              if null updates then
                  bgpSnd handle BGPKeepalive
              else
                  mapM_ (bgpSnd handle ) updates
-             sendLoop handle timer ribGet
+             sendLoop handle timer rh
         )
         (\(FSMException _) -> return ()
             -- this is perfectly normal event when the fsm closes down as it doesn't stop the keepAliveLoop explicitly
