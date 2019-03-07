@@ -7,14 +7,15 @@ import Data.Word
 
 import BGPlib
 import BGPRib
+import Log
 
 delPeerByAddress :: Rib -> Word16 -> IPv4 -> IO ()
 delPeerByAddress rib port ip = do
     peers <- filter (\pd -> peerIPv4 pd == ip && peerPort pd == port) <$> getPeersInRib rib
     if null peers then
-        putStrLn $ "delPeerByAddress failed for " ++ show ip ++ ":" ++ show port
+        warn $ "delPeerByAddress failed for " ++ show ip ++ ":" ++ show port
     else do
-        when ( length peers > 1 ) $ putStrLn $ "delPeerByAddress failed for (multiplepeers!) " ++ show ip ++ ":" ++ show port
+        when ( length peers > 1 ) $ warn $ "delPeerByAddress failed for (multiplepeers!) " ++ show ip ++ ":" ++ show port
         mapM_ (delPeer rib) peers
     
 buildUpdates :: Rib -> PeerData -> IO [ParsedUpdate]

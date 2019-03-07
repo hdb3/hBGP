@@ -21,6 +21,7 @@ import Collision
 import Route
 import Global
 import Config
+import Log
 
 -- TODO - modify the putStrLn's to at least report the connected peer. but..
 -- better: implement a logger
@@ -46,7 +47,7 @@ instance Exception FSMException
 bgpFSM :: Global -> ( Socket , SockAddr) -> IO ()
 bgpFSM global@Global{..} ( sock , peerName ) =
                           do threadId <- myThreadId
-                             putStrLn $ "Thread " ++ show threadId ++ " starting: peer is " ++ show peerName
+                             trace $ "Thread " ++ show threadId ++ " starting: peer is " ++ show peerName
 
                              let (SockAddrInet remotePort remoteIP) = peerName
                              socketName <- getSocketName sock
@@ -68,8 +69,8 @@ bgpFSM global@Global{..} ( sock , peerName ) =
                              deregister collisionDetector
                              delPeerByAddress rib (fromIntegral remotePort) (fromHostAddress remoteIP)
                              either
-                                 (\s -> putStrLn $ "BGPfsm exception exit" ++ s)
-                                 (\s -> putStrLn $ "BGPfsm normal exit" ++ s)
+                                 (\s -> warn $ "BGPfsm exception exit" ++ s)
+                                 (\s -> trace $ "BGPfsm normal exit" ++ s)
                                  fsmExitStatus
 
 
@@ -89,7 +90,7 @@ bgpSnd h msg | 4079 > L.length (encode msg) = catchIOError ( sndRawMessage h (en
              | otherwise = do (n,h) <- mkstemp "bgpSnd"
                               L.hPut h (encode msg)
                               hClose h
-                              putStrLn $ "encoded message too long in bgpSnd, encoded message was written to: " ++ n
+                              warn $ "encoded message too long in bgpSnd, encoded message was written to: " ++ n
 
 get :: Handle -> Int -> IO BGPMessage
 get b t = fmap decodeBGPByteString (getRawMsg b t)
@@ -124,7 +125,7 @@ runFSM g@Global{..} socketName peerName handle =
             f ToEstablished = toEstablished
             f Established = established
 
-    idle s = do putStrLn $ "IDLE - reason: " ++ s
+    idle s = do trace $ "IDLE - reason: " ++ s
                 return (Idle, undefined )
 
     stateConnected :: F
@@ -132,21 +133,21 @@ runFSM g@Global{..} socketName peerName handle =
         msg <- get handle delayOpenTimer
         case msg of
             BGPTimeout -> do
-                putStrLn "stateConnected - event: delay open expiry"
+                trace "stateConnected - event: delay open expiry"
                 bgpSnd handle (localOffer osm)
-                putStrLn "stateConnected -> stateOpenSent"
+                trace "stateConnected -> stateOpenSent"
                 return (StateOpenSent,st )
 
             open@BGPOpen{} -> do
                 let osm' = updateOpenStateMachine osm open
                     resp = getResponse osm'
-                putStrLn "stateConnected - event: rcv open"
+                trace "stateConnected - event: rcv open"
                 collision <- collisionCheck collisionDetector (myBGPid gd) (bgpID open)
                 if isJust collision then do
                     bgpSnd handle $ BGPNotify NotificationCease _NotificationCeaseSubcodeConnectionCollisionResolution L.empty
                     idle (fromJust collision)
                 else if isKeepalive resp then do
-                    putStrLn "stateConnected -> stateOpenConfirm"
+                    trace "stateConnected -> stateOpenConfirm"
                     bgpSnd handle (localOffer osm)
                     bgpSnd handle resp
                     return (StateOpenConfirm , st {osm=osm'} )
@@ -176,14 +177,14 @@ runFSM g@Global{..} socketName peerName handle =
           open@BGPOpen{} -> do
               let osm' = updateOpenStateMachine osm open
                   resp =  getResponse osm'
-              putStrLn "stateOpenSent - rcv open"
+              trace "stateOpenSent - rcv open"
               collision <- collisionCheck collisionDetector (myBGPid gd) (bgpID open)
               if isJust collision then do
                   bgpSnd handle $ BGPNotify NotificationCease 0 L.empty
                   idle (fromJust collision)
               else if isKeepalive resp then do
                   bgpSnd handle resp
-                  putStrLn "stateOpenSent -> stateOpenConfirm"
+                  trace "stateOpenSent -> stateOpenConfirm"
                   return (StateOpenConfirm,st{osm=osm'})
               else do
                     bgpSnd handle resp
@@ -205,7 +206,7 @@ runFSM g@Global{..} socketName peerName handle =
                 idle "stateOpenConfirm - error initial Hold Timer expiry"
 
             BGPKeepalive -> do
-                putStrLn "stateOpenConfirm - rcv keepalive"
+                trace "stateOpenConfirm - rcv keepalive"
                 return (ToEstablished,st)
 
             BGPNotify{} -> idle "stateOpenConfirm - rcv notify"
@@ -216,8 +217,8 @@ runFSM g@Global{..} socketName peerName handle =
 
     toEstablished :: F
     toEstablished st@St{..} = do
-        putStrLn "transition -> established"
-        putStrLn $ "hold timer: " ++ show (getNegotiatedHoldTime osm) ++ " keep alive timer: " ++ show (getKeepAliveTimer osm)
+        trace "transition -> established"
+        trace $ "hold timer: " ++ show (getNegotiatedHoldTime osm) ++ " keep alive timer: " ++ show (getKeepAliveTimer osm)
         -- only now can we create the peer data record becasue we have the remote AS/BGPID available and confirmed
 
         let globalData = gd

@@ -14,13 +14,14 @@ import Collision
 import BGPRib
 import Global
 import Redistributor
+import Log
 
 main :: IO ()
 main = do
     config <- getConfig
     print config
 
-    putStrLn "ZRouter starting"
+    info "Router starting"
 
     global <- buildGlobal config
 
@@ -29,9 +30,9 @@ main = do
     let
         app = bgpFSM global
 
-    putStrLn $ "connecting to " ++ show (activePeers config)
+    info $ "connecting to " ++ show (activePeers config)
     session 179 app (activePeers config)
-    putStrLn "Router ready"
+    info "Router ready"
     idle where idle = do threadDelay 10000000
                          idle
 
@@ -60,7 +61,7 @@ buildGlobal c@Config{..} = do
         -- TODO the map creation should be in Config...
         peerMap = Data.Map.fromList $ map (\pc -> (peerConfigIPv4 pc,pc)) configConfiguredPeers
 
-        logger = hPutStrLn stderr
+        logger = hPutStrLn stdout
 
     collisionDetector <- mkCollisionDetector
     sessions <- newMVar Data.Map.empty

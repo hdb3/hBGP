@@ -11,25 +11,26 @@ import Route
 import Global
 import Config
 import ZServ
+import Log
 
 redistribute :: Global -> IO ()
 redistribute global@Global{..} = do
     insertTestRoutes global (configTestRoutePath config) (configTestRouteCount config)
     if not (configEnableDataPlane config )
-    then putStrLn "configEnableDataPlane not set, not starting zserv API"
+    then info "configEnableDataPlane not set, not starting zserv API"
     else do threadId <- myThreadId
-            putStrLn $ "Thread " ++ show threadId ++ " starting redistributor"
+            trace $ "Thread " ++ show threadId ++ " starting redistributor"
             ( zStreamIn, zStreamOut ) <- getZServerStreamUnix "/var/run/quagga/zserv.api"
             zservRegister zStreamOut _ZEBRA_ROUTE_BGP
             if configEnableRedistribution config
             then void $ forkIO (zservReader global (localPeer gd) ( zStreamIn, zStreamOut ))
-            else putStrLn "configEnableRedistribution not enabled - not staring Zserv listener"
+            else info "configEnableRedistribution not enabled - not staring Zserv listener"
 
             let routeInstall (route, nextHop) = do
-                    putStrLn $ "install " ++ show route ++ " via " ++ show nextHop
+                    trace $ "install " ++ show route ++ " via " ++ show nextHop
                     addRoute zStreamOut (toAddrRange $ toPrefix route) nextHop
                 routeDelete route = do
-                    putStrLn $ "delete " ++ show route
+                    trace $ "delete " ++ show route
                     delRoute zStreamOut (toAddrRange $ toPrefix route)
 
             ribUpdateListener (routeInstall,routeDelete) global ( localPeer gd ) 1
@@ -40,7 +41,7 @@ ribUpdateListener (routeInstall,routeDelete) global@Global{..} peer timeout = do
     if null updates then
         yield -- null op - could check if exit from thread is needed...
     else do 
-        putStrLn $ show (length updates) ++ " updates for " ++ show peer
+        trace $ show (length updates) ++ " updates for " ++ show peer
         let (update,withdraw) = foldl disc ([],[]) updates
             disc (u,w) (pfxs,0) = (u,w++pfxs) -- withdraw has 0 for the route index
             disc (u,w) (pfxs,ri) = ((pfxs,ri):u,w) -- alternate case is an update, not withdraw , the routeIndex is preserved for the route lookup
@@ -61,14 +62,14 @@ zservReader global@Global{..} peer ( zStreamIn, zStreamOut ) = do
     where
     loop stream = do
         msg <- Streams.read stream
-        maybe ( putStrLn "end of messages")
+        maybe ( trace "end of messages")
               ( \zMsg -> do 
                               -- print zMsg
-                              maybe (putStrLn "--")
+                              maybe (trace "--")
                                     -- (\s -> putStrLn $ "local route:" ++ show s)
-                                    (\(pfx,maybeNH) -> maybe (do putStrLn $ "delete route: " ++ show pfx
+                                    (\(pfx,maybeNH) -> maybe (do trace $ "delete route: " ++ show pfx
                                                                  delRouteRib rib peer pfx )
-                                                             (\nh -> do putStrLn $ "add route: " ++ show pfx ++ " via " ++ show nh
+                                                             (\nh -> do trace $ "add route: " ++ show pfx ++ " via " ++ show nh
                                                                         addRouteRib rib peer pfx nh)
                                                              maybeNH
 
@@ -80,13 +81,13 @@ zservReader global@Global{..} peer ( zStreamIn, zStreamOut ) = do
               msg
 
 
-insertTestRoutes _ "" _ = putStrLn "no test route data specified"
+insertTestRoutes _ "" _ = info "no test route data specified"
 insertTestRoutes Global{..} path count = do
-    putStrLn $ "test route set requested: " ++ path
+    info $ "test route set requested: " ++ path
     updates <- pathReadRib path
     let count' = if count == 0 then length updates else count
-    putStrLn $ "inserting " ++ show count' ++ " routes"
+    info $ "inserting " ++ show count' ++ " routes"
     let updates' = concatMap (\((_,pas),pfxs) -> makeUpdate pfxs [] pas) updates
         updates'' = if 0 == count then updates' else take count updates'
     mapM_ (ribUpdater rib ( localPeer gd )) updates''
-    putStrLn "done"
+    info "done"
