@@ -258,7 +258,7 @@ runFSM g@Global{..} socketName peerName handle =
                          idle "established - Update parse error"
                     )
                     (\parsedUpdate -> do
-                      Rib.ribUpdater (fromJust ribHandle) parsedUpdate
+                      Rib.ribPush (fromJust ribHandle) parsedUpdate
                       return (Established,st)
                     )
                     ( processUpdate update )
@@ -301,7 +301,7 @@ runFSM g@Global{..} socketName peerName handle =
 
 -- loop runs until it catches the FSMException
     sendLoop handle timer rh = catch
-        ( do updates <- encodeUpdates <$> Rib.msgTimeout timer (Rib.buildUpdates rh)
+        ( do updates <- encodeUpdates <$> Rib.msgTimeout timer (Rib.ribPull rh)
              if null updates then
                  bgpSnd handle BGPKeepalive
              else

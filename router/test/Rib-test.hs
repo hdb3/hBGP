@@ -59,8 +59,8 @@ main = do
 
     putStrLn "\nupdate internalPeer prefixes1"
     --print("XXZZ",( makeUpdateSimple attrs1 prefixes1 [] ))
-    ribUpdater rib internalPeer ( makeUpdateSimple attrs1 prefixes1 [] )
-    -- ribUpdater rib internalPeer ( makeUpdateSimple attrs2 prefixes2 [] )
+    ribPush rib internalPeer ( makeUpdateSimple attrs1 prefixes1 [] )
+    -- ribPush rib internalPeer ( makeUpdateSimple attrs2 prefixes2 [] )
     pr rib
     pullAllUpdates externalPeer rib >>= ( \v -> putStrLn $ "externalPeer AdjRibOut" ++ show v )
     -- pullAllUpdates externalPeer rib >>= ( \v -> putStrLn $ "externalPeer AdjRibOut" ++ show v )
@@ -81,15 +81,15 @@ main' = do
     pr rib
 
     putStrLn "\nupdate internalPeer prefixes1"
-    ribUpdater rib internalPeer ( makeUpdateSimple attrs1 prefixes1 [] )
-    -- ribUpdater rib internalPeer ( makeUpdateSimple attrs2 prefixes2 [] )
+    ribPush rib internalPeer ( makeUpdateSimple attrs1 prefixes1 [] )
+    -- ribPush rib internalPeer ( makeUpdateSimple attrs2 prefixes2 [] )
     pr rib
     pullAllUpdates internalPeer rib >>= ( \v -> putStrLn $ "internalPeer AdjRibOut" ++ show v )
     pullAllUpdates externalPeer rib >>= ( \v -> putStrLn $ "externalPeer AdjRibOut" ++ show v )
     pullAllUpdates externalPeer rib >>= ( \v -> putStrLn $ "externalPeer AdjRibOut" ++ show v )
 
     putStrLn "\nwithdraw internalPeer prefixes1"
-    ribUpdater rib internalPeer ( makeUpdateSimple [] [] prefixes1 )
+    ribPush rib internalPeer ( makeUpdateSimple [] [] prefixes1 )
     pr rib
     pullAllUpdates internalPeer rib >>= ( \v -> putStrLn $ "internalPeer AdjRibOut" ++ show v )
     pullAllUpdates externalPeer rib >>= ( \v -> putStrLn $ "externalPeer AdjRibOut" ++ show v )

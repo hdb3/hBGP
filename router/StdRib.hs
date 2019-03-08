@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards, TupleSections #-}
-module StdRib(buildUpdates,msgTimeout,addRouteRib,delRouteRib,updateFromAdjRibEntrys,routesFromAdjRibEntrys,delPeerByAddress,StdRib.addPeer,StdRib.ribUpdater,RibHandle) where
+module StdRib(ribPull,msgTimeout,addRouteRib,delRouteRib,updateFromAdjRibEntrys,routesFromAdjRibEntrys,delPeerByAddress,StdRib.addPeer,StdRib.ribPush,RibHandle) where
 import Control.Monad.Extra(when,concatMapM)
 import System.Timeout(timeout)
 import Data.Maybe(fromMaybe)
@@ -17,10 +17,10 @@ addPeer rib peer = do
     BGPRib.addPeer rib peer
     return (rib,peer)
 
-ribUpdater :: RibHandle -> ParsedUpdate -> IO()
-ribUpdater (rib,peer) update = do
-    trace $ "ribUpdater " ++ show peer ++ ":" ++ show update
-    BGPRib.ribUpdater rib peer update
+ribPush :: RibHandle -> ParsedUpdate -> IO()
+ribPush (rib,peer) update = do
+    trace $ "ribPush " ++ show peer ++ ":" ++ show update
+    BGPRib.ribPush rib peer update
 
 delPeerByAddress :: Rib -> Word16 -> IPv4 -> IO ()
 delPeerByAddress rib port ip = do
@@ -31,17 +31,17 @@ delPeerByAddress rib port ip = do
         when ( length peers > 1 ) $ warn $ "delPeerByAddress failed for (multiplepeers!) " ++ show ip ++ ":" ++ show port
         mapM_ (delPeer rib) peers
     
-buildUpdates :: RibHandle -> IO [ParsedUpdate]
-buildUpdates (rib,peer) = pullAllUpdates peer rib >>= updateFromAdjRibEntrys rib peer
+ribPull :: RibHandle -> IO [ParsedUpdate]
+ribPull (rib,peer) = pullAllUpdates peer rib >>= updateFromAdjRibEntrys rib peer
 
 msgTimeout :: Int -> IO [a] -> IO [a]
 msgTimeout t f = fromMaybe [] <$> timeout (1000000 * t) f
 
 addRouteRib :: Rib -> PeerData -> AddrRange IPv4 -> IPv4 -> IO()
-addRouteRib rib peer prefix nextHop = BGPRib.ribUpdater rib peer (igpUpdate nextHop [fromAddrRange prefix])
+addRouteRib rib peer prefix nextHop = BGPRib.ribPush rib peer (igpUpdate nextHop [fromAddrRange prefix])
 
 delRouteRib :: Rib -> PeerData -> AddrRange IPv4 -> IO()
-delRouteRib rib peer prefix = BGPRib.ribUpdater rib peer (originateWithdraw [fromAddrRange prefix])
+delRouteRib rib peer prefix = BGPRib.ribPush rib peer (originateWithdraw [fromAddrRange prefix])
 
 buildUpdate :: PeerData -> [IPrefix] -> RouteData -> [ParsedUpdate]
 -- there are three distinct 'peers' and associated PeerData potentially in scope here

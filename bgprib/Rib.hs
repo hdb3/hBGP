@@ -175,13 +175,13 @@ makeRouteData' peerData pathAttributes routeId = RouteData peerData pathAttribut
     nextHop = getNextHop pathAttributes
     origin = getOrigin pathAttributes
 
-ribUpdater :: Rib -> PeerData -> ParsedUpdate -> IO()
-ribUpdater rib routeData update = modifyMVar_ rib (ribUpdater' routeData update)
+ribPush :: Rib -> PeerData -> ParsedUpdate -> IO()
+ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
 
-ribUpdater' :: PeerData -> ParsedUpdate -> Rib' -> IO Rib'
+ribPush' :: PeerData -> ParsedUpdate -> Rib' -> IO Rib'
 -- TODO write the monadic style in a way that works????!!!
--- ribUpdater' peerData ParsedUpdate{..} = ribUpdateMany' peerData puPathAttributes hash nlri >>= ribWithdrawMany' peerData withdrawn
-ribUpdater' peerData ParsedUpdate{..} rib0 = do
+-- ribPush' peerData ParsedUpdate{..} = ribUpdateMany' peerData puPathAttributes hash nlri >>= ribWithdrawMany' peerData withdrawn
+ribPush' peerData ParsedUpdate{..} rib0 = do
     rib1 <- ribUpdateMany' peerData puPathAttributes hash nlri rib0
     rib2 <- ribWithdrawMany' peerData withdrawn rib1 
     return rib2

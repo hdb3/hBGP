@@ -28,7 +28,7 @@ bgpReader path = do
     rib' <- BGPRib.getLocRib rib
     return (getRIB rib')
 updateRib :: Rib -> ParsedUpdate -> IO ()
-updateRib rib parsedUpdate@ParsedUpdate{..} = BGPRib.ribUpdater rib BGPRib.dummyPeerData parsedUpdate
+updateRib rib parsedUpdate@ParsedUpdate{..} = BGPRib.ribPush rib BGPRib.dummyPeerData parsedUpdate
 
 -- readRib: a convenience function for simple applications
 -- the returned structure masks only derived or artificial data

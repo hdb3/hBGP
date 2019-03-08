@@ -90,5 +90,5 @@ insertTestRoutes Global{..} path count = do
     info $ "inserting " ++ show count' ++ " routes"
     let updates' = concatMap (\((_,pas),pfxs) -> makeUpdate pfxs [] pas) updates
         updates'' = if 0 == count then updates' else take count updates'
-    mapM_ (ribUpdater rib ( localPeer gd )) updates''
+    mapM_ (ribPush rib ( localPeer gd )) updates''
     info "done"

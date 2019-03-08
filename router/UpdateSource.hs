@@ -7,8 +7,8 @@ import BGPlib
 import BGPRib
 
 type UpdateSource = IO [ParsedUpdate]
-initSource :: PeerData -> AddrRange IPv4 -> Int -> Int -> Int -> IO UpdateSource
-initSource peer startPrefix tableSize groupSize burstSize = do
+initSource :: PeerData -> AddrRange IPv4 -> Int -> Int -> Int -> Int -> IO UpdateSource
+initSource peer startPrefix tableSize groupSize burstSize repeatCount = do
     mv <- newMVar ((0,1) :: (Int,Word32))
     print $ addrRangePair startPrefix
     let (ip,l) = addrRangePair startPrefix
