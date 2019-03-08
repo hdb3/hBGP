@@ -37,7 +37,7 @@ delPeerByAddress _ port ip =
 addPeer :: Rib -> PeerData -> IO RibHandle
 addPeer _ peer = do
     trace $ "addPeer " ++ show peer
-    updateSource <- initSource peer "172.16.0.0/30" 16 4 2 0 -- table size / group size / burst size / repeat count
+    updateSource <- initSource peer "172.16.0.0/30" 1000000 4 1000 -- table size / group size / burst size / repeat count
     cRib <- newMVar $ CRib 0
     start <- getCurrentTime
     return RibHandle{..}
@@ -52,8 +52,9 @@ ribPull :: RibHandle -> IO [ParsedUpdate]
 ribPull RibHandle{..} =  do
     deltaTime <- showDeltaTime start
     --trace $ deltaTime ++ " pull " ++ show peer
+    updates <- updateSource
     threadDelay (100 * 1000)
-    updateSource
+    return updates
     --threadDelay 10000000000
     --return []
 
