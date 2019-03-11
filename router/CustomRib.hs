@@ -45,6 +45,7 @@ addPeer _ peer = do
         thread = read $ drop (length ( "ThreadId " :: String)) (show tid)
 
     updateSource <- if testMode == Passive then nullInitSource else initSource peer startPrefix tableSize groupSize burstSize oneShotMode
+    info $ show thread ++ " - customRib operating in mode: " ++ show testMode
     --updateSource <- initSourceDefault peer
     -- updateSource <- initSource peer "172.16.0.0/30" 1000000 4 1000 -- table size / group size / burst size / repeat count
     mvCRib <- newMVar $ CRib 0 False undefined undefined
@@ -58,12 +59,12 @@ ribPush RibHandle{..} NullUpdate = do
         putMVar mvCRib ( cRib {active = False})
         report cRib
     else do
-        --putStrLn "ribPush (keepalive)"
+        --trace "ribPush (keepalive)"
         putMVar mvCRib cRib
     where
     report CRib{..} = do
         let deltaTime = diffUTCTime lastUpdate start
-        putStrLn $ show thread ++ " :report: " ++ show peer ++ " " ++ show msgCount ++ " " ++ show deltaTime
+        info $ show thread ++ " :report: " ++ show peer ++ " " ++ show msgCount ++ " " ++ show deltaTime
 
 ribPush RibHandle{..} update = do
     --deltaTime <- showDeltaTime start

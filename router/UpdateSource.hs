@@ -20,7 +20,10 @@ initSourceDefault peer = initSource peer startPrefix tableSize groupSize burstSi
     oneShotMode = True
 
 nullInitSource :: IO UpdateSource
-nullInitSource = return (return [])
+nullInitSource = return f where
+    f = do
+        threadDelay $ 10^12 -- 1M seconds - but the caller will time us out according to its own keepalive timer...
+        return []
 
 initSource :: PeerData -> AddrRange IPv4 -> Word32 -> Word32 -> Word32 -> Bool -> IO UpdateSource
 initSource peer startPrefix tableSize groupSize burstSize oneShotMode= do
@@ -29,7 +32,8 @@ initSource peer startPrefix tableSize groupSize burstSize oneShotMode= do
     let f mv = do
              n <- takeMVar mv
              putMVar mv $ n + 1
-             if oneShotMode && n > tableSize then
+             if oneShotMode && n > tableSize then do
+                 threadDelay $ 10^12 -- 1M seconds - but the caller will time us out according to its own keepalive timer...
                  return []
              else return $ concatMap (updates peer startPrefix tableSize groupSize) (map (n * burstSize +) [0..burstSize-1])
     return (f mv)

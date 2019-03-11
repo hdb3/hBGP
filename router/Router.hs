@@ -38,7 +38,8 @@ main = do
 
 getConfig = do
     args <- getArgs
-    let n = if 1 < length args then read (args !! 1) :: Int else 0
+    --let n = if 1 < length args then read (args !! 1) :: Int else 0
+    let n = 0 -- kludge until this is patched to support ArgConfig style parameters.....
     let configPath = if null args then "bgp.conf" else head args
 
     configString <- readFile configPath
