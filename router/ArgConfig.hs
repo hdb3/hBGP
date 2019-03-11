@@ -23,9 +23,14 @@ buildDictionary = do
     where
         f s = let (s1,s2) = break ('=' ==) s in (s1,dropWhile ('=' ==) s2)
 
-getInt :: Dictionary -> String -> Maybe Int
---getInt d k = maybe (Just Nothing) ( Just . readMaybe) ( lookup k d )
-getInt d k = case ( lookup k d ) of
-                  Nothing -> Nothing
-                  Just s -> readMaybe s
+getVal ::  Read p => Dictionary -> p -> String -> p
+getVal d z k = case lookup k d of
+                  Nothing -> z
+                  Just p -> case readMaybe p of
+                      Nothing -> z
+                      Just q ->  q
 
+getArgVal :: Read p => p -> String -> IO p
+getArgVal z k = do
+    d <- buildDictionary
+    return $ getVal d z k

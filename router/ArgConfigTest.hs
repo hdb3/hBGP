@@ -5,8 +5,10 @@ import ArgConfig
 
 main = do
     d <-  buildDictionary
-    print d
     let
-        p1 = getInt d "p1"
-        p2 = getInt d "p2"
+        p1 = getVal d 100 "p1"
+        p2 = getVal d 200 "p2"
     print (p1,p2)
+    a <- getArgVal  99 "a"
+    b <- getArgVal  999 "b"
+    print (a,b)
