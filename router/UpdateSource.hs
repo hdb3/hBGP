@@ -11,6 +11,13 @@ import BGPRib hiding ( group )
 
 type UpdateSource = IO [ParsedUpdate]
 
+initSourceDefault peer = initSource peer startPrefix tableSize groupSize burstSize
+    where
+    startPrefix = "172.16.0.0/30"
+    tableSize = 100
+    groupSize = 4
+    burstSize = 10
+
 initSource :: PeerData -> AddrRange IPv4 -> Word32 -> Word32 -> Word32 -> IO UpdateSource
 initSource peer startPrefix tableSize groupSize burstSize = do
     mv <- newMVar  0 -- (0 :: Word32)

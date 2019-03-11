@@ -11,16 +11,19 @@ import BGPRib hiding ( ribPush, addPeer)
 import UpdateSource
 import Log
 
-data CRib = CRib { msgCount :: Int }
+data CRib = CRib { msgCount :: Int, active :: Bool, lastUpdate :: UTCTime }
 
 bumpMsgCount :: MVar CRib -> IO Int
 bumpMsgCount mCRib = do
+    now <- getCurrentTime
     cRib <- takeMVar mCRib
     let c = msgCount cRib
+        lastUpdate = now
+        active = True
     putMVar mCRib ( cRib {msgCount = c + 1})
     return c
 
-data RibHandle = RibHandle {cRib :: MVar CRib, peer :: PeerData, start :: UTCTime, updateSource :: UpdateSource}
+data RibHandle = RibHandle {thread :: Int, mvCRib :: MVar CRib, peer :: PeerData, start :: UTCTime, updateSource :: UpdateSource}
 
 showDeltaTime :: UTCTime -> IO String
 showDeltaTime start = do
@@ -37,16 +40,31 @@ delPeerByAddress _ port ip =
 addPeer :: Rib -> PeerData -> IO RibHandle
 addPeer _ peer = do
     trace $ "addPeer " ++ show peer
-    updateSource <- initSource peer "172.16.0.0/30" 1000000 4 1000 -- table size / group size / burst size / repeat count
-    cRib <- newMVar $ CRib 0
+    updateSource <- initSourceDefault peer
+    -- updateSource <- initSource peer "172.16.0.0/30" 1000000 4 1000 -- table size / group size / burst size / repeat count
     start <- getCurrentTime
+    tid <- myThreadId
+    let thread = read $ drop (length ( "ThreadId " :: String)) (show tid)
+    mvCRib <- newMVar $ CRib 0 False start
     return RibHandle{..}
 
 ribPush :: RibHandle -> ParsedUpdate -> IO()
-ribPush RibHandle{..} NullUpdate = return ()
+--ribPush RibHandle{..} NullUpdate = return ()
+ribPush RibHandle{..} NullUpdate = do
+    cRib <- takeMVar mvCRib
+    if active cRib then do
+        putMVar mvCRib ( cRib {active = False})
+        report cRib
+    else
+        putMVar mvCRib cRib
+    where
+    report CRib{..} = do
+        let deltaTime = diffUTCTime lastUpdate start
+        putStrLn $ show thread ++ " : " ++ show peer ++ " " ++ show msgCount ++ " " ++ show deltaTime
+
 ribPush RibHandle{..} update = do
     deltaTime <- showDeltaTime start
-    count <- bumpMsgCount cRib
+    count <- bumpMsgCount mvCRib
     trace $ deltaTime ++ " push " ++ " : " ++ show peer ++ ": (" ++ show count ++ ") " ++ show update
 
 ribPull :: RibHandle -> IO [ParsedUpdate]
