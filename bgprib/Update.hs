@@ -13,7 +13,7 @@ import FarmHash(hash64)
 myHash :: L.ByteString -> Int
 myHash = fromIntegral . hash64 . L.toStrict
 
-data ParsedUpdate = ParsedUpdate { puPathAttributes :: [PathAttribute], nlri :: [Prefix], withdrawn :: [Prefix], hash :: Int } deriving Show
+data ParsedUpdate = ParsedUpdate { puPathAttributes :: [PathAttribute], nlri :: [Prefix], withdrawn :: [Prefix], hash :: Int } | NullUpdate deriving Show
 
 parseUpdate a n w = (decodedAttributes,decodedNlri,decodedWithdrawn)
     where

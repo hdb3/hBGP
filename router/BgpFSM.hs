@@ -13,7 +13,7 @@ import Data.Either(either)
 import qualified Data.Map.Strict as Data.Map
 import System.Posix.Temp(mkstemp)
 
-import BGPRib(processUpdate,encodeUpdates,GlobalData(..),PeerData(..),ParsedUpdate)
+import BGPRib(processUpdate,encodeUpdates,GlobalData(..),PeerData(..),ParsedUpdate(..))
 -- TODO = move Update.hs, and ppssibly some or all of BGPData, from bgprib to bgplib, so that bgprib does not need to be imported here.....
 --        the needed thing in BGPData is PeerData, but what else should move to is less obvious
 --        there are some things which any BGP application needs.....
@@ -249,7 +249,8 @@ runFSM g@Global{..} socketName peerName handle =
         msg <- get handle (getNegotiatedHoldTime osm)
         case msg of
 
-            BGPKeepalive -> return (Established,st)
+            BGPKeepalive -> do Rib.ribPush (fromJust ribHandle) NullUpdate
+                               return (Established,st)
 
             update@BGPUpdate{} ->
                 maybe

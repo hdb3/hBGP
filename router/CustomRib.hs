@@ -43,6 +43,7 @@ addPeer _ peer = do
     return RibHandle{..}
 
 ribPush :: RibHandle -> ParsedUpdate -> IO()
+ribPush RibHandle{..} NullUpdate = return ()
 ribPush RibHandle{..} update = do
     deltaTime <- showDeltaTime start
     count <- bumpMsgCount cRib

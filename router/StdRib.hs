@@ -18,6 +18,7 @@ addPeer rib peer = do
     return (rib,peer)
 
 ribPush :: RibHandle -> ParsedUpdate -> IO()
+ribPush _ NullUpdate = return ()
 ribPush (rib,peer) update = do
     trace $ "ribPush " ++ show peer ++ ":" ++ show update
     BGPRib.ribPush rib peer update
