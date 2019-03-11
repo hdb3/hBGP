@@ -15,6 +15,7 @@ import Text.Read(readMaybe)
 
 -- build a dictionary of key/value pairs, where the delimiter is '='
 -- for each parameter the type is used to determine the parameret getter, via the Read class
+
 type Dictionary = [(String,String)]
 buildDictionary :: IO Dictionary
 buildDictionary = do
