@@ -34,10 +34,11 @@ addPeer _ peer = do
         tableSize = getVal dict 100 "tableSize"
         groupSize = getVal dict 4 "groupSize"
         burstSize = getVal dict 10 "burstSize"
+        burstDelay = getVal dict 0 "burstDelay"
         oneShotMode = testMode == OneShot
         thread = read $ drop (length ( "ThreadId " :: String)) (show tid)
 
-    updateSource <- if testMode == Passive then nullInitSource else initSource peer startPrefix tableSize groupSize burstSize oneShotMode
+    updateSource <- if testMode == Passive then nullInitSource else initSource peer startPrefix tableSize groupSize burstSize burstDelay oneShotMode
     info $ show thread ++ " - customRib operating in mode: " ++ show testMode
     --updateSource <- initSourceDefault peer
     -- updateSource <- initSource peer "172.16.0.0/30" 1000000 4 1000 -- table size / group size / burst size / repeat count

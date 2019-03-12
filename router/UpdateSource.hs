@@ -11,12 +11,13 @@ import BGPRib hiding ( group )
 
 type UpdateSource = IO [ParsedUpdate]
 
-initSourceDefault peer = initSource peer startPrefix tableSize groupSize burstSize oneShotMode
+initSourceDefault peer = initSource peer startPrefix tableSize groupSize burstSize burstDelay oneShotMode
     where
     startPrefix = "172.16.0.0/30"
     tableSize = 100
     groupSize = 4
     burstSize = 10
+    burstDelay = 0
     oneShotMode = True
 
 nullInitSource :: IO UpdateSource
@@ -25,17 +26,19 @@ nullInitSource = return f where
         threadDelay $ 10^12 -- 1M seconds - but the caller will time us out according to its own keepalive timer...
         return []
 
-initSource :: PeerData -> AddrRange IPv4 -> Word32 -> Word32 -> Word32 -> Bool -> IO UpdateSource
-initSource peer startPrefix tableSize groupSize burstSize oneShotMode= do
+initSource :: PeerData -> AddrRange IPv4 -> Word32 -> Word32 -> Word32 -> Int -> Bool -> IO UpdateSource
+initSource peer startPrefix tableSize groupSize burstSize burstDelay oneShotMode= do
     mv <- newMVar  0 -- (0 :: Word32)
     print $ addrRangePair startPrefix
     let f mv = do
              n <- takeMVar mv
              putMVar mv $ n + 1
              if oneShotMode && n > tableSize then do
-                 threadDelay $ 10^12 -- 1M seconds - but the caller will time us out according to its own keepalive timer...
+                 threadDelay $ 10^12
                  return []
-             else return $ concatMap (updates peer startPrefix tableSize groupSize) (map (n * burstSize +) [0..burstSize-1])
+             else do
+                 when (burstDelay /= 0) (threadDelay $ 10^3 * burstDelay)
+                 return $ concatMap (updates peer startPrefix tableSize groupSize) (map (n * burstSize +) [0..burstSize-1])
     return (f mv)
 
 
@@ -50,7 +53,7 @@ group startPrefix groupSize index = map ip4 $ seeds (ip4' ip) groupSize index
     seeds base groupSize index = map (base + index * groupSize +) [0..groupSize-1]
 
 main = do
-    s <- initSource dummyPeerData "192.168.0.0/24" 8 2 4 True
+    s <- initSource dummyPeerData "192.168.0.0/24" 8 2 4 0 True
     replicateM 10 s >>= print
 
 

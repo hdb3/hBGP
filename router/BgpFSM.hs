@@ -94,6 +94,12 @@ bgpSnd h msg | 4079 > L.length (encode msg) = catchIOError ( sndRawMessage h (en
                               hClose h
                               warn $ "encoded message too long in bgpSnd, encoded message was written to: " ++ n
 
+bgpSndAll :: Handle -> [BGPMessage] -> IO()
+bgpSndAll h msgs = do
+    let encodedMessages = map encode msgs
+    catchIOError ( sndRawMessages h encodedMessages )
+                 (\e -> throw $ FSMException (show (e :: IOError)))
+
 get :: Handle -> Int -> IO BGPMessage
 get b t = fmap decodeBGPByteString (getRawMsg b t)
 
@@ -127,7 +133,7 @@ runFSM g@Global{..} socketName peerName handle =
             f ToEstablished = toEstablished
             f Established = established
 
-    idle s = do trace $ "IDLE - reason: " ++ s
+    idle s = do info $ "IDLE - reason: " ++ s
                 return (Idle, undefined )
 
     stateConnected :: F
@@ -307,7 +313,8 @@ runFSM g@Global{..} socketName peerName handle =
              if null updates then
                  bgpSnd handle BGPKeepalive
              else
-                 mapM_ (bgpSnd handle ) updates
+                 bgpSndAll handle updates
+                 --mapM_ (bgpSnd handle ) updates
              sendLoop handle timer rh
         )
         (\(FSMException _) -> return ()

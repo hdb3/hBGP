@@ -95,3 +95,6 @@ wireFormat bs = toLazyByteString $ lazyByteString lBGPMarker <> word16BE (fromIn
 
 sndRawMessage :: Handle -> L.ByteString -> IO ()
 sndRawMessage h bgpMsg = L.hPut h $ wireFormat bgpMsg
+
+sndRawMessages :: Handle -> [L.ByteString] -> IO ()
+sndRawMessages h bgpMsgs = L.hPut h $ L.concat $ map wireFormat bgpMsgs
