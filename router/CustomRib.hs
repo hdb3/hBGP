@@ -5,6 +5,7 @@ import Data.Time.Clock
 import Data.Maybe(fromMaybe)
 import Data.Word
 import Control.Concurrent
+import Control.Monad(when)
 
 import BGPlib
 import BGPRib hiding ( ribPush, addPeer)
@@ -16,14 +17,6 @@ data TestMode = OneShot | Continuous | Passive deriving (Read,Show,Eq)
 data CRib = CRib { msgCount :: Int, active :: Bool, firstUpdate,lastUpdate :: UTCTime }
 
 data RibHandle = RibHandle {testMode :: TestMode, thread :: Int, mvCRib :: MVar CRib, peer :: PeerData, start :: UTCTime, updateSource :: UpdateSource}
-
-showDeltaTime :: UTCTime -> IO String
-showDeltaTime start = do
-    now <- getCurrentTime
-    let deltaTime = diffUTCTime now start
-    tid <- myThreadId
-    let thread = drop (length ( "ThreadId " :: String)) (show tid)
-    return $ thread ++ " - " ++ init (show deltaTime)
 
 delPeerByAddress :: Rib -> Word16 -> IPv4 -> IO ()
 delPeerByAddress _ port ip =
@@ -52,14 +45,13 @@ addPeer _ peer = do
     return RibHandle{..}
 
 ribPush :: RibHandle -> ParsedUpdate -> IO()
---ribPush RibHandle{..} NullUpdate = return ()
 ribPush RibHandle{..} NullUpdate = do
     cRib <- takeMVar mvCRib
     if active cRib then do
         putMVar mvCRib ( cRib {active = False})
         report cRib
     else do
-        --trace "ribPush (keepalive)"
+        trace "ribPush (keepalive)"
         putMVar mvCRib cRib
     where
     report CRib{..} = do
@@ -67,8 +59,6 @@ ribPush RibHandle{..} NullUpdate = do
         info $ show thread ++ " :report: " ++ show peer ++ " " ++ show msgCount ++ " " ++ show deltaTime
 
 ribPush RibHandle{..} update = do
-    --deltaTime <- showDeltaTime start
-    --count <- bumpMsgCount mvCRib
     now <- getCurrentTime
     cRib <- takeMVar mvCRib
     let mc = msgCount cRib + 1
@@ -79,23 +69,16 @@ ribPush RibHandle{..} update = do
 
     let deltaTime = init $ show $ diffUTCTime now start
     trace $ show thread ++ " : " ++ deltaTime ++ " :push: " ++ " : " ++ show peer ++ ": (" ++ show mc ++ ") " ++ show update
-    where
-    bumpMsgCount :: MVar CRib -> IO Int
-    bumpMsgCount mCRib = do
-        now <- getCurrentTime
-        cRib <- takeMVar mCRib
-        let c = msgCount cRib
-        putMVar mCRib ( cRib {msgCount = c + 1, active = True, lastUpdate = now})
-        return c
 
 ribPull :: RibHandle -> IO [ParsedUpdate]
 ribPull RibHandle{..} =  do
-    deltaTime <- showDeltaTime start
+    --now <- getCurrentTime
+    --let deltaTime = diffUTCTime now start
     --trace $ deltaTime ++ " pull " ++ show peer
     updates <- updateSource
-    threadDelay (100 * 1000)
+    when (null updates)
+         (threadDelay $ 10^12)
     return updates
-    --threadDelay 10000000000
     --return []
 
 msgTimeout :: Int -> IO [a] -> IO [a]

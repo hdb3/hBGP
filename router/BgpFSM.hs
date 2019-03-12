@@ -194,9 +194,9 @@ runFSM g@Global{..} socketName peerName handle =
 
           BGPNotify{} -> idle "stateOpenSent - rcv notify"
 
-          _ -> do
+          msg -> do
               bgpSnd handle $ BGPNotify NotificationFiniteStateMachineError 0 L.empty
-              idle "stateOpenSent - FSM error"
+              idle $ "stateOpenSent - FSM error" ++ show msg
 
     stateOpenConfirm :: F
     stateOpenConfirm st@St{..} = do
