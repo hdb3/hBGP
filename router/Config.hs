@@ -43,11 +43,11 @@ defaultPeerConfig = PeerConfig { peerConfigIPv4 = undefined
                                , peerConfigBGPID = Nothing
                                , peerConfigEnableOutbound = True
                                , peerConfigEnableInbound = True
-                               , peerConfigOfferedCapabilities = undefined
-                               , peerConfigRequiredCapabilities = undefined
+                               , peerConfigOfferedCapabilities = [CapAS4 0]
+                               , peerConfigRequiredCapabilities = [CapAS4 0]
                                }
 
-dummyPeerConfig = defaultPeerConfig {peerConfigIPv4="127.0.0.1", peerConfigOfferedCapabilities=[],peerConfigRequiredCapabilities=[]}
+dummyPeerConfig = defaultPeerConfig {peerConfigIPv4="127.0.0.1" }
 
 -- expand an input configuration to push all peer definitions into the 'configConfiguredPeers' group
 -- at the same time also populate fully the 'configEnabledPeers'
