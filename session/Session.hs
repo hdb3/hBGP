@@ -31,6 +31,10 @@ logger :: String -> IO ()
 logger = putStrLn
 -- logger _ = return ()
 
+debug :: String -> IO ()
+debug _ = return ()
+--debug = putStrLn
+
 seconds :: Int
 seconds = 1000000
 
@@ -40,8 +44,8 @@ respawnDelay = 10 * seconds
 session :: NS.PortNumber -> App -> [IPv4] -> IO ()
 session port defaultApp peers = do
     state <- mkState port defaultApp peers
-    listener state
     mapM_ ( forkIO . run state ) peers
+    listener state
     where
 
     mkState port defaultApp peers = do
@@ -140,9 +144,14 @@ wrap State{..} app sock = do
 
 run :: State -> IPv4 -> IO ()
 run state@State{..} ip = do
+    debug $ "run: " ++ show ip ++ " start"
     unblocked <- raceCheckBlock ip
+    debug $ "run: " ++ show ip ++ " checked"
     if unblocked then
-         do sock <- connectTo port ip
+         do
+            debug $ "run: " ++ show ip ++ " unblocked"
+            sock <- connectTo port ip
+            debug $ "run: " ++ show ip ++ " connected"
             maybe ( return () )
                   (wrap state defaultApp)
                   sock
@@ -165,7 +174,7 @@ run state@State{..} ip = do
             logger $ "Exception connecting to " ++ show ip ++ " - " ++ errReport errno e
             return Nothing )
 
-errReport errno e | errno `elem` [2,107] = ioe_description e ++ " (" ++ show errno ++ ")"
+errReport errno e | errno `elem` [2,107,115] = ioe_description e ++ " (" ++ show errno ++ ")"
                   | otherwise = errReport' errno e
 
 errReport' errno e = unlines
