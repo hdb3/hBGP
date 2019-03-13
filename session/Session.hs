@@ -41,11 +41,15 @@ seconds = 1000000
 respawnDelay :: Int
 respawnDelay = 10 * seconds
 
-session :: NS.PortNumber -> App -> [IPv4] -> IO ()
-session port defaultApp peers = do
+session :: NS.PortNumber -> App -> [IPv4] -> Bool -> IO ()
+session port defaultApp peers enableInbound = do
     state <- mkState port defaultApp peers
     mapM_ ( forkIO . run state ) peers
-    listener state
+    if enableInbound then
+        listener state
+    else do
+        putStrLn "session: inbound connections not enabled"
+        forever (threadDelay $ 10^12)
     where
 
     mkState port defaultApp peers = do

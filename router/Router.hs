@@ -31,7 +31,7 @@ main = do
         app = bgpFSM global
 
     info $ "connecting to " ++ show (activePeers config)
-    session 179 app (activePeers config)
+    session 179 app (activePeers config) (not $ activeOnly config)
     info "Router ready"
     idle where idle = do threadDelay 10000000
                          idle

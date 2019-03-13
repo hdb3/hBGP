@@ -28,6 +28,9 @@ data Config = Config { configAS :: Word32
 activePeers :: Config -> [IPv4]
 activePeers config = map peerConfigIPv4 $ filter peerConfigEnableOutbound (configConfiguredPeers config)
 
+activeOnly :: Config -> Bool
+activeOnly c = null (configEnabledPeers c) && null ((filter peerConfigEnableInbound) (configConfiguredPeers c)) && not  (configAllowDynamicPeers c)
+
 data PeerConfig = PeerConfig { peerConfigIPv4 :: IPv4
                              , peerConfigAS ::  Maybe Word32
                              , peerConfigBGPID ::  Maybe IPv4
