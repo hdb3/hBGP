@@ -4,6 +4,7 @@ import Network.Socket
 import System.IO.Error(catchIOError)
 import System.IO(IOMode( ReadWriteMode ),Handle, hClose)
 import qualified Data.ByteString.Lazy as L
+import qualified Data.ByteString as BS
 import Data.Binary(encode)
 import Data.IP
 import Control.Concurrent
@@ -122,10 +123,10 @@ runFSM g@Global{..} socketName peerName handle =
                                                      }))
     where
 
-    rawPut bs = catchIOError ( L.hPut handle bs )
+    rawPut bs = catchIOError ( BS.hPut handle bs )
                              (\e -> throw $ FSMException (show (e :: IOError)))
 
-    framedPut msgs = rawPut ( L.concat $ map wireFormat msgs)
+    framedPut msgs = rawPut ( L.toStrict $ L.concat $ map wireFormat msgs)
 
     bgpMessagesPut bgpMsgs = framedPut ( map encode bgpMsgs )
 
@@ -328,7 +329,8 @@ runFSM g@Global{..} socketName peerName handle =
              if null updates then
                  bgpSnd handle BGPKeepalive
              else
-                 bgpSndAll handle updates
+                 bgpMessagesPut updates
+                 --bgpSndAll handle updates
                  --mapM_ (bgpSnd handle ) updates
              sendLoop handle timer rh
         )
