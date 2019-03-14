@@ -2,6 +2,7 @@ module ArgConfig where
 
 import System.Environment
 import Text.Read(readMaybe)
+import Data.Maybe(fromMaybe)
 
 -- read test configuration parameters from the command line or a file
 -- syntax is equivalent - 'key=value'
@@ -27,9 +28,7 @@ buildDictionary = do
 getVal ::  Read p => Dictionary -> p -> String -> p
 getVal d z k = case lookup k d of
                   Nothing -> z
-                  Just p -> case readMaybe p of
-                      Nothing -> z
-                      Just q ->  q
+                  Just p -> fromMaybe z (readMaybe p)
 
 getArgVal :: Read p => p -> String -> IO p
 getArgVal z k = do

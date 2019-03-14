@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings , RecordWildCards, TupleSections #-}
+{-# LANGUAGE OverloadedStrings , RecordWildCards #-}
 module CustomRib(ribPull,msgTimeout,addRouteRib,delRouteRib,updateFromAdjRibEntrys,routesFromAdjRibEntrys,delPeerByAddress, addPeer, ribPush, RibHandle ) where
 import System.Timeout(timeout)
 import Data.Time.Clock
