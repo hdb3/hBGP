@@ -1,6 +1,15 @@
 {-# LANGUAGE RecordWildCards,OverloadedStrings #-}
 module Config where
 
+-- ## TODO rework the whole Config concept of 'enabled' peers
+--         objective - allow concise specification of peers with default attributes
+--                     whilst distinguishing active and passive roles
+--                   - allow complete flexibility on attributes as required
+--                   - reconsider the config defintion (JSON?), and whether
+--                     the 'raw' config should be made available 'anonymously' from Global
+--                     (possibly yes, so that extensions can use custom configuration
+--                      without modifying top level code)
+
 -- define the configuration which is passed to the main program
 
 import Data.List(nub,(\\))
@@ -29,7 +38,7 @@ activePeers :: Config -> [IPv4]
 activePeers config = map peerConfigIPv4 $ filter peerConfigEnableOutbound (configConfiguredPeers config)
 
 activeOnly :: Config -> Bool
-activeOnly c = null (configEnabledPeers c) && null ((filter peerConfigEnableInbound) (configConfiguredPeers c)) && not  (configAllowDynamicPeers c)
+activeOnly c = null (configEnabledPeers c) && null ((filter (peerConfigEnableInbound)) (configConfiguredPeers c)) && not (configAllowDynamicPeers c)
 
 data PeerConfig = PeerConfig { peerConfigIPv4 :: IPv4
                              , peerConfigAS ::  Maybe Word32
@@ -58,7 +67,7 @@ dummyPeerConfig = defaultPeerConfig {peerConfigIPv4="127.0.0.1" }
 buildPeerConfigs :: Config -> Config
 
 buildPeerConfigs inConfig = inConfig { configOfferedCapabilities = outConfigOfferedCapabilities
-                                     , configEnabledPeers = outEnabledIPv4s
+                                     --, configEnabledPeers = outEnabledIPv4s
                                      , configConfiguredPeers = outConfiguredPeers } where
    myAS = configAS inConfig
    outConfigOfferedCapabilities = setAS myAS (configOfferedCapabilities inConfig)
@@ -66,7 +75,7 @@ buildPeerConfigs inConfig = inConfig { configOfferedCapabilities = outConfigOffe
    configuredPeers = nub $ configConfiguredPeers inConfig -- eliminate any duplicates -- should ideally also eliminate non-duplicates with equal IPv4s
    configuredIPv4s = map peerConfigIPv4 configuredPeers -- extract the IPs from full configuration
    nonDupEnabledPeers = enabledIPv4s \\ configuredIPv4s -- remove from the enabled list any which also have full configuration
-   outEnabledIPv4s = nonDupEnabledPeers ++ configuredIPv4s
+   --outEnabledIPv4s = nonDupEnabledPeers ++ configuredIPv4s
    outConfiguredPeers = map fixAS4 configuredPeers ++ map ( fillConfig inConfig) nonDupEnabledPeers
 
    fixAS4 :: PeerConfig -> PeerConfig

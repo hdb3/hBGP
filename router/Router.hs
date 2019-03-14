@@ -19,7 +19,6 @@ import Log
 main :: IO ()
 main = do
     config <- getConfig
-    print config
 
     info "Router starting"
 
@@ -31,6 +30,8 @@ main = do
         app = bgpFSM global
 
     info $ "connecting to " ++ show (activePeers config)
+    info $ "activeOnly = " ++ show (activeOnly config)
+    print config
     session 179 app (activePeers config) (not $ activeOnly config)
     info "Router ready"
     idle where idle = do threadDelay 10000000
