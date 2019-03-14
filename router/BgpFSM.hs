@@ -122,6 +122,15 @@ runFSM g@Global{..} socketName peerName handle =
                                                      }))
     where
 
+    rawPut bs = catchIOError ( L.hPut handle bs )
+                             (\e -> throw $ FSMException (show (e :: IOError)))
+
+    framedPut msgs = rawPut ( L.concat $ map wireFormat msgs)
+
+    bgpMessagesPut bgpMsgs = framedPut ( map encode bgpMsgs )
+
+    updatesPut updates = bgpMessagesPut ( map encodeUpdates updates )
+
     fsm :: (State,FSMState) -> IO (Either String String)
     fsm (s,st) | s == Idle = return $ Right "FSM normal exit"
                | otherwise = do
@@ -256,20 +265,26 @@ runFSM g@Global{..} socketName peerName handle =
         msg <- get handle (getNegotiatedHoldTime osm)
         case msg of
 
-            BGPKeepalive -> do Rib.ribPush (fromJust ribHandle) NullUpdate
+            BGPKeepalive -> do Rib.ribPush (fromJust ribHandle) msg
                                return (Established,st)
 
-            update@BGPUpdate{} ->
-                maybe
-                    ( do
-                         bgpSnd handle $ BGPNotify NotificationUPDATEMessageError 0 L.empty
-                         idle "established - Update parse error"
-                    )
-                    (\parsedUpdate -> do
-                      Rib.ribPush (fromJust ribHandle) parsedUpdate
-                      return (Established,st)
-                    )
-                    ( processUpdate update )
+            update@BGPUpdate{} -> do
+                pushResponse <- Rib.ribPush (fromJust ribHandle) update
+                if pushResponse then
+                    return (Established,st)
+                else do
+                    bgpSnd handle $ BGPNotify NotificationUPDATEMessageError 0 L.empty
+                    idle "established - Update parse error"
+--                maybe
+--                    ( do
+--                         bgpSnd handle $ BGPNotify NotificationUPDATEMessageError 0 L.empty
+--                         idle "established - Update parse error"
+--                    )
+--                    (\parsedUpdate -> do
+--                      Rib.ribPush (fromJust ribHandle) parsedUpdate
+--                      return (Established,st)
+--                    )
+--                    ( processUpdate update )
 
             BGPNotify{} -> idle "established - rcv notify"
 
@@ -309,7 +324,7 @@ runFSM g@Global{..} socketName peerName handle =
 
 -- loop runs until it catches the FSMException
     sendLoop handle timer rh = catch
-        ( do updates <- encodeUpdates <$> Rib.msgTimeout timer (Rib.ribPull rh)
+        ( do updates <- Rib.msgTimeout timer (Rib.ribPull rh)
              if null updates then
                  bgpSnd handle BGPKeepalive
              else

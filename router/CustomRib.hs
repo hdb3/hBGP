@@ -45,8 +45,8 @@ addPeer _ peer = do
     mvCRib <- newMVar $ CRib 0 False undefined undefined
     return RibHandle{..}
 
-ribPush :: RibHandle -> ParsedUpdate -> IO()
-ribPush RibHandle{..} NullUpdate = do
+ribPush :: RibHandle -> BGPMessage -> IO Bool
+ribPush RibHandle{..} BGPKeepalive = do
     cRib <- takeMVar mvCRib
     if active cRib then do
         putMVar mvCRib ( cRib {active = False})
@@ -54,6 +54,7 @@ ribPush RibHandle{..} NullUpdate = do
     else do
         trace "ribPush (keepalive)"
         putMVar mvCRib cRib
+    return True
     where
     report CRib{..} = do
         let deltaTime = diffUTCTime lastUpdate start
@@ -70,8 +71,9 @@ ribPush RibHandle{..} update = do
 
     let deltaTime = init $ show $ diffUTCTime now start
     trace $ show thread ++ " : " ++ deltaTime ++ " :push: " ++ " : " ++ show peer ++ ": (" ++ show mc ++ ") " ++ show update
+    return True
 
-ribPull :: RibHandle -> IO [ParsedUpdate]
+ribPull :: RibHandle -> IO [BGPMessage]
 ribPull RibHandle{..} =  do
     --now <- getCurrentTime
     --let deltaTime = diffUTCTime now start

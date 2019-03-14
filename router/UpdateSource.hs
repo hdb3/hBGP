@@ -9,7 +9,7 @@ import Control.Monad
 import BGPlib
 import BGPRib hiding ( group )
 
-type UpdateSource = IO [ParsedUpdate]
+type UpdateSource = IO [BGPMessage]
 
 initSourceDefault peer = initSource peer startPrefix tableSize groupSize burstSize burstDelay oneShotMode
     where
@@ -38,7 +38,7 @@ initSource peer startPrefix tableSize groupSize burstSize burstDelay oneShotMode
                  return []
              else do
                  when (burstDelay /= 0) (threadDelay $ 10^3 * burstDelay)
-                 return $ concatMap (updates peer startPrefix tableSize groupSize) (map (n * burstSize +) [0..burstSize-1])
+                 return $ encodeUpdates $ concatMap (updates peer startPrefix tableSize groupSize) (map (n * burstSize +) [0..burstSize-1])
     return (f mv)
 
 
