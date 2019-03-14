@@ -35,10 +35,11 @@ addPeer _ peer = do
         groupSize = getVal dict 4 "groupSize"
         burstSize = getVal dict 10 "burstSize"
         burstDelay = getVal dict 0 "burstDelay"
+        repeatDelay = getVal dict 0 "repeatDelay"
         oneShotMode = testMode == OneShot
         thread = read $ drop (length ( "ThreadId " :: String)) (show tid)
 
-    updateSource <- if testMode == Passive then nullInitSource else initSource peer startPrefix tableSize groupSize burstSize burstDelay oneShotMode
+    updateSource <- if testMode == Passive then nullInitSource else initSource peer startPrefix tableSize groupSize burstSize burstDelay oneShotMode repeatDelay
     info $ show thread ++ " - customRib operating in mode: " ++ show testMode
     --updateSource <- initSourceDefault peer
     -- updateSource <- initSource peer "172.16.0.0/30" 1000000 4 1000 -- table size / group size / burst size / repeat count
@@ -53,11 +54,12 @@ ribPush RibHandle{..} BGPKeepalive = do
         report cRib
     else do
         trace "ribPush (keepalive)"
-        putMVar mvCRib cRib
+        putMVar mvCRib $ CRib 0 False undefined undefined
+        --putMVar mvCRib cRib
     return True
     where
     report CRib{..} = do
-        let deltaTime = diffUTCTime lastUpdate start
+        let deltaTime = diffUTCTime lastUpdate firstUpdate
         info $ show thread ++ " :report: " ++ show peer ++ " " ++ show msgCount ++ " " ++ show deltaTime
 
 ribPush RibHandle{..} update = do

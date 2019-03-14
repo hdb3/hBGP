@@ -26,8 +26,8 @@ nullInitSource = return f where
         threadDelay $ 10^12 -- 1M seconds - but the caller will time us out according to its own keepalive timer...
         return []
 
-initSource :: PeerData -> AddrRange IPv4 -> Word32 -> Word32 -> Word32 -> Int -> Bool -> IO UpdateSource
-initSource peer startPrefix tableSize groupSize burstSize burstDelay oneShotMode= do
+initSource :: PeerData -> AddrRange IPv4 -> Word32 -> Word32 -> Word32 -> Int -> Bool -> Int -> IO UpdateSource
+initSource peer startPrefix tableSize groupSize burstSize burstDelay oneShotMode repeatDelay = do
     mv <- newMVar  0
     print $ addrRangePair startPrefix
     let f mv = do
@@ -37,6 +37,11 @@ initSource peer startPrefix tableSize groupSize burstSize burstDelay oneShotMode
                  if n < tableSize-1 then do
                      when (burstDelay /= 0) (threadDelay $ 10^3 * burstDelay)
                      return $ encodeUpdates $ concatMap (update peer startPrefix tableSize groupSize) [n .. min tableSize (n+burstSize)-1]
+                 else if repeatDelay > 0 then do
+                     n <- takeMVar mv
+                     putMVar mv 0
+                     threadDelay $ 10^6 * repeatDelay
+                     return []
                  else do
                      threadDelay $ 10^12
                      return []
@@ -56,7 +61,7 @@ group startPrefix groupSize index = map ip4 $ seeds (ip4' ip) groupSize index
     seeds base groupSize index = map (base + index * groupSize +) [0..groupSize-1]
 
 main = do
-    s <- initSource dummyPeerData "192.168.0.0/24" 8 2 4 0 True
+    s <- initSource dummyPeerData "192.168.0.0/24" 8 2 4 0 True 0
     replicateM 10 s >>= print
 
 
