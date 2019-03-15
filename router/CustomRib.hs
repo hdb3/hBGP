@@ -16,7 +16,7 @@ import ArgConfig
 data TestMode = OneShot | Continuous | Passive deriving (Read,Show,Eq)
 data CRib = CRib { msgCount :: Int, active :: Bool, firstUpdate,lastUpdate :: UTCTime }
 
-data RibHandle = RibHandle {testMode :: TestMode, thread :: Int, mvCRib :: MVar CRib, peer :: PeerData, start :: UTCTime, updateSource :: UpdateSource}
+data RibHandle = RibHandle {testMode :: TestMode, thread :: Int, mvCRib :: MVar CRib, peer :: PeerData, start :: UTCTime, updateSource :: UpdateSource, idleDetect :: NominalDiffTime}
 
 delPeerByAddress :: Rib -> Word16 -> IPv4 -> IO ()
 delPeerByAddress _ port ip =
@@ -36,6 +36,7 @@ addPeer _ peer = do
         burstSize = getVal dict 10 "burstSize"
         burstDelay = getVal dict 0 "burstDelay"
         repeatDelay = getVal dict 0 "repeatDelay"
+        idleDetect = fromRational $ getVal dict 5.0 "idleDetect"
         oneShotMode = testMode == OneShot
         thread = read $ drop (length ( "ThreadId " :: String)) (show tid)
 
@@ -50,8 +51,11 @@ ribPush :: RibHandle -> BGPMessage -> IO Bool
 ribPush RibHandle{..} BGPKeepalive = do
     cRib <- takeMVar mvCRib
     if active cRib then do
-        putMVar mvCRib ( cRib {active = False})
-        report cRib
+        now <- getCurrentTime
+        let idleTime = diffUTCTime now (lastUpdate cRib)
+        if idleTime < idleDetect then putMVar mvCRib cRib else do
+            putMVar mvCRib ( cRib {active = False})
+            report cRib
     else do
         trace "ribPush (keepalive)"
         putMVar mvCRib $ CRib 0 False undefined undefined
@@ -59,8 +63,8 @@ ribPush RibHandle{..} BGPKeepalive = do
     return True
     where
     report CRib{..} = do
-        let deltaTime = diffUTCTime lastUpdate firstUpdate
-        info $ show thread ++ " :report: " ++ show peer ++ " " ++ show msgCount ++ " " ++ show deltaTime
+        let deltaTime = init $ show $ diffUTCTime lastUpdate firstUpdate
+        info $ show thread ++ " :report: " ++ show peer ++ " " ++ show msgCount ++ " " ++ deltaTime
 
 ribPush RibHandle{..} update = do
     now <- getCurrentTime
