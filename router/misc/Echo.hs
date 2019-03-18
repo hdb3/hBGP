@@ -13,7 +13,7 @@ import System.Environment(getArgs)
 import Control.Concurrent
 import Control.Monad (void,forever)
 import Control.Applicative((<$>))
-import Network.Socket hiding (send,recv)
+import Network.Socket
 import Network.Socket.ByteString(send,recv)
 import System.IO
 
