@@ -15,10 +15,13 @@ import Network.Socket.IOCtl
 import Data.Word
 import Foreign.C.Types(CInt)
 
+import Poll
+
 main :: IO ()    
 main = do
     sock <- connectTo "169.254.99.99" 5000 "169.254.99.98"
     forever (do sendAll sock $ C8.pack "Hello"
+                poll ( unsent sock )
                 threadDelay $ 10^7
             )
 

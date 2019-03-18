@@ -11,7 +11,6 @@ copyright:           nicholas hart
 category:            Network
 build-type:          Simple
 extra-source-files:  ChangeLog.md, README.md
-ghc-options: -O2 -Wall -Wno-missing-signatures -Wno-type-defaults 
 
 library
   exposed-modules:     Session
@@ -20,3 +19,10 @@ library
   build-depends:       base >=4.9 && <4.13, network >=2.8 && <3.1, iproute >=1.7 && <1.8, containers >=0.5 && <0.7
   -- hs-source-dirs:      
   default-language:    Haskell2010
+  ghc-options:         -O2 -Wall -Wno-missing-signatures -Wno-type-defaults 
+
+executable Session-test
+  main-is:             Test.hs
+  default-language:    Haskell2010
+  build-depends:       base , ioctl , network , bytestring , iproute
+  ghc-options:         -O2 -Wall -Wno-missing-signatures -Wno-type-defaults 
