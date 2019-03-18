@@ -10,7 +10,8 @@ import GHC.IO.Exception(ioe_description)
 import Foreign.C.Error
 import Network.Socket.ByteString
 import qualified Data.ByteString.Char8 as C8
-
+import Network.Socket.IOCtl
+import Data.Word
 
 main :: IO ()    
 main = do
@@ -18,6 +19,12 @@ main = do
     forever (do sendAll sock $ C8.pack "Hello"
                 threadDelay $ 10^7
             )
+
+instance IOControl Word64 Word64 where
+    ioctlReq = fromIntegral
+
+unsent :: NS.Socket -> Word64 -> IO Word64
+unsent sock = ioctlsocket' sock 0x5411
                 
 connectTo :: IPv4 -> NS.PortNumber -> IPv4 -> IO NS.Socket
 connectTo localIP port remoteIP = do
