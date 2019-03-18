@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 module Main where
 
 import Control.Concurrent
@@ -12,6 +13,7 @@ import Network.Socket.ByteString
 import qualified Data.ByteString.Char8 as C8
 import Network.Socket.IOCtl
 import Data.Word
+import Foreign.C.Types(CInt)
 
 main :: IO ()    
 main = do
@@ -20,11 +22,12 @@ main = do
                 threadDelay $ 10^7
             )
 
-instance IOControl Word64 Word64 where
-    ioctlReq = fromIntegral
+data SIOCOUTQ = SIOCOUTQ
+instance IOControl SIOCOUTQ Word64 where
+    ioctlReq _ = 0x5411
 
-unsent :: NS.Socket -> Word64 -> IO Word64
-unsent sock = ioctlsocket' sock 0x5411
+unsent :: NS.Socket -> IO Word64
+unsent sock = ioctlsocket' sock SIOCOUTQ
                 
 connectTo :: IPv4 -> NS.PortNumber -> IPv4 -> IO NS.Socket
 connectTo localIP port remoteIP = do
