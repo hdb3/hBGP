@@ -13,6 +13,7 @@ import Data.Maybe(fromJust,isJust,fromMaybe)
 import Data.Either(either)
 import qualified Data.Map.Strict as Data.Map
 import System.Posix.Temp(mkstemp)
+import qualified System.Posix.Types as SPT
 
 import BGPRib(processUpdate,encodeUpdates,GlobalData(..),PeerData(..),ParsedUpdate(..))
 -- TODO = move Update.hs, and ppssibly some or all of BGPData, from bgprib to bgplib, so that bgprib does not need to be imported here.....
@@ -28,8 +29,10 @@ import Global
 import Config
 import Log
 import ArgConfig
+import Session(fdWaitOnQEmpty)
 
 data FSMState = St { handle :: Handle
+                   , fd :: SPT.Fd
                    , peerName :: SockAddr
                    , socketName :: SockAddr
                    , osm :: OpenStateMachine
@@ -54,6 +57,7 @@ bgpFSM global@Global{..} ( sock , peerName ) =
 
                              let (SockAddrInet remotePort remoteIP) = peerName
                              socketName <- getSocketName sock
+                             fd  <- SPT.Fd <$> fdSocket sock
                              handle <- socketToHandle sock ReadWriteMode
 
                              let maybePeer = maybe
@@ -63,7 +67,7 @@ bgpFSM global@Global{..} ( sock , peerName ) =
                                                  ( Data.Map.lookup (fromHostAddress remoteIP) peerMap )
                              fsmExitStatus <-
                                          catch
-                                             (runFSM global socketName peerName handle maybePeer )
+                                             (runFSM global socketName peerName handle fd maybePeer )
                                              (\(FSMException s) ->
                                                  return $ Left s)
                              -- TDOD throuuigh testing around delPeer
@@ -104,8 +108,8 @@ bgpSndAll h msgs = do
 get :: Handle -> Int -> IO BGPMessage
 get b t = fmap decodeBGPByteString (getRawMsg b t)
 
-runFSM :: Global -> SockAddr -> SockAddr -> Handle -> Maybe PeerConfig -> IO (Either String String)
-runFSM g@Global{..} socketName peerName handle =
+runFSM :: Global -> SockAddr -> SockAddr -> Handle -> SPT.Fd -> Maybe PeerConfig -> IO (Either String String)
+runFSM g@Global{..} socketName peerName handle fd =
 -- The 'Maybe PeerData' allows the FSM to handle unwanted connections, i.e. send BGP Notification
 -- thereby absolving the caller from having and BGP protocol awareness
     maybe (do bgpSnd handle $ BGPNotify NotificationCease _NotificationCeaseSubcodeConnectionRejected L.empty
@@ -115,6 +119,7 @@ runFSM g@Global{..} socketName peerName handle =
                                                        peerName = peerName
                                                      , socketName = socketName
                                                      , handle = handle
+                                                     , fd = fd
                                                      , osm = initialiseOSM g peerConfig
                                                      , peerConfig = peerConfig
                                                      , maybePD = Nothing
@@ -328,8 +333,9 @@ runFSM g@Global{..} socketName peerName handle =
         ( do updates <- Rib.msgTimeout timer (Rib.ribPull rh)
              if null updates then
                  bgpSnd handle BGPKeepalive
-             else
+             else do
                  bgpMessagesPut updates
+                 fdWaitOnQEmpty fd
                  --bgpSndAll handle updates
                  --mapM_ (bgpSnd handle ) updates
              sendLoop handle timer rh
