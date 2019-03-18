@@ -27,9 +27,10 @@ import System.IOControl
 foreign import ccall "ioctl" c_ioctl :: CInt -> CInt -> Ptr () -> IO CInt
 
 c_ioctl' :: IOControl req d => Socket -> req -> Ptr d -> IO ()
-c_ioctl' f req p =
+c_ioctl' f req p = do
+    fd <- fdSocket f
     throwErrnoIfMinus1_ "ioctl" $
-        c_ioctl (fdSocket f) (ioctlReq req) (castPtr p)
+        c_ioctl fd (ioctlReq req) (castPtr p)
 
 -- | Calls a ioctl reading the structure after the call
 ioctlsocket :: IOControl req d

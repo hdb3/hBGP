@@ -14,7 +14,7 @@ library
   exposed-modules:     BMPlib
   other-modules:       BMPMessage
   other-extensions:    RecordWildCards, DuplicateRecordFields
-  build-depends:       base >=4.9 && <4.13, binary >=0.8 && <0.9, bytestring >=0.10 && <0.11, io-streams >=1.5 && <1.6, iproute >=1.7 && <1.8, network >=2.8 && <3.1, bgplib >=0.1 && <0.2, attoparsec >=0.13 && <0.14, attoparsec-binary >=0.2 && <0.3, base16-bytestring >=0.1 && <0.2
+  build-depends:       base >=4.9 && <4.13, binary >=0.8 && <0.9, bytestring >=0.10 && <0.11, io-streams >=1.5 && <1.6, iproute >=1.7 && <1.8, network >=3.0 , bgplib >=0.1 && <0.2, attoparsec >=0.13 && <0.14, attoparsec-binary >=0.2 && <0.3, base16-bytestring >=0.1 && <0.2
   hs-source-dirs:      lib
   default-language:    Haskell2010
   ghc-options:         -O2 -Wall -Wno-missing-signatures -Wno-type-defaults 

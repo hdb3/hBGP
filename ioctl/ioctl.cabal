@@ -1,5 +1,5 @@
 Name:                     ioctl
-Version:                  0.0.1
+Version:                  0.1.0
 Synopsis:                 Type-safe I/O control package
 Description:              Package allowing type-safe I/O control
 Category:                 Data, System
@@ -12,7 +12,7 @@ Cabal-Version:            >=1.4
 
 Library
   Build-Depends:          base >= 3 && < 5,
-                          network
+                          network >= 3
   Exposed-Modules:        Network.Socket.IOCtl
   Other-Modules:          System.IOControl
   Extensions:             FunctionalDependencies,
