@@ -1,13 +1,14 @@
 cabal-version:       2.4
 
 name:                bluster
-version:             0.1.0.1
+version:             0.1.0.2
 synopsis:            Implmentation of a group cluster based RIB for multi-peer BGP route tables
 license:             Apache-2.0
 author:              Nicholas Hart
 copyright:           Nicholas Hart
 category:            Network
 build-type:          Simple
+ghc-options: -O2 -Wall -Wno-missing-signatures -Wno-type-defaults 
 
 library
   exposed-modules:     GroupRIBReport, Consistency, Operations, Containers, BasicOperations, Analysis, Testdata, Core

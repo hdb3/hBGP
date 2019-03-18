@@ -1,7 +1,7 @@
 cabal-version:       2.4
 
 name:                session
-version:             0.1.1.1
+version:             0.1.1.2
 synopsis:            application/protocol agnostic Haskell network daemon framework
 license:             Apache-2.0
 license-file:        LICENSE
@@ -11,6 +11,7 @@ copyright:           nicholas hart
 category:            Network
 build-type:          Simple
 extra-source-files:  ChangeLog.md, README.md
+ghc-options: -O2 -Wall -Wno-missing-signatures -Wno-type-defaults 
 
 library
   exposed-modules:     Session

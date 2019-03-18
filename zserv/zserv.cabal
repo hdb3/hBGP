@@ -1,6 +1,6 @@
 cabal-version:       2.4
 name:                zserv
-version:             1.0.1.2
+version:             1.0.1.3
 synopsis:            Haskell implementation of the zebra routing daemon API
 homepage:            https://github.com/hdb3/zserv
 license:             Apache-2.0
@@ -11,6 +11,7 @@ copyright:           Nicholas Hart
 category:            Network
 build-type:          Simple
 extra-source-files:  ChangeLog.md, README.md
+ghc-options: -O2 -Wall -Wno-missing-signatures -Wno-type-defaults 
 
 library
   exposed-modules:     ZServ

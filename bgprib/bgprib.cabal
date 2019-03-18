@@ -1,6 +1,6 @@
 cabal-version:       2.4
 name:                bgprib
-version:             0.1.1.3
+version:             0.1.1.4
 synopsis:            Haskell support library for BGP speaker and BGP reader
 license:             Apache-2.0
 license-file:        LICENSE
@@ -10,6 +10,7 @@ copyright:           nicholas hart
 category:            Network
 build-type:          Simple
 extra-source-files:  ChangeLog.md
+ghc-options: -O2 -Wall -Wno-missing-signatures -Wno-type-defaults 
 
 library
   exposed-modules:     BGPRib, BGPReader, PrefixTableUtils, Update, BGPData, PrefixTable, AdjRIBOut, Common, Rib, Fifo, PathFilter, BogonFilter

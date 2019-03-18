@@ -1,6 +1,6 @@
 cabal-version:       2.4
 name:                router
-version:             0.1.0.5
+version:             0.1.0.6
 synopsis:            BGP speaker in haskell
 license:             Apache-2.0
 license-file:        LICENSE
@@ -10,6 +10,7 @@ copyright:           nicholas hart
 category:            Network
 build-type:          Simple
 extra-source-files:  ChangeLog.md, README.md
+ghc-options: -O2 -Wall -Wno-missing-signatures -Wno-type-defaults 
 
 executable Router
   main-is:             Router.hs
