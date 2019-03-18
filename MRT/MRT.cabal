@@ -26,14 +26,17 @@ library
 executable MRTPrefix-test
   import:              deps
   main-is:             MRTPrefix-test.hs
+  ghc-options:         -O2 -Wall -Wno-missing-signatures -Wno-type-defaults -Wno-name-shadowing -Wno-unused-matches
 
 executable MRTRibAnalysis-test
   import:              deps
   main-is:             MRTRibAnalysis-test.hs
+  ghc-options:         -O2 -Wall -Wno-missing-signatures -Wno-type-defaults  -Wno-name-shadowing -Wno-unused-matches
 
 executable FMStest
   import:              deps
   main-is:             FMStest.hs
+  ghc-options:         -O2 -Wall -Wno-missing-signatures -Wno-type-defaults -Wno-unused-matches
 
 executable MRTformat-test
   import:              deps

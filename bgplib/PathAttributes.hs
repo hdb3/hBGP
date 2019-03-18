@@ -18,7 +18,7 @@ import Control.Monad
 import Codes
 import LibCommon
 import ASPath
-import Prefixes
+import Prefixes()
 
 -- for some this function may be all that is ever wanted....
 decodeAttributes :: L.ByteString -> [PathAttribute]

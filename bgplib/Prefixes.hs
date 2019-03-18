@@ -146,7 +146,7 @@ chunkEnumeratedPrefixes n = foldl f ([],[],0) where
 
 -- enumeratePrefixes :: [Prefix] -> [(Int,Prefix)]
 enumeratePrefixes = map (\pfx -> (getLength pfx, pfx)) where
-    getLength (Prefix (subnet,ip)) | subnet == 0 = 1
+    getLength (Prefix (subnet,_)) | subnet == 0 = 1
                                    | subnet < 9  = 2
                                    | subnet < 17 = 3
                                    | subnet < 25 = 4

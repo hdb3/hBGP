@@ -1,9 +1,5 @@
 module BMPlib (module BMPlib, module BMPMessage) where
-import qualified System.Environment
 import qualified Data.IP as IP
-import qualified Text.Read
-import qualified Data.Binary as Binary
-import qualified Data.ByteString.Lazy as L
 import qualified Network.Socket as NS
 import qualified System.IO
 import qualified System.IO.Streams as Streams

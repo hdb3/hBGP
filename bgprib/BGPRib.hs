@@ -1,5 +1,4 @@
-module BGPRib (module BGPRib
-              , module AdjRIBOut
+module BGPRib ( module AdjRIBOut
               , module BGPData
               , module Common
               , module Fifo

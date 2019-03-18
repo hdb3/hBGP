@@ -55,7 +55,7 @@ ribUpdateListener (routeInstall,routeDelete) global@Global{..} peer timeout = do
     ribUpdateListener (routeInstall,routeDelete) global peer timeout
 
 
-zservReader global@Global{..} peer ( zStreamIn, zStreamOut ) = do
+zservReader Global{..} peer ( zStreamIn, zStreamOut ) = do
     zservRequestRouterId zStreamOut
     zservRequestInterface zStreamOut
     zservRequestRedistributeAll zStreamOut

@@ -84,11 +84,8 @@ makeUpdate' nlri withdrawn attributes = ParsedUpdate attributes nlri withdrawn (
 
 makeSegmentedUpdate :: [Prefix] -> [Prefix] -> [PathAttribute] -> [ParsedUpdate]
 makeSegmentedUpdate nlri withdrawn attributes = result where
-                                                    withdrawnRoutesLength = L.length (encode withdrawn)
                                                     pathAttributesLength = L.length (encode attributes)
-                                                    nlriLength = L.length (encode nlri)
                                                     nonPrefixLength = 16 + 2 + 1 + 2 + 2 + pathAttributesLength
-                                                    nominalLength = nonPrefixLength + withdrawnRoutesLength + nlriLength
                                                     availablePrefixSpace = fromIntegral (4096 - nonPrefixLength) :: Int64
                                                     chunkedNlri = chunkPrefixes availablePrefixSpace nlri
                                                     chunkedWithdrawn = chunkPrefixes availablePrefixSpace withdrawn

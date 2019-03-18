@@ -28,7 +28,6 @@ import qualified CustomRib as Rib
 import Global
 import Config
 import Log
-import ArgConfig
 import Session(fdWaitOnQEmpty)
 
 data FSMState = St { handle :: Handle
@@ -134,8 +133,6 @@ runFSM g@Global{..} socketName peerName handle fd =
     framedPut msgs = rawPut ( L.toStrict $ L.concat $ map wireFormat msgs)
 
     bgpMessagesPut bgpMsgs = framedPut ( map encode bgpMsgs )
-
-    updatesPut updates = bgpMessagesPut ( map encodeUpdates updates )
 
     fsm :: (State,FSMState) -> IO (Either String String)
     fsm (s,st) | s == Idle = return $ Right "FSM normal exit"
@@ -262,16 +259,15 @@ runFSM g@Global{..} socketName peerName handle fd =
         -- preconfigured values as soon as possible
         -- TODO - make the addPeer function return a handle so that rib and peer data are not exposed
         ribHandle <- Rib.addPeer rib peerData
-        forkIO $ sendLoop handle (getKeepAliveTimer osm) ribHandle
+        _ <- forkIO $ sendLoop handle (getKeepAliveTimer osm) ribHandle
         return (Established,st{maybePD=Just peerData , ribHandle = Just ribHandle})
 
     established :: F
     established st@St{..} = do
-        let peerData = fromJust maybePD
         msg <- get handle (getNegotiatedHoldTime osm)
         case msg of
 
-            BGPKeepalive -> do Rib.ribPush (fromJust ribHandle) msg
+            BGPKeepalive -> do _ <- Rib.ribPush (fromJust ribHandle) msg
                                return (Established,st)
 
             update@BGPUpdate{} -> do

@@ -252,7 +252,7 @@ bmpParser = ( do msg <- bsParser
 
 bsParser :: Parser BS.ByteString
 bsParser = do
-    word8 0x03
+    _ <- word8 0x03
     msgLen <- anyWord32be
     when (msgLen < 5 || msgLen > 0xffff) ( fail "invalid message length")
     Data.Attoparsec.ByteString.take (fromIntegral msgLen - 5)
@@ -261,8 +261,7 @@ bsParser = do
 
 newtype HexByteString = HexByteString BS.ByteString deriving (Eq,Read)
 instance Show HexByteString where
-    show (HexByteString bs) = let toHex = Data.ByteString.Char8.unpack . Data.ByteString.Base16.encode
-                              in "[" ++ toHex bs ++ "]"
+    show (HexByteString bs) = "[" ++ toHex bs ++ "]"
 
 hbLength (HexByteString hb) = BS.length hb
 
@@ -296,7 +295,7 @@ rawBMPMessageParser = atto rawBMPMessageParser' "BMP wire format parser"
 rawBMPMessageParser' :: Parser BMPMessageRaw
 rawBMPMessageParser' = do
 -- TODO cal back to bsParse instead
-    word8 0x03
+    _ <- word8 0x03
     msgLen <- anyWord32be
     when (msgLen < 5 || msgLen > 0xffff) ( fail "invalid message length")
     payload <- Data.Attoparsec.ByteString.take (fromIntegral msgLen - 5)

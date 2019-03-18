@@ -4,7 +4,7 @@ module Main where
 import System.Environment(getArgs)
 import System.IO
 import Network.Socket
-import Session
+import qualified Session
 import Control.Concurrent
 import qualified Data.Map.Strict as Data.Map
 
@@ -24,7 +24,7 @@ main = do
 
     global <- buildGlobal config
 
-    forkIO (redistribute global)
+    _ <- forkIO (redistribute global)
     
     let
         app = bgpFSM global
@@ -32,7 +32,7 @@ main = do
     info $ "connecting to " ++ show (activePeers config)
     info $ "activeOnly = " ++ show (activeOnly config)
     --print config
-    session 179 app (activePeers config) (not $ activeOnly config)
+    Session.session 179 app (activePeers config) (not $ activeOnly config)
     info "Router ready"
     idle where idle = do threadDelay 10000000
                          idle

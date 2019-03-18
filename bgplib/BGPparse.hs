@@ -79,9 +79,6 @@ instance Binary BGPMessage where
                                                                where
                                                                    withdrawnRoutesLength = fromIntegral $ L.length withdrawnRoutes
                                                                    pathAttributesLength = fromIntegral $ L.length pathAttributes
-                                                                   nlriLength = fromIntegral $ L.length nlri
-                                                                   nonPrefixLength = 16 + 2 + 1 + 2 + 2 + pathAttributesLength
-                                                                   availablePrefixSpace = 4096 - nonPrefixLength
 
     put (BGPNotify code subCode caps) = do putWord8 _BGPNotify
                                            putWord8 $ encode8 code

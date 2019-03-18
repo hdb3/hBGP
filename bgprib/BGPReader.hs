@@ -43,9 +43,6 @@ readRib = readUngroupedRib
 readUngroupedRib :: IO [((Int, [PathAttribute]), Prefix)]
 readUngroupedRib = fmap ( map normalise ) readRib' 
 
-readUngroupedRibF :: IO [((Int, [PathAttribute]), Prefix)]
-readUngroupedRibF = fmap ( filter (bogonFilter . snd) ) readUngroupedRib
-
 readGroupedRib :: IO [((Int, [PathAttribute]), [Prefix])]
 readGroupedRib = fmap (map normalise . applyBogonFilter . groupBy_) readRib'
 
