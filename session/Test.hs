@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 module Main where
 
 import Control.Concurrent
@@ -9,29 +8,27 @@ import Data.IP
 import System.IO.Error
 import GHC.IO.Exception(ioe_description)
 import Foreign.C.Error
-import Network.Socket.ByteString
+--import Network.Socket.ByteString
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
-import Network.Socket.IOCtl
-import Data.Word
-import Foreign.C.Types(CInt)
+import System.IO(IOMode( ReadWriteMode ))
+import qualified System.Posix.Types as SPT
 
 import Poll
 
 main :: IO ()    
 main = do
     sock <- connectTo "169.254.99.99" 5000 "169.254.99.98"
-    forever (do sendAll sock $ C8.pack "Hello"
-                poll ( unsent sock )
+    fd  <- NS.fdSocket sock
+    handle <- NS.socketToHandle sock ReadWriteMode
+    forever (do 
+                BS.hPut handle $ C8.pack "Hello"
+                fdWaitOnQEmpty (SPT.Fd fd)
+                --sendAll sock $ C8.pack "Hello"
+                --waitOnQEmpty sock
                 threadDelay $ 10^7
             )
 
-data SIOCOUTQ = SIOCOUTQ
-instance IOControl SIOCOUTQ Word64 where
-    ioctlReq _ = 0x5411
-
-unsent :: NS.Socket -> IO Word64
-unsent sock = ioctlsocket' sock SIOCOUTQ
-                
 connectTo :: IPv4 -> NS.PortNumber -> IPv4 -> IO NS.Socket
 connectTo localIP port remoteIP = do
     sock <- NS.socket NS.AF_INET NS.Stream NS.defaultProtocol

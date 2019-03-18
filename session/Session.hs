@@ -1,12 +1,11 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE MultiWayIf #-}
-module Session(session) where
+module Session( module Session , module Poll) where
 
 import Data.Maybe
 import Control.Concurrent
-import Control.Monad (void,forever)
+import Control.Monad (forever)
 import qualified Network.Socket as NS
-import Control.Applicative((<$>))
 import System.IO
 import System.Exit(die)
 import Data.IP
@@ -14,6 +13,7 @@ import qualified Data.Map.Strict as Data.Map
 import System.IO.Error
 import GHC.IO.Exception(ioe_description)
 import Foreign.C.Error
+import Poll(fdWaitOnQEmpty,waitOnQEmpty)
 
 
 type App = ((NS.Socket,NS.SockAddr) -> IO ())
@@ -140,7 +140,7 @@ wrap State{..} app sock = do
         fromPeerAddress (NS.SockAddrInet _ ip) = fromHostAddress ip
     catchIOError
         ( do logger $ "connected to : " ++ show ip
-             app ( sock , peerAddress )
+             _ <- app ( sock , peerAddress )
              NS.close sock
              logger $ "app terminated for : " ++ show ip )
         (\e -> do Errno errno <- getErrno
