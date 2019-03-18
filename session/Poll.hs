@@ -10,9 +10,11 @@ import qualified System.Posix.IOCtl as SPI
 import qualified System.Posix as SP
 
 _1mS = 10^3
+_10mS = 10^4
+tPollDelay = _10mS
 
 poll :: ( Show a, Eq a) => IO a -> a -> IO ()
-poll action terminationValue = poll' ( terminationValue == ) _1mS action
+poll action terminationValue = poll' ( terminationValue == ) tPollDelay action
 
 poll' :: ( Show a, Eq a)=> (a-> Bool) -> Int -> IO a -> IO ()
 poll' cmp tDelay action = do
@@ -54,5 +56,3 @@ waitOnQEmpty sock = poll ( unsent sock ) 0
 
 fdWaitOnQEmpty :: SP.Fd -> IO ()
 fdWaitOnQEmpty fd = poll ( fdUnsent fd ) 0
-    --where
-    --fdUnsent fd = SPI.ioctl' fd SIOCOUTQ

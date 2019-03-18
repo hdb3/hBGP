@@ -19,13 +19,13 @@ import Poll
 main :: IO ()    
 main = do
     sock <- connectTo "169.254.99.99" 5000 "169.254.99.98"
-    --fd  <- NS.fdSocket sock
-    --handle <- NS.socketToHandle sock ReadWriteMode
+    fd  <- NS.fdSocket sock
+    handle <- NS.socketToHandle sock ReadWriteMode
     forever (do 
-                --BS.hPut handle $ BS.replicate 4096 0
-                --fdWaitOnQEmpty (SPT.Fd fd)
-                sendAll sock $ BS.replicate (1024 * 16) 0
-                waitOnQEmpty sock
+                BS.hPut handle $ BS.replicate (1024 * 16) 0
+                fdWaitOnQEmpty (SPT.Fd fd)
+                --sendAll sock $ BS.replicate (1024 * 16) 0
+                --waitOnQEmpty sock
                 --threadDelay $ 10^7
             )
 
