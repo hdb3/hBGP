@@ -8,7 +8,7 @@ import Data.IP
 import System.IO.Error
 import GHC.IO.Exception(ioe_description)
 import Foreign.C.Error
---import Network.Socket.ByteString
+import Network.Socket.ByteString
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
 import System.IO(IOMode( ReadWriteMode ))
@@ -19,14 +19,14 @@ import Poll
 main :: IO ()    
 main = do
     sock <- connectTo "169.254.99.99" 5000 "169.254.99.98"
-    fd  <- NS.fdSocket sock
-    handle <- NS.socketToHandle sock ReadWriteMode
+    --fd  <- NS.fdSocket sock
+    --handle <- NS.socketToHandle sock ReadWriteMode
     forever (do 
-                BS.hPut handle $ C8.pack "Hello"
-                fdWaitOnQEmpty (SPT.Fd fd)
-                --sendAll sock $ C8.pack "Hello"
-                --waitOnQEmpty sock
-                threadDelay $ 10^7
+                --BS.hPut handle $ BS.replicate 4096 0
+                --fdWaitOnQEmpty (SPT.Fd fd)
+                sendAll sock $ BS.replicate (1024 * 16) 0
+                waitOnQEmpty sock
+                --threadDelay $ 10^7
             )
 
 connectTo :: IPv4 -> NS.PortNumber -> IPv4 -> IO NS.Socket

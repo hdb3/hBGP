@@ -36,17 +36,17 @@ poll' cmp tDelay action = do
         else return x'
 
 data SIOCOUTQ = SIOCOUTQ
-instance NSI.IOControl SIOCOUTQ Word64 where
+instance NSI.IOControl SIOCOUTQ Word32 where
     ioctlReq _ = 0x5411
 
 -- NSI.IOControl and SPI.IOControl are equivalent
---instance SPI.IOControl SIOCOUTQ Word64 where
+--instance SPI.IOControl SIOCOUTQ Word32 where
 --    ioctlReq _ = 0x5411
 
-fdUnsent :: SP.Fd -> IO Word64
+fdUnsent :: SP.Fd -> IO Word32
 fdUnsent fd = SPI.ioctl' fd SIOCOUTQ
 
-unsent :: NS.Socket -> IO Word64
+unsent :: NS.Socket -> IO Word32
 unsent sock = NSI.ioctlsocket' sock SIOCOUTQ
 
 waitOnQEmpty :: NS.Socket -> IO ()

@@ -7,19 +7,16 @@
 -}
 module Main where
 
-import Data.Char(toUpper)
-import qualified Data.ByteString.Char8 as C
---import Control.Concurrent
-import Control.Monad (void,forever)
-import Control.Applicative((<$>))
+import qualified Data.ByteString as BS
+import Control.Monad (forever)
 import Network.Socket
-import Network.Socket.ByteString(send,recv)
---import System.IO
+import Network.Socket.ByteString(recv)
 import Data.IP
+import Control.Concurrent
 
 main :: IO ()
 main = do
-    let port = 179
+    let port = 5000
         localIP = "169.254.99.98"
     listeningSocket <- socket AF_INET Stream defaultProtocol
     setSocketOption listeningSocket ReuseAddr 1
@@ -28,19 +25,25 @@ main = do
     forever $ do
                 (sock, SockAddrInet remotePort remoteIPv4) <- accept listeningSocket
                 putStrLn $ "listener - connect request from " ++ show remoteIPv4 ++ ":" ++ show remotePort
-                echo sock
+                serve sock
 
     where
 
-    echo sock = do
-        putStrLn "echo starting"
+    serve sock = do
+        putStrLn "serve starting"
         peerAddress  <- getPeerName sock
         localAddress <- getSocketName sock
-        putStrLn $ "echo - local address: " ++ show localAddress ++ " peer address: " ++ show peerAddress
-        void $ send sock $ C.pack "hello friend\n"
-        reply <- C.unpack <$> recv sock 4096
-        putStrLn $ "my friend said: \"" ++ reply ++ "\"\n"
-        void $ send sock $ C.pack $ "you said " ++ map toUpper reply ++ "\n"
-        void $ send sock $ C.pack "Goodbye!\n"
+        putStrLn $ "serve - local address: " ++ show localAddress ++ " peer address: " ++ show peerAddress
+        recvLoop sock
         close sock
         return ()
+
+    recvLoop sock = do
+        threadDelay $ 10^6
+        reply <- recv sock 4096
+        putStrLn $ "received " ++ show (BS.length reply)
+        if BS.null reply
+        then
+            return ()
+        else
+            recvLoop sock
