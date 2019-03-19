@@ -11,14 +11,14 @@ copyright:           Nicholas Hart
 category:            Network
 
 common deps
-  build-depends:       base ^>=4.12.0.0, bytestring ^>=0.10.8.2, bluster ^>=0.1.0.0, MRT, containers
+  build-depends:       base ^>=4.11.0.0, bytestring ^>=0.10.8.2, bluster ^>=0.1.0.0, MRT, containers
   hs-source-dirs:      app
   default-language:    Haskell2010
   ghc-options:         -O2 -Wall -Wno-missing-signatures -Wno-type-defaults 
 
 library
   exposed-modules:     ClusterMetrics, MRTformat, MRTquest, MRTrib, Overlap, PrefixGroupMetrics, FilterMoreSpecifics, MRTlib, MRTRibAnalysis, MRTXRib, PrefixTree
-  build-depends:       base ^>=4.12.0.0, bytestring ^>=0.10.8.2, bluster ^>=0.1.0.0, zlib, iproute, attoparsec-binary, base16-bytestring, attoparsec, hashable, containers, farmhash, array, bgplib, bgprib
+  build-depends:       base ^>=4.11.0.0, bytestring ^>=0.10.8.2, bluster ^>=0.1.0.0, zlib, iproute, attoparsec-binary, base16-bytestring, attoparsec, hashable, containers, farmhash, array, bgplib, bgprib
   hs-source-dirs:      lib
   default-language:    Haskell2010
   ghc-options: -O2
