@@ -41,12 +41,6 @@ getDeltaFirstPull rh = modifyMVar (mvCRib rh) (\crib -> if zeroDay == firstPull 
 getFirstPull :: RibHandle -> IO UTCTime
 getFirstPull = gfp
 
---setFirstPull :: RibHandle -> IO ()
---setFirstPull rh = modifyMVar_ (mvCRib rh) (\crib -> if zeroDay == firstPull crib
---                                                    then getCurrentTime >>= \ t -> return $ crib{firstPull = t}
---                                                    else return crib
---                                          )
-
 setCRibTime :: (CRib -> UTCTime -> CRib) -> RibHandle -> IO ()
 setCRibTime updater rh = modifyMVar_ (mvCRib rh) ( \ crib -> updater crib <$> getCurrentTime )
 
@@ -70,7 +64,6 @@ gfu = getCRibTime firstUpdate
 glu = getCRibTime lastUpdate
 
 getLastPull :: RibHandle -> IO UTCTime
---getLastPull rh = lastPull <$> readMVar (mvCRib rh)
 getLastPull = getCRibTime lastPull
 
 data RibHandle = RibHandle {testMode :: TestMode
@@ -158,7 +151,8 @@ ribPull rh =  do
     pullActive <- testAndClearPullActive rh
     deltaFirstPull <- show <$> getDeltaFirstPull rh
     trace $ "ribPull: pullActive=" ++ show pullActive
-    when pullActive
+    -- this is quite chatty if the bursts are small
+    when False -- pullActive
          ( do t0 <- glp rh
               tfp <- gfp rh
               now <- getCurrentTime
@@ -167,7 +161,9 @@ ribPull rh =  do
          )
     updates <- updateSource rh
     if null updates then do
-        trace $ "ribPull: update stream ended"
+        when pullActive ( do info $ "ribPull: update stream ended"
+                             info $ deltaFirstPull ++ " pull " ++ show ( peer rh)
+                        )
         threadDelay $ 10^12 -- should just return if the stream REALYY is empty forever.....
     else do
         slp rh

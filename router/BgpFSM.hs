@@ -329,7 +329,7 @@ runFSM g@Global{..} socketName peerName handle fd =
         ( do 
              -- this forces a delay until the TCP ACK for all sent messages
              -- however there could still be a lot (500kb?) of data in the receiver's queue.
-             fdWaitOnQEmpty fd
+             -- fdWaitOnQEmpty fd
              updates <- Rib.msgTimeout timer (Rib.ribPull rh)
              if null updates then
                  bgpSnd handle BGPKeepalive
