@@ -53,7 +53,12 @@ ribPush RibHandle{..} BGPKeepalive = do
     if active cRib then do
         now <- getCurrentTime
         let idleTime = diffUTCTime now (lastUpdate cRib)
-        if idleTime < idleDetect then putMVar mvCRib cRib else do
+        if idleTime < idleDetect then do
+            --putStrLn "((lastUpdate cRib),now,idleTime,idleDetect)"
+            --print ((lastUpdate cRib),now,idleTime,idleDetect)
+            putMVar mvCRib cRib
+        else do
+        --if idleTime < idleDetect then return () else do
             putMVar mvCRib ( cRib {active = False})
             report cRib
     else do
