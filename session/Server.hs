@@ -18,8 +18,8 @@ main :: IO ()
 main = do
     let port = 5000
         localIP = toHostAddress "169.254.99.98"
-        app = devNull ; startDelay = 0
-        --app = recvLoop ; startDelay = 10^8
+        app = devNull (10^8) 0 ; startDelay = 0
+        --app = recvLoop (10^6) 0 ; startDelay = 10^8
     listeningSocket <- socket AF_INET Stream defaultProtocol
     setSocketOption listeningSocket ReuseAddr 1
     bind listeningSocket ( SockAddrInet port localIP )
@@ -39,25 +39,26 @@ main = do
         putStrLn $ "Server process - local address: " ++ show localAddress ++ " peer address: " ++ show peerAddress
         threadDelay sd
         putStrLn "Server loop starting"
-        n <- app sock 0
+        n <- app sock
         putStrLn $ "Server loop exit: " ++ show n
         close sock
         --return ()
 
-    recvLoop sock n = do
-        threadDelay $ 10^6
+    -- recvLoop slowly drains the queue, with a configurable pause
+    recvLoop pause n sock = do
+        threadDelay pause
         reply <- recv sock 4096
         putStrLn $ "received " ++ show (BS.length reply) ++ "/" ++ show (n + BS.length reply)
         if BS.null reply
         then
             return n
         else
-            recvLoop sock (n + BS.length reply)
+            recvLoop pause (n + BS.length reply) sock
 
-    devNull sock n = do
-        reply <- recv sock (10^8)
+    devNull bs n sock = do
+        reply <- recv sock bs
         if BS.null reply
         then
             return n
         else
-            devNull sock (n + BS.length reply)
+            devNull bs (n + BS.length reply) sock
