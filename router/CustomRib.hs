@@ -2,6 +2,7 @@
 module CustomRib(ribPull,msgTimeout,addRouteRib,delRouteRib,updateFromAdjRibEntrys,routesFromAdjRibEntrys,delPeerByAddress, addPeer, ribPush, RibHandle ) where
 import System.Timeout(timeout)
 import Data.Time.Clock
+import Data.Time.Calendar(Day(ModifiedJulianDay))
 import Data.Maybe(fromMaybe)
 import Data.Word
 import Control.Concurrent
@@ -13,11 +14,14 @@ import UpdateSource
 import Log
 import ArgConfig
 
+zeroDay :: UTCTime
+zeroDay = UTCTime (ModifiedJulianDay 0) 0.0
+
 data TestMode = OneShot | Continuous | Passive deriving (Read,Show,Eq)
 data CRib = CRib { msgCount :: Int
                  , pullActive
                  , active :: Bool
-                 --, firstPull
+                 , firstPull
                  , lastPull
                  , firstUpdate
                  , lastUpdate :: UTCTime }
@@ -27,6 +31,21 @@ testAndClearPullActive rh = modifyMVar (mvCRib rh) (\crib -> return (crib{pullAc
 
 setPullActive :: RibHandle -> IO ()
 setPullActive rh = modifyMVar_ (mvCRib rh) (\crib -> return crib{pullActive=True})
+
+getDeltaFirstPull :: RibHandle -> IO NominalDiffTime
+getDeltaFirstPull rh = modifyMVar (mvCRib rh) (\crib -> if zeroDay == firstPull crib
+                                                    then getCurrentTime >>= \ t -> return (crib{firstPull = t},fromRational 0.0)
+                                                    else getCurrentTime >>= \ t -> return (crib,diffUTCTime t (firstPull crib))
+                                          )
+
+getFirstPull :: RibHandle -> IO UTCTime
+getFirstPull = gfp
+
+--setFirstPull :: RibHandle -> IO ()
+--setFirstPull rh = modifyMVar_ (mvCRib rh) (\crib -> if zeroDay == firstPull crib
+--                                                    then getCurrentTime >>= \ t -> return $ crib{firstPull = t}
+--                                                    else return crib
+--                                          )
 
 setCRibTime :: (CRib -> UTCTime -> CRib) -> RibHandle -> IO ()
 setCRibTime updater rh = modifyMVar_ (mvCRib rh) ( \ crib -> updater crib <$> getCurrentTime )
@@ -45,6 +64,7 @@ setLastPull rh = modifyMVar_ (mvCRib rh) setLastPullCRib
 slp = setCRibTime (\rh a -> rh {lastPull=a})
 sfu = setCRibTime (\rh a -> rh {firstUpdate=a})
 slu = setCRibTime (\rh a -> rh {lastUpdate=a})
+gfp = getCRibTime firstPull
 glp = getCRibTime lastPull
 gfu = getCRibTime firstUpdate
 glu = getCRibTime lastUpdate
@@ -88,6 +108,7 @@ addPeer _ peer = do
     mvCRib <- newMVar $ CRib { msgCount = 0
                              , pullActive = False
                              , active = False
+                             , firstPull = zeroDay
                              , lastPull = start
                              , firstUpdate = undefined
                              , lastUpdate = undefined  }
@@ -135,12 +156,14 @@ ribPull :: RibHandle -> IO [BGPMessage]
 --ribPull RibHandle{..} =  do
 ribPull rh =  do
     pullActive <- testAndClearPullActive rh
+    deltaFirstPull <- show <$> getDeltaFirstPull rh
     trace $ "ribPull: pullActive=" ++ show pullActive
     when pullActive
          ( do t0 <- glp rh
+              tfp <- gfp rh
               now <- getCurrentTime
               let deltaTime = show ( diffUTCTime now t0 )
-              info $ deltaTime ++ " pull " ++ show ( peer rh)
+              info $ deltaFirstPull ++ " (" ++ deltaTime ++ ") pull " ++ show ( peer rh)
          )
     updates <- updateSource rh
     if null updates then do
