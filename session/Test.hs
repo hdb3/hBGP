@@ -13,21 +13,36 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
 import System.IO(IOMode( ReadWriteMode ))
 import qualified System.Posix.Types as SPT
+import Data.Time.Clock
 
 import Poll
 
 main :: IO ()    
 main = do
+    --let app = loop ; blockSize = 1024
+    let app = nullLoop ; blockSize = 10^9
     sock <- connectTo "169.254.99.99" 5000 "169.254.99.98"
     fd  <- NS.fdSocket sock
     handle <- NS.socketToHandle sock ReadWriteMode
-    forever (do 
-                BS.hPut handle $ BS.replicate (1024 * 16) 0
-                fdWaitOnQEmpty (SPT.Fd fd)
-                --sendAll sock $ BS.replicate (1024 * 16) 0
-                --waitOnQEmpty sock
-                --threadDelay $ 10^7
-            )
+    app handle (SPT.Fd fd) blockSize 0
+    where
+    loop h fd bs n = do 
+        BS.hPut h $ BS.replicate bs 0
+        fdWaitOnQEmpty fd
+        putStrLn $ "Client: put " ++ show bs ++ "/" ++ show (n + bs)
+        --sendAll sock $ BS.replicate bs 0
+        --waitOnQEmpty sock
+        --threadDelay $ 10^7
+        loop h fd bs (n + bs)
+
+    nullLoop h fd bs n = do 
+        t0 <- getCurrentTime
+        BS.hPut h $ BS.replicate bs 0
+        t1 <- getCurrentTime
+        fdWaitOnQEmpty fd
+        t2 <- getCurrentTime
+        putStrLn $ "Client: put " ++ show bs ++ "/" ++ show (n + bs)
+        putStrLn $ "Client: elapsed times = " ++ show ( diffUTCTime t2 t0 ) ++ " total " ++ show ( diffUTCTime t1 t0 ) ++ " before ACK "++ show ( diffUTCTime t2 t1 ) ++ " after ACK "
 
 connectTo :: IPv4 -> NS.PortNumber -> IPv4 -> IO NS.Socket
 connectTo localIP port remoteIP = do

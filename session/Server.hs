@@ -17,33 +17,47 @@ import Control.Concurrent
 main :: IO ()
 main = do
     let port = 5000
-        localIP = "169.254.99.98"
+        localIP = toHostAddress "169.254.99.98"
+        app = devNull ; startDelay = 0
+        --app = recvLoop ; startDelay = 10^8
     listeningSocket <- socket AF_INET Stream defaultProtocol
     setSocketOption listeningSocket ReuseAddr 1
-    bind listeningSocket ( SockAddrInet port $ toHostAddress localIP )
+    bind listeningSocket ( SockAddrInet port localIP )
     listen listeningSocket 1
     forever $ do
                 (sock, SockAddrInet remotePort remoteIPv4) <- accept listeningSocket
-                putStrLn $ "listener - connect request from " ++ show remoteIPv4 ++ ":" ++ show remotePort
-                serve sock
+                putStrLn $ "Server - connect request from " ++ show ( fromHostAddress remoteIPv4 ) ++ ":" ++ show remotePort
+                serve sock app startDelay
+                putStrLn $ "Server - session close from " ++ show ( fromHostAddress remoteIPv4 ) ++ ":" ++ show remotePort
 
     where
 
-    serve sock = do
-        putStrLn "serve starting"
+    serve sock app sd = do
+        putStrLn "Server process starting"
         peerAddress  <- getPeerName sock
         localAddress <- getSocketName sock
-        putStrLn $ "serve - local address: " ++ show localAddress ++ " peer address: " ++ show peerAddress
-        recvLoop sock
+        putStrLn $ "Server process - local address: " ++ show localAddress ++ " peer address: " ++ show peerAddress
+        threadDelay sd
+        putStrLn "Server loop starting"
+        n <- app sock 0
+        putStrLn $ "Server loop exit: " ++ show n
         close sock
-        return ()
+        --return ()
 
-    recvLoop sock = do
+    recvLoop sock n = do
         threadDelay $ 10^6
         reply <- recv sock 4096
-        putStrLn $ "received " ++ show (BS.length reply)
+        putStrLn $ "received " ++ show (BS.length reply) ++ "/" ++ show (n + BS.length reply)
         if BS.null reply
         then
-            return ()
+            return n
         else
-            recvLoop sock
+            recvLoop sock (n + BS.length reply)
+
+    devNull sock n = do
+        reply <- recv sock (10^8)
+        if BS.null reply
+        then
+            return n
+        else
+            devNull sock (n + BS.length reply)
