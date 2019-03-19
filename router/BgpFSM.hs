@@ -326,12 +326,15 @@ runFSM g@Global{..} socketName peerName handle fd =
 
 -- loop runs until it catches the FSMException
     sendLoop handle timer rh = catch
-        ( do updates <- Rib.msgTimeout timer (Rib.ribPull rh)
+        ( do 
+             -- this forces a delay until the TCP ACK for all sent messages
+             -- however there could still be a lot (500kb?) of data in the receiver's queue.
+             fdWaitOnQEmpty fd
+             updates <- Rib.msgTimeout timer (Rib.ribPull rh)
              if null updates then
                  bgpSnd handle BGPKeepalive
              else do
                  bgpMessagesPut updates
-                 fdWaitOnQEmpty fd
                  --bgpSndAll handle updates
                  --mapM_ (bgpSnd handle ) updates
              sendLoop handle timer rh

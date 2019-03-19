@@ -22,10 +22,11 @@ poll' cmp tDelay action = do
     iv <- action
     go ts0 iv where
     go t0 v = do
-        t <- getCurrentTime
+        --t <- getCurrentTime
         --print (t,v)
         if cmp v then
-            putStrLn $ "Poll: elapsed time = " ++ show ( diffUTCTime t t0 )
+            --putStrLn $ "Poll: elapsed time = " ++ show ( diffUTCTime t t0 )
+            return ()
         else do
             v' <- retry v
             go t0 v'

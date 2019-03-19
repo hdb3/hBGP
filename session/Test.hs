@@ -20,7 +20,8 @@ import Poll
 main :: IO ()    
 main = do
     --let app = loop ; blockSize = 1024
-    let app = nullLoop (10^3) (10^6)
+    let app = nullLoop (10^6) (10^3)
+    --let app = nullLoop (10^3) (10^6)
     sock <- connectTo "169.254.99.99" 5000 "169.254.99.98"
     fd  <- NS.fdSocket sock
     handle <- NS.socketToHandle sock ReadWriteMode
@@ -37,16 +38,16 @@ main = do
         --threadDelay $ 10^7
         loop h fd bs (n + bs)
 
-    nullLoop bs c h fd = do 
+    nullLoop burstSize count h fd = do 
         t0 <- getCurrentTime
-        go h ( BS.replicate bs 0 ) c
+        go ( BS.replicate burstSize 0 ) count
         t1 <- getCurrentTime
         fdWaitOnQEmpty fd
         t2 <- getCurrentTime
-        putStrLn $ "Client: put " ++ show c ++ " blocks of size " ++ show bs
+        putStrLn $ "Client: put " ++ show count ++ " blocks of size " ++ show burstSize
         putStrLn $ "Client: elapsed times = " ++ show ( diffUTCTime t2 t0 ) ++ " total " ++ show ( diffUTCTime t1 t0 ) ++ " before ACK "++ show ( diffUTCTime t2 t1 ) ++ " after ACK "
         where
-            go h bs n = if n == 0 then return () else do BS.hPut h bs ; go h bs (n-1)
+            go bs n = if n == 0 then return () else do BS.hPut h bs ; go bs (n-1)
 
     connectTo :: IPv4 -> NS.PortNumber -> IPv4 -> IO NS.Socket
     connectTo localIP port remoteIP = do
