@@ -14,6 +14,7 @@ import Data.Either(either)
 import qualified Data.Map.Strict as Data.Map
 import System.Posix.Temp(mkstemp)
 import qualified System.Posix.Types as SPT
+import Control.Applicative ((<|>))
 
 import BGPRib(processUpdate,encodeUpdates,GlobalData(..),PeerData(..),ParsedUpdate(..))
 -- TODO = move Update.hs, and ppssibly some or all of BGPData, from bgprib to bgplib, so that bgprib does not need to be imported here.....
@@ -54,16 +55,18 @@ bgpFSM global@Global{..} ( sock , peerName ) =
                           do threadId <- myThreadId
                              trace $ "Thread " ++ show threadId ++ " starting: peer is " ++ show peerName
 
-                             let (SockAddrInet remotePort remoteIP) = peerName
                              socketName <- getSocketName sock
+                             let (SockAddrInet remotePort remoteIP) = peerName
+                                 (SockAddrInet localPort localIP)   = socketName
                              fd  <- SPT.Fd <$> fdSocket sock
                              handle <- socketToHandle sock ReadWriteMode
 
-                             let maybePeer = maybe
-                                                 ( if configAllowDynamicPeers config then Just (fillConfig config (fromHostAddress remoteIP))
-                                                   else Nothing)
-                                                 Just
-                                                 ( Data.Map.lookup (fromHostAddress remoteIP) peerMap )
+                             -- lookup explicit local IP then failover to widlcard adn eventually, if allowed, a dynamic peer
+                             let maybePeer = ( Data.Map.lookup (fromHostAddress localIP , fromHostAddress remoteIP) peerMap ) <|>
+                                             ( Data.Map.lookup (fromHostAddress 0 , fromHostAddress remoteIP) peerMap ) <|>
+                                             ( if configAllowDynamicPeers config
+                                               then Just (fillConfig config (fromHostAddress remoteIP))
+                                               else Nothing)
                              fsmExitStatus <-
                                          catch
                                              (runFSM global socketName peerName handle fd maybePeer )

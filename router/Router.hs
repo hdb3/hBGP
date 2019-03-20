@@ -32,7 +32,7 @@ main = do
     info $ "connecting to " ++ show (activePeers config)
     info $ "activeOnly = " ++ show (activeOnly config)
     --print config
-    Session.session 179 app (activePeers config) (not $ activeOnly config)
+    Session.session 179 app (configListenAddress config) (activePeers config) (not $ activeOnly config)
     info "Router ready"
     idle where idle = do threadDelay 10000000
                          idle

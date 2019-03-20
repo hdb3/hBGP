@@ -9,7 +9,7 @@ import Config
 import Collision
 
 data Global = Global { rib :: BGPRib.Rib
-                     , peerMap :: Data.Map.Map IPv4 PeerConfig
+                     , peerMap :: Data.Map.Map (IPv4,IPv4) PeerConfig
                      ,collisionDetector :: CollisionDetector
                      ,sessions :: MVar ( Data.Map.Map ThreadId PeerData )
                      ,gd :: GlobalData

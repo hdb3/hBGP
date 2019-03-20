@@ -19,6 +19,7 @@ import BGPlib
 
 data Config = Config { configAS :: Word32
                      , configBGPID :: IPv4
+                     , configListenAddress :: IPv4
                      , configEnabledPeers :: [IPv4]
                      , configConfiguredPeers :: [PeerConfig]
                      , configDelayOpenTimer :: Int
@@ -34,15 +35,15 @@ data Config = Config { configAS :: Word32
                      }
                      deriving (Show,Read)
 
-activePeers :: Config -> [IPv4]
+activePeers :: Config -> [(IPv4,IPv4)]
 activePeers config = map peerConfigIPv4 $ filter peerConfigEnableOutbound (configConfiguredPeers config)
 
 activeOnly :: Config -> Bool
 activeOnly c = null (configEnabledPeers c) && null (filter peerConfigEnableInbound (configConfiguredPeers c)) && not (configAllowDynamicPeers c)
 
-data PeerConfig = PeerConfig { peerConfigIPv4 :: IPv4
-                             , peerConfigAS ::  Maybe Word32
-                             , peerConfigBGPID ::  Maybe IPv4
+data PeerConfig = PeerConfig { peerConfigIPv4 :: (IPv4,IPv4)
+                             , peerConfigAS :: Maybe Word32
+                             , peerConfigBGPID :: Maybe IPv4
                              , peerConfigEnableOutbound :: Bool
                              , peerConfigEnableInbound :: Bool
                              , peerConfigOfferedCapabilities :: [ Capability ]
@@ -59,41 +60,42 @@ defaultPeerConfig = PeerConfig { peerConfigIPv4 = undefined
                                , peerConfigRequiredCapabilities = [CapAS4 0]
                                }
 
-dummyPeerConfig = defaultPeerConfig {peerConfigIPv4="127.0.0.1" }
+dummyPeerConfig = defaultPeerConfig {peerConfigIPv4=("0.0.0.0","127.0.0.1") }
 
 -- expand an input configuration to push all peer definitions into the 'configConfiguredPeers' group
--- at the same time also populate fully the 'configEnabledPeers'
--- and fix up the CapAS4 AS number in configOfferedCapabilities
+-- at the same time fix up the CapAS4 AS number in configOfferedCapabilities
 buildPeerConfigs :: Config -> Config
 
 buildPeerConfigs inConfig = inConfig { configOfferedCapabilities = outConfigOfferedCapabilities
-                                     --, configEnabledPeers = outEnabledIPv4s
-                                     , configConfiguredPeers = outConfiguredPeers } where
-   myAS = configAS inConfig
-   outConfigOfferedCapabilities = setAS myAS (configOfferedCapabilities inConfig)
-   enabledIPv4s = nub $ configEnabledPeers inConfig -- eliminate any duplicates
-   configuredPeers = nub $ configConfiguredPeers inConfig -- eliminate any duplicates -- should ideally also eliminate non-duplicates with equal IPv4s
-   configuredIPv4s = map peerConfigIPv4 configuredPeers -- extract the IPs from full configuration
-   nonDupEnabledPeers = enabledIPv4s \\ configuredIPv4s -- remove from the enabled list any which also have full configuration
-   --outEnabledIPv4s = nonDupEnabledPeers ++ configuredIPv4s
-   outConfiguredPeers = map fixAS4 configuredPeers ++ map ( fillConfig inConfig) nonDupEnabledPeers
+                                     , configConfiguredPeers = allPeers } where
 
-   fixAS4 :: PeerConfig -> PeerConfig
-   fixAS4 pc@PeerConfig{..} = pc { peerConfigOfferedCapabilities = setAS myAS peerConfigOfferedCapabilities }
+   outConfigOfferedCapabilities = setAS inConfig (configOfferedCapabilities inConfig)
+
+   allPeers = map (fixAS4 inConfig) ( (configConfiguredPeers inConfig) ++ constructedPeers )
+
+   constructedPeers = map ( fillConfig inConfig) (enabledIPv4s \\ configuredIPv4s)
+       where
+       enabledIPv4s = nub $ configEnabledPeers inConfig -- eliminate any duplicates
+       configuredIPv4s = nub $ map ( snd . peerConfigIPv4) (configConfiguredPeers inConfig) -- extract the destination IPs from full configuration
 
    -- this is to allow an AS4 requirement to be specified without explicitly writing the local AS into the configuration file again
    -- so - the capability can be written [ CapAS4 0 ] which parses, knowing it will be set right before use...
    -- it is done for both fully and partially configured peers
    -- though a case could be made for leaving the fully configured ones intact...
 
-setAS :: Word32 -> [ Capability ] -> [ Capability ]
-setAS as = map (setAS' as) 
-setAS' as (CapAS4 _) = CapAS4 as
-setAS' _ cap = cap
 
+   fixAS4 :: Config -> PeerConfig -> PeerConfig
+   fixAS4 config pc@PeerConfig{..} = pc { peerConfigOfferedCapabilities = setAS config peerConfigOfferedCapabilities }
+
+setAS :: Config -> [ Capability ] -> [ Capability ]
+setAS config = map setAS'
+    where
+    setAS' (CapAS4 _) = CapAS4 $ configAS config
+    setAS' cap = cap
+
+   -- construct complete peer configurations from bare IPs
 fillConfig :: Config -> IPv4 -> PeerConfig
-fillConfig config ip = defaultPeerConfig { peerConfigIPv4 = ip
-                                         , peerConfigOfferedCapabilities = setAS (configAS config) ( configOfferedCapabilities config )
-                                         , peerConfigRequiredCapabilities = configRequiredCapabilities config
+fillConfig config ip = defaultPeerConfig { peerConfigIPv4 = ("0.0.0.0",ip)
+                                         , peerConfigOfferedCapabilities = setAS config $ configOfferedCapabilities config 
+                                         , peerConfigRequiredCapabilities = setAS config $ configRequiredCapabilities config
                                          }
-
