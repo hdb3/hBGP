@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
-module Update(encodeUpdates,processUpdate,getUpdate,ungetUpdate,ParsedUpdate(..),makeUpdate,makeUpdateSimple,igpUpdate,originateWithdraw,originateUpdate,myHash) where
+module Update(endOfRib,encodeUpdates,processUpdate,getUpdate,ungetUpdate,ParsedUpdate(..),makeUpdate,makeUpdateSimple,igpUpdate,originateWithdraw,originateUpdate,myHash) where
 import qualified Data.ByteString.Lazy as L
 import Data.Int
 import Data.Binary
@@ -41,6 +41,9 @@ encodeUpdates = map ungetUpdate
 -- TODO rename getUpdate/ungetUpdate encodeUpdate/decodeUpdate
 ungetUpdate :: ParsedUpdate -> BGPMessage
 ungetUpdate ParsedUpdate{..} = BGPUpdate { withdrawn = encode withdrawn , attributes = encode puPathAttributes , nlri = encode nlri } 
+
+endOfRib :: BGPMessage
+endOfRib = BGPUpdate { withdrawn = L.empty , attributes = L.empty , nlri = L.empty }
 
 getUpdate :: BGPMessage -> ParsedUpdate
 getUpdate BGPUpdate{..} = ParsedUpdate { puPathAttributes = a , nlri = n , withdrawn = w,

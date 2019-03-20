@@ -28,27 +28,38 @@ nullInitSource = return f where
 
 initSource :: PeerData -> AddrRange IPv4 -> Word32 -> Word32 -> Word32 -> Int -> Bool -> Int -> IO UpdateSource
 initSource peer startPrefix tableSize groupSize burstSize burstDelay oneShotMode repeatDelay = do
-    mv <- newMVar  0
-    print $ addrRangePair startPrefix
+    mv <- newMVar maxBound
+    --print $ addrRangePair startPrefix
     let f mv = do
-             n <- takeMVar mv
-             putMVar mv $ n + burstSize
-             if oneShotMode then
-                 if n < tableSize then do
-                     when (burstDelay /= 0) (threadDelay $ 10^3 * burstDelay)
-                     return $ encodeUpdates $ concatMap (update peer startPrefix tableSize groupSize) [n .. min tableSize (n+burstSize)-1]
-                 else if repeatDelay > 0 then do
-                     _ <- takeMVar mv
-                     putMVar mv 0
-                     threadDelay $ 10^6 * repeatDelay
-                     f mv
-                     --return []
-                 else do
-                     --threadDelay $ 10^12
-                     return []
+             n <- fromIntegral <$> takeMVar mv
+             if n == maxBound
+             then do
+                 putMVar mv 0
+                 return [endOfRib,BGPKeepalive]
              else do
-                 when (burstDelay /= 0) (threadDelay $ 10^3 * burstDelay)
-                 return $ encodeUpdates $ concatMap (update peer startPrefix tableSize groupSize) [n .. n+burstSize-1]
+                 let initDelay = 5000 -- mS  - arbitary one second delay to allow a BGP peer to settle after reeceiving inintial EoR
+                                      -- this needs to be made configurable, too.... ;-)
+                 when (n == 0) (threadDelay $ 10^3 * initDelay)
+                 putMVar mv $ n + burstSize
+                 if oneShotMode then
+                     if n < tableSize then do
+                         when (burstDelay /= 0) (threadDelay $ 10^3 * burstDelay)
+                         return $ encodeUpdates $ concatMap (update peer startPrefix tableSize groupSize) [n .. min tableSize (n+burstSize)-1]
+                     else if repeatDelay > 0 then do
+                         _ <- takeMVar mv
+                         putMVar mv 0
+                         threadDelay $ 10^6 * repeatDelay
+                         -- this is not going to work for small values of hold timer
+                         f mv
+                         --return []
+                     else do
+                         --threadDelay $ 10^12
+                         -- empty list tells CustomRib that the update stream is now empty
+                         return []
+                 else do
+                     when (burstDelay /= 0) (threadDelay $ 10^3 * burstDelay)
+                     return $ encodeUpdates $ concatMap (update peer startPrefix tableSize groupSize) [n .. n+burstSize-1]
+
     return (f mv)
 
 
