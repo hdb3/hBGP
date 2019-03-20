@@ -15,6 +15,7 @@ module Config where
 import Data.List(nub,(\\))
 import Data.IP
 import Data.Word
+import Data.Maybe(fromMaybe)
 import BGPlib
 
 data Config = Config { configAS :: Word32
@@ -44,6 +45,8 @@ activeOnly c = null (configEnabledPeers c) && null (filter peerConfigEnableInbou
 data PeerConfig = PeerConfig { peerConfigIPv4 :: (IPv4,IPv4)
                              , peerConfigAS :: Maybe Word32
                              , peerConfigBGPID :: Maybe IPv4
+                             , peerConfigLocalAS :: Maybe Word32
+                             , peerConfigLocalBGPID :: Maybe IPv4
                              , peerConfigEnableOutbound :: Bool
                              , peerConfigEnableInbound :: Bool
                              , peerConfigOfferedCapabilities :: [ Capability ]
@@ -54,6 +57,8 @@ data PeerConfig = PeerConfig { peerConfigIPv4 :: (IPv4,IPv4)
 defaultPeerConfig = PeerConfig { peerConfigIPv4 = undefined
                                , peerConfigAS = Nothing
                                , peerConfigBGPID = Nothing
+                               , peerConfigLocalAS = Nothing
+                               , peerConfigLocalBGPID = Nothing
                                , peerConfigEnableOutbound = True
                                , peerConfigEnableInbound = True
                                , peerConfigOfferedCapabilities = [CapAS4 0]
@@ -69,7 +74,7 @@ buildPeerConfigs :: Config -> Config
 buildPeerConfigs inConfig = inConfig { configOfferedCapabilities = outConfigOfferedCapabilities
                                      , configConfiguredPeers = allPeers } where
 
-   outConfigOfferedCapabilities = setAS inConfig (configOfferedCapabilities inConfig)
+   outConfigOfferedCapabilities = setAS (configAS inConfig) (configOfferedCapabilities inConfig)
 
    allPeers = map (fixAS4 inConfig) ( (configConfiguredPeers inConfig) ++ constructedPeers )
 
@@ -85,10 +90,19 @@ buildPeerConfigs inConfig = inConfig { configOfferedCapabilities = outConfigOffe
 
 
    fixAS4 :: Config -> PeerConfig -> PeerConfig
-   fixAS4 config pc@PeerConfig{..} = pc { peerConfigOfferedCapabilities = setAS config peerConfigOfferedCapabilities }
+   fixAS4 config pc = pc { peerConfigOfferedCapabilities = setAS localAS $ peerConfigOfferedCapabilities pc }
+       where
+       localAS = fromMaybe (configAS config) (peerConfigLocalAS pc)
 
-setAS :: Config -> [ Capability ] -> [ Capability ]
-setAS config = map setAS'
+   setAS :: Word32 -> [ Capability ] -> [ Capability ]
+   setAS as = map setAS'
+       where
+       setAS' (CapAS4 _) = CapAS4 as
+       setAS' cap = cap
+
+
+setASfromConfig :: Config -> [ Capability ] -> [ Capability ]
+setASfromConfig config = map setAS'
     where
     setAS' (CapAS4 _) = CapAS4 $ configAS config
     setAS' cap = cap
@@ -96,6 +110,6 @@ setAS config = map setAS'
    -- construct complete peer configurations from bare IPs
 fillConfig :: Config -> IPv4 -> PeerConfig
 fillConfig config ip = defaultPeerConfig { peerConfigIPv4 = ("0.0.0.0",ip)
-                                         , peerConfigOfferedCapabilities = setAS config $ configOfferedCapabilities config 
-                                         , peerConfigRequiredCapabilities = setAS config $ configRequiredCapabilities config
+                                         , peerConfigOfferedCapabilities = setASfromConfig config $ configOfferedCapabilities config 
+                                         , peerConfigRequiredCapabilities = setASfromConfig config $ configRequiredCapabilities config
                                          }

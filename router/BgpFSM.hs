@@ -85,9 +85,9 @@ bgpFSM global@Global{..} ( sock , peerName ) =
 
 initialiseOSM :: Global -> PeerConfig -> OpenStateMachine
 initialiseOSM Global{..} PeerConfig{..} =
-    makeOpenStateMachine BGPOpen { myAutonomousSystem = toAS2 $ myAS gd
+    makeOpenStateMachine BGPOpen { myAutonomousSystem = toAS2 $ fromMaybe ( myAS gd ) peerConfigLocalAS
                                    , holdTime = configOfferedHoldTime config
-                                   , bgpID = myBGPid gd
+                                   , bgpID = fromMaybe ( myBGPid gd) peerConfigLocalBGPID
                                    , caps = peerConfigOfferedCapabilities}
                          BGPOpen { myAutonomousSystem = toAS2 $ fromMaybe 0 peerConfigAS
                                    , holdTime = 0
