@@ -1,6 +1,8 @@
 {-# LANGUAGE DuplicateRecordFields,RecordWildCards #-}
 module Main where
 
+import Paths_router(version)
+import Data.Version(showVersion)
 import System.Environment(getArgs)
 import System.IO
 import Network.Socket
@@ -20,7 +22,7 @@ main :: IO ()
 main = do
     config <- getConfig
 
-    info "Router starting"
+    info $ "Router " ++ showVersion version ++ " starting"
 
     global <- buildGlobal config
 

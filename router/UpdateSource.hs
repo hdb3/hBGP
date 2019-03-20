@@ -34,7 +34,7 @@ initSource peer startPrefix tableSize groupSize burstSize burstDelay oneShotMode
              n <- takeMVar mv
              putMVar mv $ n + burstSize
              if oneShotMode then
-                 if n < tableSize-1 then do
+                 if n < tableSize then do
                      when (burstDelay /= 0) (threadDelay $ 10^3 * burstDelay)
                      return $ encodeUpdates $ concatMap (update peer startPrefix tableSize groupSize) [n .. min tableSize (n+burstSize)-1]
                  else if repeatDelay > 0 then do

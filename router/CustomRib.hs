@@ -152,7 +152,8 @@ ribPull rh =  do
     deltaFirstPull <- show <$> getDeltaFirstPull rh
     trace $ "ribPull: pullActive=" ++ show pullActive
     -- this is quite chatty if the bursts are small
-    when False -- pullActive
+    --when False -- pullActive
+    when ( pullActive && ifTrace )
          ( do t0 <- glp rh
               tfp <- gfp rh
               now <- getCurrentTime
