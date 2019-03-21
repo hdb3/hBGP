@@ -1,8 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import Control.Concurrent
-import Control.Monad (forever)
+import Paths_session(version)
+import Data.Version(showVersion)
+--import Control.Concurrent
+--import Control.Monad (forever)
 import qualified Network.Socket as NS
 import Data.IP
 import System.IO.Error
@@ -10,7 +12,7 @@ import GHC.IO.Exception(ioe_description)
 import Foreign.C.Error
 import Network.Socket.ByteString
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Char8 as C8
+--import qualified Data.ByteString.Char8 as C8
 import System.IO(IOMode( ReadWriteMode ))
 import qualified System.Posix.Types as SPT
 import Data.Time.Clock
@@ -19,10 +21,15 @@ import Poll
 
 main :: IO ()    
 main = do
+    let localIP = "169.254.99.99"
+        remoteIP = "169.254.99.98"
+        remotePort = 5000
+    putStrLn $ "Client " ++ showVersion version
+    putStrLn $ "Connecting to " ++ show remoteIP ++ ":" ++ show remotePort ++ " from " ++ show localIP
     --let app = loop ; blockSize = 1024
     let app = nullLoop (10^6) (10^3)
     --let app = nullLoop (10^3) (10^6)
-    sock <- connectTo "169.254.99.99" 5000 "169.254.99.98"
+    sock <- connectTo localIP remoteIP remotePort
     fd  <- NS.fdSocket sock
     handle <- NS.socketToHandle sock ReadWriteMode
     app handle (SPT.Fd fd)
@@ -49,14 +56,14 @@ main = do
         where
             go bs n = if n == 0 then return () else do BS.hPut h bs ; go bs (n-1)
 
-    connectTo :: IPv4 -> NS.PortNumber -> IPv4 -> IO NS.Socket
-    connectTo localIP port remoteIP = do
+    connectTo :: IPv4 -> IPv4 -> NS.PortNumber -> IO NS.Socket
+    connectTo localIP remoteIP remotePort = do
         sock <- NS.socket NS.AF_INET NS.Stream NS.defaultProtocol
         catchIOError
             ( do NS.setSocketOption sock NS.ReuseAddr 1
                  NS.setSocketOption sock NS.NoDelay 1
                  NS.bind sock (NS.SockAddrInet NS.defaultPort $ toHostAddress localIP)
-                 NS.connect sock $ NS.SockAddrInet port $ toHostAddress remoteIP
+                 NS.connect sock $ NS.SockAddrInet remotePort $ toHostAddress remoteIP
                  return sock )
     
             (\e -> do

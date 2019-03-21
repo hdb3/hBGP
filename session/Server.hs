@@ -6,7 +6,8 @@
 
 -}
 module Main where
-
+import Paths_session(version)
+import Data.Version(showVersion)
 import qualified Data.ByteString as BS
 import Control.Monad (forever)
 import Network.Socket
@@ -17,12 +18,14 @@ import Control.Concurrent
 main :: IO ()
 main = do
     let port = 5000
-        localIP = toHostAddress "169.254.99.98"
+        localIP = "169.254.99.98"
         app = devNull (10^8) 0 ; startDelay = 0
         --app = recvLoop (10^6) 0 ; startDelay = 10^8
+    putStrLn $ "Server " ++ showVersion version
+    putStrLn $ "Listening on " ++ show localIP ++ ":" ++ show port
     listeningSocket <- socket AF_INET Stream defaultProtocol
     setSocketOption listeningSocket ReuseAddr 1
-    bind listeningSocket ( SockAddrInet port localIP )
+    bind listeningSocket ( SockAddrInet port ( toHostAddress localIP) )
     listen listeningSocket 1
     forever $ do
                 (sock, SockAddrInet remotePort remoteIPv4) <- accept listeningSocket
