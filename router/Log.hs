@@ -5,7 +5,9 @@ import Prelude hiding (log)
 import qualified Data.ByteString.Char8 as BS
 
 data LogMode = Debug | Trace | Info | Warn | Silent deriving (Eq, Ord)
+
 logMode = Info
+
 log :: LogMode -> String -> IO ()
 log mode s = if mode >= logMode then say s else noOp s
 noOp :: String -> IO ()

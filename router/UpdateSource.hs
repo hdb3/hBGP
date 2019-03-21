@@ -28,8 +28,8 @@ nullInitSource = return f where
 
 initSource :: PeerData -> AddrRange IPv4 -> Word32 -> Word32 -> Word32 -> Int -> Bool -> Int -> IO UpdateSource
 initSource peer startPrefix tableSize groupSize burstSize burstDelay oneShotMode repeatDelay = do
-    mv <- newMVar maxBound
-    --print $ addrRangePair startPrefix
+    ---mv <- newMVar maxBound
+    mv <- newMVar 0
     let f mv = do
              n <- fromIntegral <$> takeMVar mv
              if n == maxBound
@@ -37,9 +37,9 @@ initSource peer startPrefix tableSize groupSize burstSize burstDelay oneShotMode
                  putMVar mv 0
                  return [endOfRib,BGPKeepalive]
              else do
-                 let initDelay = 5000 -- mS  - arbitary one second delay to allow a BGP peer to settle after reeceiving inintial EoR
-                                      -- this needs to be made configurable, too.... ;-)
-                 when (n == 0) (threadDelay $ 10^3 * initDelay)
+                 ---let initDelay = 2000 -- mS  - arbitary one second delay to allow a BGP peer to settle after reeceiving inintial EoR
+                 ---                     -- this needs to be made configurable, too.... ;-)
+                 ---when (n == 0) (threadDelay $ 10^3 * initDelay)
                  putMVar mv $ n + burstSize
                  if oneShotMode then
                      if n < tableSize then do
@@ -61,7 +61,6 @@ initSource peer startPrefix tableSize groupSize burstSize burstDelay oneShotMode
                      return $ encodeUpdates $ concatMap (update peer startPrefix tableSize groupSize) [n .. n+burstSize-1]
 
     return (f mv)
-
 
 
 group :: AddrRange IPv4 -> Word32 -> Word32 -> [AddrRange IPv4]

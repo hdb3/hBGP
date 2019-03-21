@@ -16,7 +16,7 @@ import System.Posix.Temp(mkstemp)
 import qualified System.Posix.Types as SPT
 import Control.Applicative ((<|>))
 
-import BGPRib(processUpdate,encodeUpdates,GlobalData(..),PeerData(..),ParsedUpdate(..))
+import BGPRib(endOfRib,processUpdate,encodeUpdates,GlobalData(..),PeerData(..),ParsedUpdate(..))
 -- TODO = move Update.hs, and ppssibly some or all of BGPData, from bgprib to bgplib, so that bgprib does not need to be imported here.....
 --        the needed thing in BGPData is PeerData, but what else should move to is less obvious
 --        there are some things which any BGP application needs.....
@@ -24,8 +24,8 @@ import BGPRib(processUpdate,encodeUpdates,GlobalData(..),PeerData(..),ParsedUpda
 import BGPlib
 import Open
 import Collision
---import qualified CustomRib as Rib
-import qualified StdRib as Rib
+import qualified CustomRib as Rib
+--import qualified StdRib as Rib
 import Global
 import Config
 import Log
@@ -58,7 +58,7 @@ bgpFSM global@Global{..} ( sock , peerName ) =
                              socketName <- getSocketName sock
                              let (SockAddrInet remotePort remoteIP) = peerName
                                  (SockAddrInet localPort localIP)   = socketName
-                             fd  <- SPT.Fd <$> fdSocket sock
+                             fd <- SPT.Fd <$> fdSocket sock
                              handle <- socketToHandle sock ReadWriteMode
 
                              -- lookup explicit local IP then failover to widlcard adn eventually, if allowed, a dynamic peer
@@ -115,7 +115,7 @@ runFSM g@Global{..} socketName peerName handle fd =
 -- The 'Maybe PeerData' allows the FSM to handle unwanted connections, i.e. send BGP Notification
 -- thereby absolving the caller from having and BGP protocol awareness
     maybe (do bgpSnd handle $ BGPNotify NotificationCease _NotificationCeaseSubcodeConnectionRejected L.empty
-              return  $ Left "connection rejected for unconfigured peer" )
+              return $ Left "connection rejected for unconfigured peer" )
           ( \peerConfig -> do ro <- newEmptyMVar
                               fsm (StateConnected, St{
                                                        peerName = peerName
@@ -199,7 +199,7 @@ runFSM g@Global{..} socketName peerName handle fd =
 
           open@BGPOpen{} -> do
               let osm' = updateOpenStateMachine osm open
-                  resp =  getResponse osm'
+                  resp = getResponse osm'
               trace "stateOpenSent - rcv open"
               collision <- collisionCheck collisionDetector (myBGPid gd) (bgpID open)
               if isJust collision then do
@@ -321,15 +321,19 @@ runFSM g@Global{..} socketName peerName handle fd =
                        -- does it consider whether we initiated the connection or not?
                        -- this requires to look at the port numbers
                        else if peer < self then
-                           Just $ "collisionCheck - event: collision with tie-break - open rejected error for peer "  ++ show session
+                           Just $ "collisionCheck - event: collision with tie-break - open rejected error for peer " ++ show session
                        else
                            Nothing
                 )
             rc
 
 -- loop runs until it catches the FSMException
-    sendLoop handle timer rh = catch
-        ( do 
+        -- wrapper to allow catching the entry and doing some a bit special, like sending EoR and Keepalive
+    sendLoop handle timer rh = bgpMessagesPut [endOfRib,BGPKeepalive] >>
+                               sendLoop' handle timer rh
+
+    sendLoop' handle timer rh = catch
+        ( do
              -- this forces a delay until the TCP ACK for all sent messages
              -- however there could still be a lot (500kb?) of data in the receiver's queue.
              -- fdWaitOnQEmpty fd
@@ -340,7 +344,7 @@ runFSM g@Global{..} socketName peerName handle fd =
                  bgpMessagesPut updates
                  --bgpSndAll handle updates
                  --mapM_ (bgpSnd handle ) updates
-             sendLoop handle timer rh
+             sendLoop' handle timer rh
         )
         (\(FSMException _) -> return ()
             -- this is perfectly normal event when the fsm closes down as it doesn't stop the keepAliveLoop explicitly
