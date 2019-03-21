@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
-module Update(endOfRib,encodeUpdates,processUpdate,getUpdate,ungetUpdate,ParsedUpdate(..),makeUpdate,makeUpdateSimple,igpUpdate,originateWithdraw,originateUpdate,myHash) where
+module Update(modifyPathAttributes,endOfRib,encodeUpdates,processUpdate,getUpdate,ungetUpdate,ParsedUpdate(..),makeUpdate,makeUpdateSimple,igpUpdate,originateWithdraw,originateUpdate,myHash) where
 import qualified Data.ByteString.Lazy as L
 import Data.Int
 import Data.Binary
@@ -14,6 +14,9 @@ myHash :: L.ByteString -> Int
 myHash = fromIntegral . hash64 . L.toStrict
 
 data ParsedUpdate = ParsedUpdate { puPathAttributes :: [PathAttribute], nlri :: [Prefix], withdrawn :: [Prefix], hash :: Int } | NullUpdate deriving Show
+
+modifyPathAttributes :: ([PathAttribute] -> [PathAttribute]) -> ParsedUpdate -> ParsedUpdate
+modifyPathAttributes f pu = pu { puPathAttributes = f $ puPathAttributes pu }
 
 parseUpdate a n w = (decodedAttributes,decodedNlri,decodedWithdrawn)
     where
