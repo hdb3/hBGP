@@ -18,6 +18,10 @@ import qualified System.Posix.Types as SPT
 import Data.Time.Clock
 
 import Poll
+import qualified App1
+--App1.app :: System.IO.Handle -> System.Posix.Types.Fd -> Int -> Int -> Int -> Int -> IO ()
+--App1.app :: Int -> Int -> Int -> Int -> System.IO.Handle -> System.Posix.Types.Fd -> IO ()
+--App1.app 'block size' 'tpoll' 'tcheck' 'tblock' handle fd = do 
 
 main :: IO ()    
 main = do
@@ -27,8 +31,9 @@ main = do
     putStrLn $ "Client " ++ showVersion version
     putStrLn $ "Connecting to " ++ show remoteIP ++ ":" ++ show remotePort ++ " from " ++ show localIP
     --let app = loop ; blockSize = 1024
-    let app = nullLoop (10^6) (10^3)
+    --let app = nullLoop (10^6) (10^3)
     --let app = nullLoop (10^3) (10^6)
+    let app = App1.app (10^4) (10^5) (10^6) (10^6)
     sock <- connectTo localIP remoteIP remotePort
     fd  <- NS.fdSocket sock
     handle <- NS.socketToHandle sock ReadWriteMode

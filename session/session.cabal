@@ -23,7 +23,7 @@ library
 
 executable Client
   main-is:             Client.hs
-  other-modules:       Poll , Paths_session
+  other-modules:       Poll , Paths_session , App1
   default-language:    Haskell2010
   build-depends:       base , ioctl , network , bytestring , iproute , time , unix
   ghc-options:         -O2 -Wall -Wno-missing-signatures -Wno-type-defaults  -Wno-unused-imports
