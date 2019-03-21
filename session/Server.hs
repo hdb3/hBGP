@@ -19,9 +19,9 @@ main :: IO ()
 main = do
     let port = 5000
         localIP = "169.254.99.98"
-        app = devNull (10^8) 0 ; startDelay = 0
-        --app = recvLoop (10^6) 0 ; startDelay = 10^8
-    putStrLn $ "Server " ++ showVersion version
+        --app = devNull (10^8) 0 ; startDelay = 0 ; mode = "devNull"
+        app = recvLoop (10^6) 0 ; startDelay = 10^8 ; mode = "recvLoop"
+    putStrLn $ "Server " ++ showVersion version ++ " mode: " ++ mode
     putStrLn $ "Listening on " ++ show localIP ++ ":" ++ show port
     listeningSocket <- socket AF_INET Stream defaultProtocol
     setSocketOption listeningSocket ReuseAddr 1
