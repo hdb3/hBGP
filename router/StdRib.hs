@@ -71,11 +71,7 @@ buildUpdate target iprefixes RouteData{..} = if isExternal target then egpUpdate
     igpUpdate = makeUpdate (toPrefixes iprefixes)
                            []
                            ( sortPathAttributes $
-                           -- TODO - consider why (re-)setting the origin here is sensible -
-                           --        surely it should have been set correctly on ingress and not chabged, regardless of
-                           --        destination peer???
-                           --        Specifically, this overrides local route distinctions!!!
-                           setOrigin _BGP_ORIGIN_INCOMPLETE $
+                           setOrigin origin $
                            -- this is reflector/controller default, bur for a router next-hop-self is default:
                            -- setNextHop (nextHop route) $
                            setNextHop (localIPv4 peerData ) $ -- next hop self!
@@ -85,7 +81,7 @@ buildUpdate target iprefixes RouteData{..} = if isExternal target then egpUpdate
     egpUpdate = makeUpdate (toPrefixes iprefixes)
                            []
                            ( sortPathAttributes $
-                           setOrigin _BGP_ORIGIN_INCOMPLETE $
+                           setOrigin origin $
                            -- setNextHop (nextHop route) $ -- reflector default
                            setNextHop (localIPv4 peerData ) $ -- next hop self!
                            prePendAS ( myAS $ globalData peerData )
