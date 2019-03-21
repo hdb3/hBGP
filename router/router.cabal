@@ -1,6 +1,6 @@
 cabal-version:       2.4
 name:                router
-version:             0.1.0.8
+version:             0.1.0.9
 synopsis:            BGP speaker in haskell
 license:             Apache-2.0
 license-file:        LICENSE
@@ -15,6 +15,6 @@ executable Router
   main-is:             Router.hs
   other-modules:       BgpFSM, Collision, Config, Global, Open, StdRib , Redistributor, Log, CustomRib , UpdateSource , ArgConfig , Paths_router
   other-extensions:    RecordWildCards, OverloadedStrings, MultiWayIf, Strict, DuplicateRecordFields, TypeSynonymInstances, FlexibleInstances, BangPatterns, FlexibleContexts
-  build-depends:       base >=4.11 , iproute >=1.7 && <1.8, bgplib >=0.1 && <0.2, bytestring >=0.10 && <0.11, network >=3.0 , binary >=0.8 && <0.9, base16-bytestring >= 0.1 && < 0.2, farmhash >= 0.1.0 && < 0.1.1, extra >= 1.6.12 && < 1.7, session >= 0.1.2.0, bgprib >=0.1.0.1 && < 0.2, containers >= 0.5 && < 0.7, io-streams >=1.5 && <1.6, zserv >= 1.0.1.2, unix >= 2.7 && <2.8, time, text
+  build-depends:       base >=4.11 , iproute >=1.7 && <1.8, bgplib >=0.1 && <0.2, bytestring >=0.10 && <0.11, network >=3.0 , binary >=0.8 && <0.9, base16-bytestring >= 0.1 && < 0.2, farmhash >= 0.1.0 && < 0.1.1, extra >= 1.6.12 && < 1.7, session >= 0.1.2.0, bgprib >=0.1.2.0, containers >= 0.5 && < 0.7, io-streams >=1.5 && <1.6, zserv >= 1.0.1.2, unix >= 2.7 && <2.8, time, text
   default-language:    Haskell2010
   ghc-options:         -O2 -Wall -Wno-missing-signatures -Wno-type-defaults  -Wno-name-shadowing -Wno-incomplete-patterns

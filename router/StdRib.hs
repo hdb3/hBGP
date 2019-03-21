@@ -17,11 +17,17 @@ addPeer rib peer = do
     BGPRib.addPeer rib peer
     return (rib,peer)
 
-ribPush :: RibHandle -> ParsedUpdate -> IO()
-ribPush _ NullUpdate = return ()
+ribPush :: RibHandle -> BGPMessage -> IO Bool
+--ribPush :: RibHandle -> ParsedUpdate -> IO()
+ribPush _ BGPKeepalive = return True
 ribPush (rib,peer) update = do
     trace $ "ribPush " ++ show peer ++ ":" ++ show update
-    BGPRib.ribPush rib peer update
+    either (\s -> do warn $ s ++ show peer
+                     return False )
+           --(BGPRib.ribPush rib peer >> (return True))
+           (\parsedUpdate -> do BGPRib.ribPush rib peer parsedUpdate
+                                return True)
+           ( processUpdate update )
 
 delPeerByAddress :: Rib -> Word16 -> IPv4 -> IO ()
 delPeerByAddress rib port ip = do
@@ -32,8 +38,9 @@ delPeerByAddress rib port ip = do
         when ( length peers > 1 ) $ warn $ "delPeerByAddress failed for (multiplepeers!) " ++ show ip ++ ":" ++ show port
         mapM_ (delPeer rib) peers
     
-ribPull :: RibHandle -> IO [ParsedUpdate]
-ribPull (rib,peer) = pullAllUpdates peer rib >>= updateFromAdjRibEntrys rib peer
+ribPull :: RibHandle -> IO [BGPMessage]
+--ribPull :: RibHandle -> IO [ParsedUpdate]
+ribPull (rib,peer) = pullAllUpdates peer rib >>= updateFromAdjRibEntrys rib peer >>= (pure . encodeUpdates)
 
 msgTimeout :: Int -> IO [a] -> IO [a]
 msgTimeout t f = fromMaybe [] <$> timeout (1000000 * t) f

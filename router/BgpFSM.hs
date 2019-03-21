@@ -24,8 +24,8 @@ import BGPRib(processUpdate,encodeUpdates,GlobalData(..),PeerData(..),ParsedUpda
 import BGPlib
 import Open
 import Collision
-import qualified CustomRib as Rib
---import qualified StdRib as Rib
+--import qualified CustomRib as Rib
+import qualified StdRib as Rib
 import Global
 import Config
 import Log

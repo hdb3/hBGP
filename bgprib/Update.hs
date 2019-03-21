@@ -50,26 +50,17 @@ getUpdate BGPUpdate{..} = ParsedUpdate { puPathAttributes = a , nlri = n , withd
                                         hash = myHash attributes  }
                                where (a,n,w) = validResult $ parseUpdate attributes nlri withdrawn
 
--- TODO clean up the mess here around error handling.....
-processUpdate :: BGPMessage -> Maybe ParsedUpdate
+processUpdate :: BGPMessage -> Either String ParsedUpdate
 processUpdate ( BGPUpdate w a n ) = 
     let parsedResult = parseUpdate a n w
         (puPathAttributes,nlri,withdrawn) = validResult parsedResult
         hash = myHash a
     in
-    if parseSuccess parsedResult then Just (ParsedUpdate puPathAttributes nlri withdrawn hash)
-    -- for 'production' use this should be 'Nothing', in which case the session will be dropped....
-    -- a better solution (**TODO**) would be to change the retrun type to 'either' and log the text later....
-    -- else Nothing
-    else error $
+    if parseSuccess parsedResult then Right (ParsedUpdate puPathAttributes nlri withdrawn hash)
+    else Left $
         "parsing failed: " ++
         parseErrorMesgs parsedResult ++
         diagoseResult parsedResult (a,n,w)
-{- informative error message is:
-        "parsing failed: "
-        parseErrorMesgs parsedResult
-        diagoseResult parsedResult (a,n,w)
--}
 
 originateWithdraw prefixes = ParsedUpdate []  [] prefixes 0
 
