@@ -32,6 +32,7 @@ initSource peer startPrefix tableSize groupSize burstSize burstDelay oneShotMode
     mv <- newMVar 0
     let f mv = do
              n <- fromIntegral <$> takeMVar mv
+             --- !!!!!! note this is NoOp as long as the initial value is 0 not maxBound
              if n == maxBound
              then do
                  putMVar mv 0
@@ -44,7 +45,21 @@ initSource peer startPrefix tableSize groupSize burstSize burstDelay oneShotMode
                  if oneShotMode then
                      if n < tableSize then do
                          when (burstDelay /= 0) (threadDelay $ 10^3 * burstDelay)
-                         return $ encodeUpdates $ concatMap (update peer startPrefix tableSize groupSize) [n .. min tableSize (n+burstSize)-1]
+                         let burst = concatMap (update peer startPrefix tableSize groupSize) [n .. min tableSize (n+burstSize)-1]
+
+                             burst' = if n == 0 then markFirst burst else burst
+                             burst'' = if n + burstSize >= tableSize then markLast burst' else burst'
+                             markFirst (a:ax) = (mark a : ax)
+                             markLast ax = init ax ++ [mark $ last ax]
+                             mark = modifyPathAttributes (setOrigin _BGP_ORIGIN_EGP)
+
+                         -- default behaviour before marking first and last updates
+                         -- return burst
+
+                         -- modified behaviour, marking first and last updates
+                         return $ encodeUpdates burst''
+
+                         
                      else if repeatDelay > 0 then do
                          _ <- takeMVar mv
                          putMVar mv 0
@@ -53,7 +68,6 @@ initSource peer startPrefix tableSize groupSize burstSize burstDelay oneShotMode
                          f mv
                          --return []
                      else do
-                         --threadDelay $ 10^12
                          -- empty list tells CustomRib that the update stream is now empty
                          return []
                  else do
