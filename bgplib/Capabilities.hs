@@ -21,6 +21,7 @@ _CapCodeMultiprotocol = 1
 _CapCodeRouteRefresh = 2
 _CapCodeGracefulRestart = 64
 _CapCodeAS4 = 65
+_CapCodeEnhancedRouteRefresh = 70
 _CapCodeLLGR = 71
 _CapCodeCiscoRefresh = 128
 {-
@@ -65,6 +66,7 @@ data Capability = CapMultiprotocol Word16 Word8
                 | CapRouteRefresh
                 | CapLLGR
                 | CapCiscoRefresh
+                | CapEnhancedRouteRefresh
                   deriving (Show,Eq,Read)
 
 eq_ :: Capability -> Capability -> Bool
@@ -74,6 +76,7 @@ eq_ (CapAS4 _) (CapAS4 _) = True
 eq_ CapRouteRefresh CapRouteRefresh = True
 eq_ CapLLGR CapLLGR = True
 eq_ CapCiscoRefresh CapCiscoRefresh = True
+eq_ CapEnhancedRouteRefresh CapEnhancedRouteRefresh = True
 eq_ _ _ = False
 
 putCap :: Capability -> Put
@@ -97,6 +100,10 @@ instance Binary Capability where
 
     put CapCiscoRefresh = do
         putWord8 _CapCodeCiscoRefresh
+        putWord8 0
+
+    put CapEnhancedRouteRefresh = do
+        putWord8 _CapCodeEnhancedRouteRefresh
         putWord8 0
 
     put (CapAS4 as4) = do
@@ -134,6 +141,7 @@ instance Binary Capability where
            | t == _CapCodeAS4 -> do as <- getWord32be
                                     return $ CapAS4 as -- surely not the most elegant way to say this!!!!
            | t == _CapCodeRouteRefresh -> return CapRouteRefresh
+           | t == _CapCodeEnhancedRouteRefresh -> return CapEnhancedRouteRefresh
            | t == _CapCodeCiscoRefresh -> return CapCiscoRefresh
            | t == _CapCodeLLGR -> if (l == 0) then return CapLLGR else error "LLGR with non null payload not handled"
            | otherwise        -> do error $ "Unexpected type code: " ++ show t
