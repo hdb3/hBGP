@@ -20,9 +20,9 @@ import Log
 
 main :: IO ()
 main = do
-    config <- getConfig
-
     info $ "Router " ++ showVersion version ++ " starting"
+
+    config <- getConfig
 
     global <- buildGlobal config
 

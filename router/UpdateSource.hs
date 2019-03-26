@@ -101,7 +101,7 @@ update peer startPrefix tableSize groupSize n = buildUpdate peer
     buildUpdate :: PeerData -> Word32 -> Word32 -> [AddrRange IPv4] -> [ParsedUpdate]
     buildUpdate peer as1 as2 prefixes = let
         aspath = if isExternal peer then [as1,as2] ++ [myAS $ globalData peer] else [as1,as2]
-        localPrefOrMED = if isExternal peer then PathAttributeLocalPref 0 else PathAttributeMultiExitDisc 0
+        localPrefOrMED = if isExternal peer then PathAttributeMultiExitDisc 0 else PathAttributeLocalPref 0
         nextHop = PathAttributeNextHop (localIPv4 peer)
         in
         makeUpdate ( map fromAddrRange prefixes )
