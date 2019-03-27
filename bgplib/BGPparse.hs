@@ -1,4 +1,5 @@
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE FlexibleInstances #-}
 module BGPparse where
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString as B
@@ -57,6 +58,9 @@ isOpen _ = False
 isUpdate :: BGPMessage -> Bool
 isUpdate BGPUpdate{} = True
 isUpdate _ = False
+
+instance {-# OVERLAPPING #-} Binary [BGPMessage] where
+    put _ = error "it would not make sense to encode BGPmessage list without a wireformat envelope"
 
 instance Binary BGPMessage where
 
