@@ -65,12 +65,13 @@ makeOpenStateMachine local required | isOpen local = OpenStateMachine local Noth
 updateOpenStateMachine :: OpenStateMachine -> BGPMessage -> OpenStateMachine
 updateOpenStateMachine osm remoteOpen | isOpen remoteOpen = osm { remoteOffer = Just remoteOpen }
 
+-- this might be better if it returned the Word16 values and allowed consumers to make the cast, but it would break the API for now...
 getNegotiatedHoldTime :: OpenStateMachine -> Int
-getNegotiatedHoldTime = fromIntegral . getNegotiatedHoldTime'
-getNegotiatedHoldTime' OpenStateMachine {..} | isJust remoteOffer = min ( holdTime remoteOffer') ( holdTime localOffer) where remoteOffer' = fromJust remoteOffer
+getNegotiatedHoldTime OpenStateMachine {..} = let nonZeroMin a b = if a > 0 && b > 0 then min a b else max a b in fromIntegral $ maybe 0 (nonZeroMin ( holdTime localOffer) . holdTime ) remoteOffer 
 
 getKeepAliveTimer :: OpenStateMachine -> Int
-getKeepAliveTimer osm = 1 + fromIntegral (getNegotiatedHoldTime osm) `div` 3
+getKeepAliveTimer osm | 0 > getNegotiatedHoldTime osm = 1 + fromIntegral (getNegotiatedHoldTime osm) `div` 3
+                      | otherwise = 0
 
 checkAS4Capability :: OpenStateMachine -> Bool
 checkAS4Capability OpenStateMachine {..} = hasAS4 (caps remoteOffer') && hasAS4 (caps localOffer)
@@ -103,7 +104,7 @@ getResponse osm@OpenStateMachine {..} | isJust remoteOffer = firstMaybe [checkmy
                    | otherwise = Just (BGPNotify NotificationOPENMessageError (encode8 BadBGPIdentifier) L.empty)
 
         checkHoldTime :: Maybe BGPMessage
-        checkHoldTime = if holdTime required > getNegotiatedHoldTime' osm
+        checkHoldTime = if fromIntegral (holdTime required) > getNegotiatedHoldTime osm
                         then Just (BGPNotify NotificationOPENMessageError (encode8 UnacceptableHoldTime) L.empty)
                         else Nothing
 
