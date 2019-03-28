@@ -108,7 +108,8 @@ bgpSndAll h msgs = do
                  (\e -> throw $ FSMException (show (e :: IOError)))
 
 get :: Handle -> Int -> IO BGPMessage
-get b t = fmap decodeBGPByteString (getRawMsg b t)
+get b t | t > 0     = fmap decodeBGPByteString (getRawMsg b t)
+        | otherwise = fmap decodeBGPByteString (getNext b )
 
 runFSM :: Global -> SockAddr -> SockAddr -> Handle -> SPT.Fd -> Maybe PeerConfig -> IO (Either String String)
 runFSM g@Global{..} socketName peerName handle fd =
@@ -226,7 +227,7 @@ runFSM g@Global{..} socketName peerName handle fd =
 
             BGPTimeout -> do
                 bgpSnd handle $ BGPNotify NotificationHoldTimerExpired 0 L.empty
-                idle "stateOpenConfirm - error initial Hold Timer expiry"
+                idle "stateOpenConfirm - error Hold Timer expiry"
 
             BGPKeepalive -> do
                 trace "stateOpenConfirm - rcv keepalive"
