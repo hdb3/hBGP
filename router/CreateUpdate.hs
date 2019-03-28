@@ -12,7 +12,8 @@ import BGPlib
 import BGPRib hiding ( group,update )
 
 main = do
-    L.hPut stdout $ wireFormat $ encode $ head $ encodeUpdates $ iBGPUpdate [1,2,3] ["169.254.0.123/32"] "127.0.0.1"
+    L.hPut stdout $ wireFormat $ encode $ head $ encodeUpdates $ eorBGPUpdate
+    --L.hPut stdout $ wireFormat $ encode $ head $ encodeUpdates $ iBGPUpdate [1,2,3] ["169.254.0.123/32"] "127.0.0.1"
     hClose stdout
 
 iBGPUpdate = xBGPUpdate False
@@ -25,3 +26,4 @@ xBGPUpdate isExternal aspath prefixes nextHop = makeUpdate
                    , PathAttributeNextHop nextHop
                    , if isExternal then PathAttributeMultiExitDisc 0 else PathAttributeLocalPref 0
                    ]
+eorBGPUpdate = makeUpdate [] [] []

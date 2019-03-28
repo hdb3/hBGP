@@ -7,9 +7,19 @@ import Data.IP
 import Data.Word
 
 import BGPlib
+import ArgConfig
 
+-- data BGPMessage = BGPOpen { myAutonomousSystem :: Word16, holdTime :: Word16, bgpID :: IPv4, caps :: [ Capability ] }
+
+-- simple fixed version...
+--main = writeOpen defaultOpen
+
+-- command line configured version
 main :: IO ()
-main = writeOpen defaultOpen
+main = do
+    dict <- buildDictionary
+    --writeOpen $ defaultOpen { myAutonomousSystem = getVal dict 65534 "as" , holdTime = getVal dict 0 "holdTime" , bgpID = getVal dict "0.0.0.0" "bgpID" }
+    writeOpen $ ( simpleOpen (getVal dict 65534 "as") (getVal dict "0.0.0.0" "bgpID") ){ holdTime = getVal dict 0 "holdTime" }
 
 writeOpen :: BGPMessage -> IO ()
 writeOpen = L.hPut stdout . wireFormat . encode
