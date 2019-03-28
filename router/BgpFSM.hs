@@ -108,9 +108,7 @@ bgpSndAll h msgs = do
                  (\e -> throw $ FSMException (show (e :: IOError)))
 
 get :: Handle -> Int -> IO BGPMessage
-get b t | t > 0     = fmap decodeBGPByteString (getRawMsg b t)
-        | otherwise = fmap decodeBGPByteString (getNext b )
-
+get b t = fmap decodeBGPByteString (getRawMsg b t)
 
 runFSM :: Global -> SockAddr -> SockAddr -> Handle -> SPT.Fd -> Maybe PeerConfig -> IO (Either String String)
 runFSM g@Global{..} socketName peerName handle fd =
@@ -339,7 +337,8 @@ runFSM g@Global{..} socketName peerName handle fd =
             -- this is perfectly normal event when the fsm closes down as it doesn't stop the keepAliveLoop explicitly
         )
 
-    keepaliveLoop handle timer = catch
+    keepaliveLoop handle timer | timer == 0 = return ()
+                               | otherwise  = catch
         ( do
              bgpSnd handle BGPKeepalive
              threadDelay ( 10^6 * timer)
