@@ -262,7 +262,8 @@ runFSM g@Global{..} socketName peerName handle fd =
         -- preconfigured values as soon as possible
         -- TODO - make the addPeer function return a handle so that rib and peer data are not exposed
         ribHandle <- Rib.addPeer rib peerData
-        _ <- forkIO $ sendLoop handle (getKeepAliveTimer osm) ribHandle
+        _ <- forkIO $ sendLoop handle ribHandle
+        _ <- forkIO $ keepaliveLoop handle (getKeepAliveTimer osm)
         return (Established,st{maybePD=Just peerData , ribHandle = Just ribHandle})
 
     established :: F
@@ -280,16 +281,6 @@ runFSM g@Global{..} socketName peerName handle fd =
                 else do
                     bgpSnd handle $ BGPNotify NotificationUPDATEMessageError 0 L.empty
                     idle "established - Update parse error"
---                maybe
---                    ( do
---                         bgpSnd handle $ BGPNotify NotificationUPDATEMessageError 0 L.empty
---                         idle "established - Update parse error"
---                    )
---                    (\parsedUpdate -> do
---                      Rib.ribPush (fromJust ribHandle) parsedUpdate
---                      return (Established,st)
---                    )
---                    ( processUpdate update )
 
             BGPNotify{} -> idle "established - rcv notify"
 
@@ -329,22 +320,28 @@ runFSM g@Global{..} socketName peerName handle fd =
 
 -- loop runs until it catches the FSMException
         -- wrapper to allow catching the entry and doing some a bit special, like sending EoR and Keepalive
-    sendLoop handle timer rh = bgpMessagesPut [endOfRib,BGPKeepalive] >>
+    sendLoop' handle timer rh = bgpMessagesPut [endOfRib,BGPKeepalive] >>
                                sendLoop' handle timer rh
 
-    sendLoop' handle timer rh = catch
+    sendLoop handle rh = catch
         ( do
              -- this forces a delay until the TCP ACK for all sent messages
              -- however there could still be a lot (500kb?) of data in the receiver's queue.
              -- fdWaitOnQEmpty fd
-             updates <- Rib.msgTimeout timer (Rib.ribPull rh)
-             if null updates then
-                 bgpSnd handle BGPKeepalive
-             else do
-                 bgpMessagesPut updates
-                 --bgpSndAll handle updates
-                 --mapM_ (bgpSnd handle ) updates
-             sendLoop' handle timer rh
+
+             updates <- Rib.ribPull rh
+             bgpMessagesPut updates
+             sendLoop handle rh
+        )
+        (\(FSMException _) -> return ()
+            -- this is perfectly normal event when the fsm closes down as it doesn't stop the keepAliveLoop explicitly
+        )
+
+    keepaliveLoop handle timer = catch
+        ( do
+             bgpSnd handle BGPKeepalive
+             threadDelay ( 10^6 * timer)
+             keepaliveLoop handle timer
         )
         (\(FSMException _) -> return ()
             -- this is perfectly normal event when the fsm closes down as it doesn't stop the keepAliveLoop explicitly
