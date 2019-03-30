@@ -13,14 +13,13 @@ main = eor
     where
     eor = do
         let update = eorBGPUpdate
-        hPut stderr "Building an EndOfRib Update"
+        hPut stderr "Building an EndOfRib Update\n"
         hPut stdout $ wireFormat $ encode $ head $ encodeUpdates update
 
     igp = do
         let update = iBGPUpdate [1,2,3] ["169.254.0.123/32"] "127.0.0.1"
-        hPut stderr "Building a iBGP Update:"
-        hPut stderr $ pack $ show update
-        hPut stdout $ wireFormat $ encode $ head $ encodeUpdates  update
+        hPut stderr $ pack $ "Building a iBGP Update: " ++ show update ++ "\n"
+        hPut stdout $ wireFormat $ encode $ head $ encodeUpdates update
         --hPut stdout $ wireFormat $ encode $ head $ encodeUpdates $ iBGPUpdate [1,2,3] ["169.254.0.123/32"] "127.0.0.1"
 
     iBGPUpdate = xBGPUpdate False
