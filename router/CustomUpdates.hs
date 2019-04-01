@@ -38,7 +38,8 @@ main = do
         repeatDelay = getVal dict 0 "repeatDelay"
         idleDetect = fromRational $ getVal dict 5.0 "idleDetect"
         oneShotMode = testMode == OneShot
-        peer = dummyPeerData
+        --peer = dummyPeerData { localIPv4 = "192.168.122.1" }
+        peer = dummyPeerData { localIPv4 = (getVal dict "192.168.122.1" "nextHop") }
 
     updateSource <- initSource peer startPrefix tableSize groupSize burstSize burstDelay oneShotMode repeatDelay
 
