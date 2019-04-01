@@ -1,29 +1,38 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
-import Network.Socket
-import System.IO.Error(catchIOError)
-import System.IO(IOMode( ReadWriteMode ),Handle, hClose,stdout)
-import qualified Data.ByteString.Lazy as L
-import qualified Data.ByteString as BS
+import System.IO(stdout,stderr)
+import Data.ByteString.Lazy.Char8 (pack)
+import Data.ByteString.Lazy (hPut)
 import Data.Binary(encode)
-import Data.IP
 
-import BGPlib
-import BGPRib hiding ( group,update )
+import BGPlib (wireFormat , fromAddrRange, _BGP_ORIGIN_IGP, PathAttribute(..),  ASSegment(..), ASPath(..) )
+import BGPRib (encodeUpdates , makeUpdate , makeUpdate , encodeUpdates)
 
-main = do
-    L.hPut stdout $ wireFormat $ encode $ head $ encodeUpdates $ eorBGPUpdate
-    --L.hPut stdout $ wireFormat $ encode $ head $ encodeUpdates $ iBGPUpdate [1,2,3] ["169.254.0.123/32"] "127.0.0.1"
-    hClose stdout
+main :: IO ()
+main = eor
+    where
+    eor = do
+        let update = eorBGPUpdate
+        hPut stderr "Building an EndOfRib Update\n"
+        hPut stdout $ wireFormat $ encode $ head $ encodeUpdates update
 
-iBGPUpdate = xBGPUpdate False
-eBGPUpdate = xBGPUpdate True
-xBGPUpdate isExternal aspath prefixes nextHop = makeUpdate
-                   ( map fromAddrRange prefixes )
-                   []
-                   [ PathAttributeOrigin _BGP_ORIGIN_IGP
-                   , PathAttributeASPath $ ASPath4 [ASSequence aspath]
-                   , PathAttributeNextHop nextHop
-                   , if isExternal then PathAttributeMultiExitDisc 0 else PathAttributeLocalPref 0
-                   ]
-eorBGPUpdate = makeUpdate [] [] []
+    igp = do
+        let update = iBGPUpdate [1,2,3] ["169.254.0.123/32"] "127.0.0.1"
+        hPut stderr $ pack $ "Building a iBGP Update: " ++ show update ++ "\n"
+        hPut stdout $ wireFormat $ encode $ head $ encodeUpdates update
+        --hPut stdout $ wireFormat $ encode $ head $ encodeUpdates $ iBGPUpdate [1,2,3] ["169.254.0.123/32"] "127.0.0.1"
+
+    iBGPUpdate = xBGPUpdate False
+
+    eBGPUpdate = xBGPUpdate True
+
+    xBGPUpdate isExternal aspath prefixes nextHop = makeUpdate
+                       ( map fromAddrRange prefixes )
+                       []
+                       [ PathAttributeOrigin _BGP_ORIGIN_IGP
+                       , PathAttributeASPath $ ASPath4 [ASSequence aspath]
+                       , PathAttributeNextHop nextHop
+                       , if isExternal then PathAttributeMultiExitDisc 0 else PathAttributeLocalPref 0
+                       ]
+
+    eorBGPUpdate = makeUpdate [] [] []
