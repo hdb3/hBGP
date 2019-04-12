@@ -76,7 +76,7 @@ main = do
                 putStrLn $ "Exception connecting to " ++ show remoteIP ++ " from " ++ show localIP ++ " - " ++ errReport errno e
                 return sock )
 
-    errReport errno e | errno `elem` [2,107,115] = ioe_description e ++ " (" ++ show errno ++ ")"
+    errReport errno e | errno `elem` [2,32,107,115] = ioe_description e ++ " (" ++ show errno ++ ")"
                       | otherwise = errReport' errno e
     
     errReport' errno e = unlines

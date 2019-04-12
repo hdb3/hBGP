@@ -292,7 +292,7 @@ runFSM g@Global{..} socketName peerName handle fd =
                 idle "established - HoldTimerExpired error"
             _ -> do
                 bgpSnd handle $ BGPNotify NotificationFiniteStateMachineError 0 L.empty
-                idle "established - FSM error"
+                idle $ "established - FSM error (" ++ (show msg) ++ ")"
 
     -- collisionCheck
     -- manage cases where there is an established connection (always reject)

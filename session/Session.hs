@@ -184,7 +184,7 @@ run state@State{..} (src,dst) = do
             logger $ "Exception connecting to " ++ show dst ++ " - " ++ errReport errno e
             return Nothing )
 
-errReport errno e | errno `elem` [2,107,115] = ioe_description e ++ " (" ++ show errno ++ ")"
+errReport errno e | errno `elem` [2,32,107,115] = ioe_description e ++ " (" ++ show errno ++ ")"
                   | otherwise = errReport' errno e
 
 errReport' errno e = unlines
