@@ -70,7 +70,7 @@ getNegotiatedHoldTime :: OpenStateMachine -> Int
 getNegotiatedHoldTime OpenStateMachine {..} = let nonZeroMin a b = if a > 0 && b > 0 then min a b else max a b in fromIntegral $ maybe 0 (nonZeroMin ( holdTime localOffer) . holdTime ) remoteOffer 
 
 getKeepAliveTimer :: OpenStateMachine -> Int
-getKeepAliveTimer osm | 0 > getNegotiatedHoldTime osm = 1 + fromIntegral (getNegotiatedHoldTime osm) `div` 3
+getKeepAliveTimer osm | getNegotiatedHoldTime osm > 0 = 1 + fromIntegral (getNegotiatedHoldTime osm) `div` 3
                       | otherwise = 0
 
 checkAS4Capability :: OpenStateMachine -> Bool

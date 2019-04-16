@@ -24,8 +24,8 @@ import BGPRib(endOfRib,processUpdate,encodeUpdates,GlobalData(..),PeerData(..),P
 import BGPlib
 import Open
 import Collision
-import qualified CustomRib as Rib
---import qualified StdRib as Rib
+--import qualified CustomRib as Rib
+import qualified StdRib as Rib
 import Global
 import Config
 import Log
@@ -292,7 +292,7 @@ runFSM g@Global{..} socketName peerName handle fd =
                 idle "established - HoldTimerExpired error"
             _ -> do
                 bgpSnd handle $ BGPNotify NotificationFiniteStateMachineError 0 L.empty
-                idle "established - FSM error"
+                idle $ "established - FSM error (" ++ (show msg) ++ ")"
 
     -- collisionCheck
     -- manage cases where there is an established connection (always reject)
