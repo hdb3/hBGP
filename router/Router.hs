@@ -5,6 +5,8 @@ import Paths_router(version)
 import Data.Version(showVersion)
 import System.Environment(getArgs)
 import System.IO
+import System.Exit
+import Data.List(intersect)
 import Network.Socket
 import qualified Session
 import Control.Concurrent
@@ -20,7 +22,7 @@ import Log
 
 main :: IO ()
 main = do
-    info $ "Router " ++ showVersion version ++ " starting"
+    info $ "hBGP " ++ showVersion version
 
     config <- getConfig
 
@@ -41,6 +43,7 @@ main = do
 
 getConfig = do
     args <- getArgs
+    if not $ null $ intersect args ["--version","-V","-v"] then exitSuccess else return ()
     --let n = if 1 < length args then read (args !! 1) :: Int else 0
     let n = 0 -- kludge until this is patched to support ArgConfig style parameters.....
     let configPath = if null args then "bgp.conf" else head args
