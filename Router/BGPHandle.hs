@@ -64,9 +64,9 @@ bgpRcv (BGPHandle h mvar ) t | t > 0     = bgpRcv'
 
         let
             exBGPMessage :: SomeException -> IO BGPMessage
-            exBGPMessage e = die (show e)
+            exBGPMessage e = die $ "exBGPMessage " ++ (show e)
             exUpdate :: SomeException -> IO (Maybe ParsedUpdate)
-            exUpdate e = die (show e)
+            exUpdate e = die $ "exUpdate " ++ (show e)
 
         rawMsg <- getRawMsg h t
         --let bgpMsg = evaluate $ force $ decodeBGPByteString rawMsg
