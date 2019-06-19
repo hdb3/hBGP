@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 module BGPlib.PathAttributes ( module BGPlib.Codes
                              , module BGPlib.PathAttributes
                              , module BGPlib.ASPath) where
@@ -12,7 +13,6 @@ import Data.Word
 import Data.List(find, deleteBy, sortOn)
 import Data.IP
 import Data.Hashable
-import GHC.Generics(Generic)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
 import Control.Monad
@@ -30,10 +30,10 @@ data ExtendedCommunities = ExtendedCommunities deriving (Show,Eq)
 type LargeCommunity = (Word32,Word32,Word32)
 
 getPathAttribute :: PathAttributeTypeCode -> [PathAttribute] -> Maybe PathAttribute
-getPathAttribute code pas = find ((code ==) . identify) pas
+getPathAttribute code = find ((code ==) . identify)
 
 deletePathAttributeType :: PathAttributeTypeCode -> [PathAttribute] -> [PathAttribute]
-deletePathAttributeType t = filter ( not . (t ==) . identify )
+deletePathAttributeType t = filter ( (t /=) . identify )
 
 insertPathAttribute :: PathAttribute -> [PathAttribute] -> [PathAttribute]
 -- replaces an existing attribute of the same type
@@ -74,7 +74,7 @@ data PathAttribute = PathAttributeOrigin Word8 | -- toDo = make the parameter an
                      PathAttributeLargeCommunity [LargeCommunity] |
                      PathAttributeAttrSet B.ByteString |
                      PathAttributeUnknown B.ByteString
-                     deriving (Show,Eq,Generic)
+                     deriving (Show,Eq,Generic,NFData)
 instance Hashable PathAttribute
 --instance Hashable IPv4
 
@@ -189,10 +189,10 @@ instance Binary PathAttribute where
                 | TypeCodePathAttributeAtomicAggregate == code -> return PathAttributeAtomicAggregate
 
                 | TypeCodePathAttributeAggregator == code -> do
-                    as <- if (len == 6) then do
+                    as <- if len == 6 then do
                         as2 <- getWord16be
                         return $ fromIntegral as2
-                    else if (len == 8) then
+                    else if len == 8 then
                         getWord32be
                     else fail $ "Bad length in PathAttributeAggregator: " ++ show len 
                     bgpid <- getWord32le

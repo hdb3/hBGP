@@ -1,7 +1,11 @@
-module BGPlib.LibCommon where
+module BGPlib.LibCommon (module BGPlib.LibCommon, module GHC.Generics, module Control.DeepSeq, module Data.IP)  where
+import GHC.Generics(Generic)
+import Control.DeepSeq
 import Data.Binary
 import Data.Binary.Get
+import Data.IP
 
+instance NFData IPv4
 -- todo - make this a method of Binary by hiding the default method on import.....
 putn :: Binary b => [b] -> Put
 putn pfxs | null pfxs =  return ()

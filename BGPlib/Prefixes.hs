@@ -1,11 +1,10 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
 {-# LANGUAGE BangPatterns #-}
 module BGPlib.Prefixes where
 import Data.Binary
 import Data.Hashable
-import GHC.Generics(Generic)
 import Data.Binary.Get
 import Data.Binary.Put
 import Data.Int
@@ -30,7 +29,7 @@ import BGPlib.LibCommon
 --
 -- representation of prefixes as 64 bit words: this mapping allows prefixes to be treated as Ints where useful
 
-data Prefix = Prefix !(Word8,Word32) deriving (Eq,Generic)
+data Prefix = Prefix !(Word8,Word32) deriving (Eq,Generic,NFData)
 newtype IPrefix = IPrefix Int deriving Eq
 toPrefix :: IPrefix -> Prefix
 toPrefix (IPrefix w64) = Prefix (fromIntegral $ unsafeShiftR w64 32, fromIntegral $ 0xffffffff .&. w64)
@@ -86,7 +85,7 @@ instance {-# OVERLAPPING #-} Binary [AddrRange IPv4] where
     get = fmap (map toAddrRange) getPrefixes where
         getPrefixes :: Get [Prefix]
         getPrefixes = get
-    put = putPrefixes . liftM fromAddrRange where
+    put = putPrefixes . fmap fromAddrRange where
         putPrefixes :: [Prefix] -> Put
         putPrefixes = put
 

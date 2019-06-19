@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
 module BGPlib.RFC4271 where
 import Data.Word
 
@@ -25,7 +26,7 @@ data EnumNotificationCode = InvalidNotificationError |
                             NotificationHoldTimerExpired |
                             NotificationFiniteStateMachineError |
                             NotificationCease
-                            deriving (Show,Eq)
+                            deriving (Show, Eq, Generic, NFData)
 
 instance Enum EnumNotificationCode where
     toEnum n | n == 0 = InvalidNotificationError

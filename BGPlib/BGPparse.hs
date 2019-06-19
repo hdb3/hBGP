@@ -1,5 +1,6 @@
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
 module BGPlib.BGPparse where
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString as B
@@ -20,6 +21,7 @@ _BGPNotify = 3 :: Word8
 _BGPKeepalive = 4 :: Word8
 _BGPVersion = 4 :: Word8
 
+decodeBGPByteString :: BGPByteString -> BGPMessage
 decodeBGPByteString (BGPByteString (Left Timeout)) = BGPTimeout
 decodeBGPByteString (BGPByteString (Left EndOfStream)) = BGPEndOfStream
 decodeBGPByteString (BGPByteString (Left (Error s))) = BGPError s
@@ -33,7 +35,7 @@ data BGPMessage = BGPOpen { myAutonomousSystem :: Word16, holdTime :: Word16, bg
                   | BGPTimeout
                   | BGPError String
                   | BGPEndOfStream
-                    deriving (Show,Eq)
+                    deriving (Show,Eq,Generic, NFData)
 
 toAS2 :: Word32 -> Word16
 toAS2 as | as < 0x10000 = fromIntegral as

@@ -1,6 +1,7 @@
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
 module BGPlib.Capabilities where
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString as B
@@ -67,7 +68,7 @@ data Capability = CapMultiprotocol Word16 Word8
                 | CapLLGR
                 | CapCiscoRefresh
                 | CapEnhancedRouteRefresh
-                  deriving (Show,Eq,Read)
+                  deriving (Show,Eq,Read,Generic, NFData)
 
 eq_ :: Capability -> Capability -> Bool
 eq_ (CapMultiprotocol _ _) (CapMultiprotocol _ _) = True
@@ -143,7 +144,7 @@ instance Binary Capability where
            | t == _CapCodeRouteRefresh -> return CapRouteRefresh
            | t == _CapCodeEnhancedRouteRefresh -> return CapEnhancedRouteRefresh
            | t == _CapCodeCiscoRefresh -> return CapCiscoRefresh
-           | t == _CapCodeLLGR -> if (l == 0) then return CapLLGR else error "LLGR with non null payload not handled"
+           | t == _CapCodeLLGR -> if l == 0 then return CapLLGR else error "LLGR with non null payload not handled"
            | otherwise        -> do error $ "Unexpected type code: " ++ show t
                                     return undefined
 

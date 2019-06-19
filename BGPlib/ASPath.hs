@@ -3,6 +3,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ConstrainedClassMethods #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 module BGPlib.ASPath where
 import Data.Binary
 import Data.Binary.Get
@@ -13,7 +14,6 @@ import Data.Attoparsec.ByteString -- from package attoparsec
 import Data.Attoparsec.Binary -- from package attoparsec-binary
 
 import Data.Hashable
-import GHC.Generics(Generic)
 
 import BGPlib.Codes
 import BGPlib.LibCommon
@@ -42,10 +42,10 @@ class (Eq a, Num a, Integral a, Show a, Read a, Binary a) => ASNumber a where
 
 instance ASNumber Word16 where
 instance ASNumber Word32 where
-data ASPath = ASPath2 [ASSegment Word16] | ASPath4 [ASSegment Word32] deriving (Show,Eq,Generic)
+data ASPath = ASPath2 [ASSegment Word16] | ASPath4 [ASSegment Word32] deriving (Show,Eq,Generic,NFData)
 
 instance Hashable ASPath
-data ASSegment asn = ASSet [asn] | ASSequence [asn] deriving (Show,Eq,Generic) 
+data ASSegment asn = ASSet [asn] | ASSequence [asn] deriving (Show,Eq,Generic,NFData)
 
 instance Hashable ( ASSegment Word16 )
 instance Hashable ( ASSegment Word32 )

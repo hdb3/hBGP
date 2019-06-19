@@ -26,6 +26,7 @@ import Router.Collision
 import Router.Global
 import Router.Config
 import Router.Log
+import Router.BGPHandle
 
 data FSMState = St { handle :: BGPHandle
                    , peerName :: SockAddr
