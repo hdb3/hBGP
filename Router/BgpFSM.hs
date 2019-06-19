@@ -31,14 +31,16 @@ import Router.Global
 import Router.Config
 import Router.Log
 
-data FSMState = St { handle :: Handle
+newtype BGPHandle = BGPHandle Handle
+ 
+data FSMState = St { handle :: BGPHandle
                    , peerName :: SockAddr
                    , socketName :: SockAddr
                    , osm :: OpenStateMachine
                    , peerConfig :: PeerConfig
                    , maybePD :: Maybe PeerData
                    , rcvdOpen :: MVar BGPMessage
-                   , ribHandle :: Maybe (Rib.RibHandle) }
+                   , ribHandle :: Maybe Rib.RibHandle }
 
 type F = FSMState -> IO (State, FSMState)
 
@@ -57,14 +59,14 @@ bgpFSM global@Global{..} ( sock , peerName ) =
                              socketName <- getSocketName sock
                              let (SockAddrInet remotePort remoteIP) = peerName
                                  (SockAddrInet localPort localIP)   = socketName
-                             handle <- socketToHandle sock ReadWriteMode
+                             handle <- getBGPHandle sock
 
                              -- lookup explicit local IP then failover to widlcard adn eventually, if allowed, a dynamic peer
-                             let maybePeer = ( Data.Map.lookup (fromHostAddress localIP , fromHostAddress remoteIP) peerMap ) <|>
-                                             ( Data.Map.lookup (fromHostAddress 0 , fromHostAddress remoteIP) peerMap ) <|>
-                                             ( if configAllowDynamicPeers config
+                             let maybePeer =  Data.Map.lookup (fromHostAddress localIP , fromHostAddress remoteIP) peerMap  <|>
+                                              Data.Map.lookup (fromHostAddress 0 , fromHostAddress remoteIP) peerMap  <|>
+                                              if configAllowDynamicPeers config
                                                then Just (fillConfig config (fromHostAddress remoteIP))
-                                               else Nothing)
+                                               else Nothing
                              fsmExitStatus <-
                                          catch
                                              (runFSM global socketName peerName handle maybePeer )
@@ -72,7 +74,7 @@ bgpFSM global@Global{..} ( sock , peerName ) =
                                                  return $ Left s)
                              -- TDOD throuuigh testing around delPeer
                              -- TODO REAL SOON - FIX....
-                             hClose handle
+                             bgpClose handle
                              deregister collisionDetector
                              Rib.delPeerByAddress rib (fromIntegral remotePort) (fromHostAddress remoteIP)
                              either
@@ -92,24 +94,35 @@ initialiseOSM Global{..} PeerConfig{..} =
                                    , bgpID = fromMaybe (fromHostAddress 0) peerConfigBGPID
                                    , caps = peerConfigRequiredCapabilities}
 
-bgpSnd :: Handle -> BGPMessage -> IO()
-bgpSnd h msg | 4079 > L.length (encode msg) = catchIOError ( sndRawMessage h (encode msg)) (\e -> throw $ FSMException (show (e :: IOError)))
-             | otherwise = do (n,h) <- mkstemp "bgpSnd"
-                              L.hPut h (encode msg)
-                              hClose h
-                              warn $ "encoded message too long in bgpSnd, encoded message was written to: " ++ n
+getBGPHandle :: Socket -> IO BGPHandle
+getBGPHandle sock = BGPHandle <$> socketToHandle sock ReadWriteMode
 
-bgpSndAll :: Handle -> [BGPMessage] -> IO()
-bgpSndAll h msgs = do
-    let encodedMessages = map encode msgs
-    catchIOError ( sndRawMessages h encodedMessages )
-                 (\e -> throw $ FSMException (show (e :: IOError)))
+bgpClose :: BGPHandle -> IO ()
+bgpClose (BGPHandle h) = hClose h
 
-get :: Handle -> Int -> IO BGPMessage
-get b t | t > 0     = fmap decodeBGPByteString (getRawMsg b t)
-        | otherwise = error "state machine should never set zero timeout for a handle read"
+bgpSnd :: BGPHandle -> BGPMessage -> IO()
+bgpSnd (BGPHandle h) msg | 4079 > lengthEncodedMsg = catchIOError ( sndRawMessage h encodedMsg )
+                                                                  (\e -> throw $ FSMException (show (e :: IOError)))
+                         | otherwise = error $ "encoded message too long in bgpSnd " ++ show lengthEncodedMsg
+                         where encodedMsg = encode msg
+                               lengthEncodedMsg = L.length encodedMsg
 
-runFSM :: Global -> SockAddr -> SockAddr -> Handle -> Maybe PeerConfig -> IO (Either String String)
+bgpSndAll :: BGPHandle -> [BGPMessage] -> IO()
+bgpSndAll (BGPHandle h) msgs = catchIOError ( sndRawMessages h $ map encode msgs )
+                                            (\e -> throw $ FSMException (show (e :: IOError)))
+
+bgpRcv :: BGPHandle -> Int -> IO BGPMessage
+bgpRcv (BGPHandle h) t | t > 0     = fmap decodeBGPByteString (getRawMsg h t)
+                       | otherwise = error "state machine should never set zero timeout for a handle read"
+
+bgpMessagesPut :: BGPHandle -> [BGPMessage] -> IO()
+bgpMessagesPut = bgpSndAll
+bgpMessagesPut' (BGPHandle h) bgpMsgs = framedPut ( map encode bgpMsgs )
+    where framedPut msgs = rawPut ( L.toStrict $ L.concat $ map wireFormat msgs)
+          rawPut bs = catchIOError ( BS.hPut h bs )
+                                   (\e -> throw $ FSMException (show (e :: IOError)))
+
+runFSM :: Global -> SockAddr -> SockAddr -> BGPHandle -> Maybe PeerConfig -> IO (Either String String)
 runFSM g@Global{..} socketName peerName handle =
 -- The 'Maybe PeerData' allows the FSM to handle unwanted connections, i.e. send BGP Notification
 -- thereby absolving the caller from having and BGP protocol awareness
@@ -128,13 +141,6 @@ runFSM g@Global{..} socketName peerName handle =
                                                      }))
     where
 
-    rawPut bs = catchIOError ( BS.hPut handle bs )
-                             (\e -> throw $ FSMException (show (e :: IOError)))
-
-    framedPut msgs = rawPut ( L.toStrict $ L.concat $ map wireFormat msgs)
-
-    bgpMessagesPut bgpMsgs = framedPut ( map encode bgpMsgs )
-
     fsm :: (State,FSMState) -> IO (Either String String)
     fsm (s,st) | s == Idle = return $ Right "FSM normal exit"
                | otherwise = do
@@ -151,7 +157,7 @@ runFSM g@Global{..} socketName peerName handle =
 
     stateConnected :: F
     stateConnected st@St{..} = do
-        msg <- get handle delayOpenTimer
+        msg <- bgpRcv handle delayOpenTimer
         case msg of
             BGPTimeout -> do
                 trace "stateConnected - event: delay open expiry"
@@ -188,7 +194,7 @@ runFSM g@Global{..} socketName peerName handle =
 
     stateOpenSent :: F
     stateOpenSent st@St{..} = do
-        msg <- get handle initialHoldTimer
+        msg <- bgpRcv handle initialHoldTimer
         case msg of
 
           BGPTimeout -> do
@@ -219,7 +225,7 @@ runFSM g@Global{..} socketName peerName handle =
 
     stateOpenConfirm :: F
     stateOpenConfirm st@St{..} = do
-        msg <- get handle (getNegotiatedHoldTime osm)
+        msg <- bgpRcv handle (getNegotiatedHoldTime osm)
         case msg of
 
             BGPTimeout -> do
@@ -266,7 +272,7 @@ runFSM g@Global{..} socketName peerName handle =
 
     established :: F
     established st@St{..} = do
-        msg <- get handle (getNegotiatedHoldTime osm)
+        msg <- bgpRcv handle (getNegotiatedHoldTime osm)
         case msg of
 
             BGPKeepalive -> do _ <- Rib.ribPush (fromJust ribHandle) msg
@@ -289,7 +295,7 @@ runFSM g@Global{..} socketName peerName handle =
                 idle "established - HoldTimerExpired error"
             _ -> do
                 bgpSnd handle $ BGPNotify NotificationFiniteStateMachineError 0 L.empty
-                idle $ "established - FSM error (" ++ (show msg) ++ ")"
+                idle $ "established - FSM error (" ++ show msg ++ ")"
 
     -- collisionCheck
     -- manage cases where there is an established connection (always reject)
@@ -318,13 +324,12 @@ runFSM g@Global{..} socketName peerName handle =
 
 -- loop runs until it catches the FSMException
         -- wrapper to allow catching the entry and doing some a bit special, like sending EoR and Keepalive
-    sendLoop' handle timer rh = bgpMessagesPut [endOfRib,BGPKeepalive] >>
-                               sendLoop' handle timer rh
+    --sendLoop' handle timer rh = bgpMessagesPut handle [endOfRib,BGPKeepalive] >> sendLoop' handle timer rh
 
     sendLoop handle rh = catch
         ( do
              updates <- Rib.ribPull rh
-             bgpMessagesPut updates
+             bgpMessagesPut handle updates
              sendLoop handle rh
         )
         (\(FSMException _) -> return ()
