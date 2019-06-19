@@ -8,8 +8,9 @@ import System.IO(IOMode( ReadWriteMode ),Handle, hClose)
 import qualified Data.ByteString.Lazy as L
 import Data.Binary(encode)
 import Control.Concurrent(MVar,newEmptyMVar,putMVar,tryTakeMVar)
-import Control.Exception(evaluate,throw,Exception)
+import Control.Exception(handle,evaluate,throw,Exception,SomeException)
 import Control.DeepSeq(force)
+import System.Exit(die)
 
 import BGPRib.Update(ParsedUpdate,getUpdate)
 
@@ -61,10 +62,16 @@ bgpRcv (BGPHandle h mvar ) t | t > 0     = bgpRcv'
     
 
 
+        let
+            exBGPMessage :: SomeException -> IO BGPMessage
+            exBGPMessage e = die (show e)
+            exUpdate :: SomeException -> IO (Maybe ParsedUpdate)
+            exUpdate e = die (show e)
+
         rawMsg <- getRawMsg h t
         --let bgpMsg = evaluate $ force $ decodeBGPByteString rawMsg
-        bgpMsg <- evaluate $ force $ decodeBGPByteString rawMsg
-        maybeUpdate <- if isUpdate bgpMsg then evaluate $ Just $ force $ getUpdate bgpMsg else return Nothing
+        bgpMsg <- handle exBGPMessage ( evaluate $ force $ decodeBGPByteString rawMsg )
+        maybeUpdate <- handle exUpdate ( if isUpdate bgpMsg then evaluate $ Just $ force $ getUpdate bgpMsg else return Nothing )
             --maybeUpdate = if isUpdate bgpMsg then Just $ evaluate $ force $ getUpdate bgpMsg else Nothing
         tryTakeMVar mvar
         putMVar mvar (rawMsg,maybeUpdate)
