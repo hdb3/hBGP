@@ -12,7 +12,7 @@ import Control.Exception(handle,evaluate,throw,Exception,SomeException)
 import Control.DeepSeq(force)
 import System.Exit(die)
 
-import BGPRib.Update(ParsedUpdate,getUpdate)
+import BGPRib.Update(ParsedUpdate,decodeUpdate)
 
 
 newtype BGPIOException = BGPIOException String deriving Show
@@ -71,8 +71,8 @@ bgpRcv (BGPHandle h mvar ) t | t > 0     = bgpRcv'
         rawMsg <- getRawMsg h t
         --let bgpMsg = evaluate $ force $ decodeBGPByteString rawMsg
         bgpMsg <- handle exBGPMessage ( evaluate $ force $ decodeBGPByteString rawMsg )
-        maybeUpdate <- handle exUpdate ( if isUpdate bgpMsg then evaluate $ Just $ force $ getUpdate bgpMsg else return Nothing )
-            --maybeUpdate = if isUpdate bgpMsg then Just $ evaluate $ force $ getUpdate bgpMsg else Nothing
+        maybeUpdate <- handle exUpdate ( if isUpdate bgpMsg then evaluate $ Just $ force $ decodeUpdate bgpMsg else return Nothing )
+            --maybeUpdate = if isUpdate bgpMsg then Just $ evaluate $ force $ decodeUpdate bgpMsg else Nothing
         tryTakeMVar mvar
         putMVar mvar (rawMsg,maybeUpdate)
         return bgpMsg

@@ -1,6 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
-module BGPRib.Update(modifyPathAttributes,endOfRib,encodeUpdates,processUpdate,getUpdate,ungetUpdate,ParsedUpdate(..),makeUpdate,makeUpdateSimple,igpUpdate,originateWithdraw,originateUpdate,myHash) where
+module BGPRib.Update(decodeUpdate,modifyPathAttributes,endOfRib,encodeUpdates,ungetUpdate,ParsedUpdate(..),makeUpdate,makeUpdateSimple,igpUpdate,originateWithdraw,originateUpdate,myHash) where
 import qualified Data.ByteString.Lazy as L
 import Data.Int
 import Data.Binary
@@ -15,6 +15,13 @@ myHash :: L.ByteString -> Int
 myHash = fromIntegral . hash64 . L.toStrict
 
 data ParsedUpdate = ParsedUpdate { puPathAttributes :: [PathAttribute], nlri :: [Prefix], withdrawn :: [Prefix], hash :: Int } | NullUpdate deriving ( Show , Generic, NFData)
+
+decodeUpdate :: BGPMessage -> ParsedUpdate
+decodeUpdate BGPUpdate{..} = ParsedUpdate { puPathAttributes = decode attributes 
+                                          , nlri = decode nlri 
+                                          , withdrawn = decode withdrawn
+                                          , hash = fromIntegral $ FarmHash.hash64 $ L.toStrict attributes 
+                                          }
 
 modifyPathAttributes :: ([PathAttribute] -> [PathAttribute]) -> ParsedUpdate -> ParsedUpdate
 modifyPathAttributes f pu = pu { puPathAttributes = f $ puPathAttributes pu }

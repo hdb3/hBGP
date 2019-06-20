@@ -19,7 +19,7 @@ bgpMsgReader path = do
     return bgpMessages
 
 bgpUpdateMsgReader :: FilePath -> IO [ParsedUpdate]
-bgpUpdateMsgReader = fmap ( map getUpdate . filter isUpdate ) . bgpMsgReader
+bgpUpdateMsgReader = fmap ( map decodeUpdate . filter isUpdate ) . bgpMsgReader
 
 bgpReader :: FilePath -> IO [(BGPRib.RouteData, Prefix)]
 bgpReader path = do
