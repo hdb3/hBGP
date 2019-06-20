@@ -9,7 +9,7 @@ import Control.Monad(unless)
 import qualified BGPlib.RFC4271
 import BGPlib.Capabilities(parseOptionalParameters)
 import BGPlib.LibCommon(decode8,fromHostAddress)
-
+import BGPlib.Prefixes
 
 import BGPlib.BGPparse
 
@@ -63,3 +63,56 @@ bgpParser1 = do
                return $ BGPNotify (decode8 errorCode) errorSubcode errorData
             4 -> if length == 19 then return BGPKeepalive else error "invalid length in KeepAlive"
             _ -> error $ "invalid type code (" ++ show typeCode ++ ")"
+
+
+parsePrefixes 0 = []
+
+parsePrefixes length = do
+    plen <- anyWord8
+    prefix' <-
+        if | plen == 0  -> ( Prefix (0,0) ) : parsePrefixes (length-1)
+           | plen < 9   -> readPrefix1Byte  : parsePrefixes (length-2)
+           | plen < 17  -> readPrefix2Byte  : parsePrefixes (length-3)
+           | plen < 25  -> readPrefix3Byte  : parsePrefixes (length-4)
+           | plen < 33  -> readPrefix4Byte  : parsePrefixes (length-5)
+           | otherwise  -> fail $ "plen > " ++ show plen
+    let v4address = fromHostAddress $ byteSwap32 prefix'
+    return ZPrefixV4{..}
+    where
+        readPrefix1Byte = do
+            b0 <- anyWord8
+            
+            return (unsafeShiftL (fromIntegral b0) 24)
+        readPrefix2Byte = do
+            b0 <- anyWord16be
+            return (unsafeShiftL (fromIntegral b0) 16)
+        readPrefix3Byte = do
+            b0 <- anyWord16be
+            b1 <- anyWord8
+            return (unsafeShiftL (fromIntegral b1) 8 .|. unsafeShiftL (fromIntegral b0) 16)
+        readPrefix4Byte = anyWord32be
+
+    get = label "Prefix" $ do
+        subnet <- getWord8
+        if subnet == 0
+        then return $ Prefix (0,0)
+        else if subnet < 9
+        then do
+            w8 <- getWord8
+            let ip = unsafeShiftL (fromIntegral w8 :: Word32) 24
+            return $ Prefix (subnet,ip)
+        else if subnet < 17
+        then do
+            w16  <- getWord16be
+            let ip = unsafeShiftL (fromIntegral w16  :: Word32) 16
+            return $ Prefix (subnet,ip)
+        else if subnet < 25
+        then do
+            w16  <- getWord16be
+            w8  <- getWord8
+            let ip = unsafeShiftL (fromIntegral w16  :: Word32) 16 .|.
+                     unsafeShiftL (fromIntegral w8 :: Word32) 8
+            return $ Prefix (subnet,ip)
+        else do ip <- getWord32be
+                return $ Prefix (subnet,ip)
+
