@@ -13,7 +13,7 @@ import Control.Applicative ((<|>))
 
 import BGPlib.BGPlib
 
-import BGPRib.BGPRib(PeerData(..),myBGPid,myAS)
+import BGPRib.BGPRib(ParsedUpdate(NullUpdate),decodeUpdate,PeerData(..),myBGPid,myAS)
 -- TODO = move Update.hs, and ppssibly some or all of BGPData, from bgprib to bgplib, so that bgprib does not need to be imported here.....
 --        the needed thing in BGPData is PeerData, but what else should move to is less obvious
 --        there are some things which any BGP application needs.....
@@ -237,16 +237,21 @@ runFSM g@Global{..} socketName peerName handle =
         msg <- bgpRcv handle (getNegotiatedHoldTime osm)
         case msg of
 
-            BGPKeepalive -> do _ <- Rib.ribPush (fromJust ribHandle) msg
+            BGPKeepalive -> do _ <- Rib.ribPush (fromJust ribHandle) NullUpdate
                                return (Established,st)
 
             update@BGPUpdate{} -> do
-                pushResponse <- Rib.ribPush (fromJust ribHandle) update
+                --let parsedUpdate = decodeUpdate update
+                parsedUpdate <- evaluate $ force $ decodeUpdate update
+                Rib.ribPush (fromJust ribHandle) parsedUpdate
+                return (Established,st)
+{- -- code to manage parse failure (if detected!)
                 if pushResponse then
                     return (Established,st)
                 else do
                     bgpSnd handle $ BGPNotify NotificationUPDATEMessageError 0 L.empty
                     idle "established - Update parse error"
+-}
 
             BGPNotify{} -> idle "established - rcv notify"
 
