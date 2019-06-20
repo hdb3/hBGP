@@ -1,6 +1,6 @@
 module Main where
 
-import BGPReader(readRib)
+import BGPRib.BGPReader(readRib)
 
 main = do
     rib <- readRib

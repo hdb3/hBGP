@@ -4,9 +4,9 @@ module Main where
 import Data.Hashable
 import Data.Binary
 import qualified Data.ByteString.Lazy
-import BGPlib(Prefix,BGPMessage(..))
-import BGPRib(myHash)
-import BGPReader(readMsgs)
+import BGPlib.BGPlib(Prefix,BGPMessage(..))
+import BGPRib.BGPRib(myHash)
+import BGPRib.BGPReader(readMsgs)
 --import ASPathUtils
 --import BGPutils
 
