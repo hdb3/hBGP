@@ -3,14 +3,16 @@ module BGPlib.GetBGPMsg where
 
 import System.Timeout(timeout)
 import System.IO.Error(catchIOError)
-import System.IO(Handle)
+--import System.IO(Handle)
+import Network.Socket hiding (recv,send)
+import Network.Socket.ByteString.Lazy
 import Data.Bits
 import Data.Binary
 import Data.Binary.Get
 import Data.Binary.Put
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString as B
-import Control.Monad(when,unless,fail)
+import Control.Monad(void,when,unless,fail)
 import Data.ByteString.Builder
 import Data.Monoid((<>))
 
@@ -22,10 +24,10 @@ data RcvStatus =   Timeout | EndOfStream | Error String deriving (Eq,Show)
 
 newtype BGPByteString = BGPByteString (Either RcvStatus L.ByteString) deriving Eq
 
-getRawMsg :: Handle -> Int -> IO BGPByteString
+getRawMsg :: Socket -> Int -> IO BGPByteString
 getRawMsg h t = getNextTimeout t h
 
-getNextTimeout :: Int -> Handle -> IO BGPByteString
+getNextTimeout :: Int -> Socket -> IO BGPByteString
 getNextTimeout t bsock = let t' = t * 1000000 in
              do resMaybe <- timeout t' (getNext bsock)
                 maybe
@@ -33,13 +35,13 @@ getNextTimeout t bsock = let t' = t * 1000000 in
                     return
                     resMaybe
 
-getNext:: Handle -> IO BGPByteString
+getNext:: Socket -> IO BGPByteString
 getNext h = catchIOError (getNext' h)
                          (\e -> return (BGPByteString $ Left (Error (show e)) ))
              
-getNext':: Handle -> IO BGPByteString
+getNext':: Socket -> IO BGPByteString
 getNext' h = do
-    header <- L.hGet h 18
+    header <- recv h 18
     if  L.length header < 18 then 
         return $ BGPByteString $ Left EndOfStream
     else do
@@ -49,7 +51,7 @@ getNext' h = do
         else if l' < 19 || l' > 4096 then return $ BGPByteString $ Left $ Error "Bad length in GetBGPByteString"
         else do
             let bl = l' - 18
-            body <- L.hGet h bl
+            body <- recv h bl
             if  L.length body /= fromIntegral bl then return $ BGPByteString $ Left EndOfStream
             else return $ BGPByteString $ Right body
     where
@@ -93,8 +95,8 @@ instance {-# OVERLAPPING #-} Binary [BGPByteString] where
 wireFormat :: L.ByteString -> L.ByteString
 wireFormat bs = toLazyByteString $ lazyByteString lBGPMarker <> word16BE (fromIntegral $ 18 + L.length bs) <> lazyByteString bs 
 
-sndRawMessage :: Handle -> L.ByteString -> IO ()
-sndRawMessage h bgpMsg = L.hPut h $ wireFormat bgpMsg
+sndRawMessage :: Socket -> L.ByteString -> IO ()
+sndRawMessage h bgpMsg = void $ send h $ wireFormat bgpMsg
 
-sndRawMessages :: Handle -> [L.ByteString] -> IO ()
-sndRawMessages h bgpMsgs = L.hPut h $ L.concat $ map wireFormat bgpMsgs
+sndRawMessages :: Socket -> [L.ByteString] -> IO ()
+sndRawMessages h bgpMsgs = void $ send h $ L.concat $ map wireFormat bgpMsgs

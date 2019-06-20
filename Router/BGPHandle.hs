@@ -2,9 +2,9 @@ module Router.BGPHandle where
 
 import BGPlib.GetBGPMsg(BGPByteString,sndRawMessage, sndRawMessages, getRawMsg)
 import BGPlib.BGPparse(BGPMessage,decodeBGPByteString,isUpdate)
-import Network.Socket(Socket,socketToHandle)
+import Network.Socket(Socket,close)
 import System.IO.Error(catchIOError)
-import System.IO(IOMode( ReadWriteMode ),Handle, hClose)
+--import System.IO(IOMode( ReadWriteMode ),Handle, hClose)
 import qualified Data.ByteString.Lazy as L
 import Data.Binary(encode)
 import Control.Concurrent(MVar,newEmptyMVar,putMVar,tryTakeMVar)
@@ -23,16 +23,16 @@ instance Exception BGPIOException
 
 --newtype BGPHandle = BGPHandle Handle
 --data BGPHandle = BGPHandle Handle (MVar(BGPByteString,Maybe ParsedUpdate))
-data BGPHandle = BGPHandle Handle ()
+data BGPHandle = BGPHandle Socket ()
  
 getBGPHandle :: Socket -> IO BGPHandle
-getBGPHandle sock = do h <- socketToHandle sock ReadWriteMode
+getBGPHandle sock = do -- h <- socketToHandle sock ReadWriteMode
                        --mv <- newEmptyMVar
                        --return $ BGPHandle h mv
-                       return $ BGPHandle h ()
+                       return $ BGPHandle sock ()
 
 bgpClose :: BGPHandle -> IO ()
-bgpClose (BGPHandle h _ ) = hClose h
+bgpClose (BGPHandle h _ ) = close h
 
 bgpSnd :: BGPHandle -> BGPMessage -> IO()
 bgpSnd (BGPHandle h _ ) msg | 4079 > lengthEncodedMsg = catchIOError ( sndRawMessage h encodedMsg )
