@@ -242,9 +242,17 @@ runFSM g@Global{..} socketName peerName handle =
 
             update@BGPUpdate{} -> do
                 --let parsedUpdate = decodeUpdate update
-                parsedUpdate <- evaluate $ force $ decodeUpdate update
-                Rib.ribPush (fromJust ribHandle) parsedUpdate
-                return (Established,st)
+                -- -- parsedUpdate <- evaluate $ force $ decodeUpdate update
+                -- -- Rib.ribPush (fromJust ribHandle) parsedUpdate
+                -- -- return (Established,st)
+
+                
+                eitherEParsedUpdate <- try $ evaluate $ force $ decodeUpdate update :: IO ( Either SomeException ParsedUpdate )
+
+                either ( \e -> idle $ "established - Update parse error (" ++ show e ++ ")" )
+                       ( \u -> Rib.ribPush (fromJust ribHandle) u >> return (Established,st) )
+                       eitherEParsedUpdate
+
 {- -- code to manage parse failure (if detected!)
                 if pushResponse then
                     return (Established,st)

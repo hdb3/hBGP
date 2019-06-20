@@ -12,7 +12,7 @@ import Control.Exception(handle,evaluate,throw,Exception,SomeException)
 import Control.DeepSeq(force)
 import System.Exit(die)
 
-import BGPRib.Update(ParsedUpdate,decodeUpdate)
+--import BGPRib.Update(ParsedUpdate,decodeUpdate)
 
 
 newtype BGPIOException = BGPIOException String deriving Show
@@ -22,12 +22,14 @@ instance Exception BGPIOException
 -- Follows the BGPHandle abstraction, which should allow the debugging of data integrity isses and also pluggable alternative socket access
 
 --newtype BGPHandle = BGPHandle Handle
-data BGPHandle = BGPHandle Handle (MVar(BGPByteString,Maybe ParsedUpdate))
+--data BGPHandle = BGPHandle Handle (MVar(BGPByteString,Maybe ParsedUpdate))
+data BGPHandle = BGPHandle Handle ()
  
 getBGPHandle :: Socket -> IO BGPHandle
 getBGPHandle sock = do h <- socketToHandle sock ReadWriteMode
-                       mv <- newEmptyMVar
-                       return $ BGPHandle h mv
+                       --mv <- newEmptyMVar
+                       --return $ BGPHandle h mv
+                       return $ BGPHandle h ()
 
 bgpClose :: BGPHandle -> IO ()
 bgpClose (BGPHandle h _ ) = hClose h
@@ -64,15 +66,16 @@ bgpRcv (BGPHandle h mvar ) t | t > 0     = bgpRcv'
 
         let
             exBGPMessage :: SomeException -> IO BGPMessage
-            exBGPMessage e = die $ "exBGPMessage " ++ (show e)
-            exUpdate :: SomeException -> IO (Maybe ParsedUpdate)
-            exUpdate e = die $ "exUpdate " ++ (show e)
+            exBGPMessage e = die $ "exBGPMessage " ++ show e
+            --exUpdate :: SomeException -> IO (Maybe ParsedUpdate)
+            --exUpdate e = die $ "exUpdate " ++ (show e)
 
         rawMsg <- getRawMsg h t
+        handle exBGPMessage ( evaluate $ force $ decodeBGPByteString rawMsg )
         --let bgpMsg = evaluate $ force $ decodeBGPByteString rawMsg
-        bgpMsg <- handle exBGPMessage ( evaluate $ force $ decodeBGPByteString rawMsg )
-        maybeUpdate <- handle exUpdate ( if isUpdate bgpMsg then evaluate $ Just $ force $ decodeUpdate bgpMsg else return Nothing )
+        --bgpMsg <- handle exBGPMessage ( evaluate $ force $ decodeBGPByteString rawMsg )
+        --maybeUpdate <- handle exUpdate ( if isUpdate bgpMsg then evaluate $ Just $ force $ decodeUpdate bgpMsg else return Nothing )
             --maybeUpdate = if isUpdate bgpMsg then Just $ evaluate $ force $ decodeUpdate bgpMsg else Nothing
-        tryTakeMVar mvar
-        putMVar mvar (rawMsg,maybeUpdate)
-        return bgpMsg
+        --tryTakeMVar mvar
+        --putMVar mvar (rawMsg,maybeUpdate)
+        --return bgpMsg
