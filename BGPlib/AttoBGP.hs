@@ -21,9 +21,9 @@ wireParser1 = do
     A.string $ B.replicate 16 0xff
     length <- fromIntegral <$> A.anyWord16be
     typeCode <- A.peekWord8'
-    if length < 19 then error "short length"
-    else if length > 4096 then error $ "too long " ++ show length
-    else if typeCode < 1 || typeCode > 4 then error $ "invalid type code (" ++ show typeCode ++ ")"
+    if length < 19 then fail "short length"
+    else if length > 4096 then fail $ "too long " ++ show length
+    else if typeCode < 1 || typeCode > 4 then fail $ "invalid type code (" ++ show typeCode ++ ")"
     else A.take (length - 18)
 
 bgpParser :: A.Parser [ BGPMessage ]
@@ -33,8 +33,8 @@ bgpParser1 :: A.Parser BGPMessage
 bgpParser1 = do
     A.string $ B.replicate 16 0xff
     length <- fromIntegral <$> A.anyWord16be
-    if length < 19 then error "short length"
-    else if length > 4096 then error $ "too long " ++ show length
+    if length < 19 then fail "short length"
+    else if length > 4096 then fail $ "too long " ++ show length
     else do
         typeCode <-A.anyWord8
         case typeCode of
@@ -54,17 +54,17 @@ bgpParser1 = do
                withdrawnRoutes <- L.fromStrict <$> A.take withdrawnRoutesLength
                pathAttributesLength <- fromIntegral <$> A.anyWord16be
                pathAttributes <- L.fromStrict <$> A.take pathAttributesLength
-               nlri <- L.fromStrict <$> A.take ( length - withdrawnRoutesLength - withdrawnRoutesLength - 23 )
+               nlri <- L.fromStrict <$> A.take ( length - withdrawnRoutesLength - pathAttributesLength - 23 )
                return $ BGPUpdate withdrawnRoutes pathAttributes nlri
             3 -> do
                errorCode <- A.anyWord8
                errorSubcode <- A.anyWord8
                errorData <- L.fromStrict <$> A.take ( length - 21 )
                return $ BGPNotify (decode8 errorCode) errorSubcode errorData
-            4 -> if length == 19 then return BGPKeepalive else error "invalid length in KeepAlive"
-            _ -> error $ "invalid type code (" ++ show typeCode ++ ")"
+            4 -> if length == 19 then return BGPKeepalive else fail "invalid length in KeepAlive"
+            _ -> fail $ "invalid type code (" ++ show typeCode ++ ")"
 
-
+{-
 parsePrefixes 0 = []
 
 parsePrefixes length = do
@@ -116,3 +116,4 @@ parsePrefixes length = do
         else do ip <- getWord32be
                 return $ Prefix (subnet,ip)
 
+-}
