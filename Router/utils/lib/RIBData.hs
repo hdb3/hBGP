@@ -7,7 +7,7 @@ import Data.IP(IPv4)
 --import qualified Data.Map.Strict as Map
 import qualified Data.IntMap.Strict as Map -- IntMap is only marginally faster than base Map
 
-import BGPlib
+import BGPlib.BGPlib
 
 data Peer = Peer {  peerName :: String
                  ,  isExternal :: Bool

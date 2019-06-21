@@ -8,13 +8,14 @@ import Text.Printf
 import System.Random
 import System.Random.Shuffle(shuffle')
 
-import BGPlib
-import BGPReader(updateRib,readRib,readGroupedRib)
-import qualified BGPRib
+import BGPlib.BGPlib
+import BGPRib.BGPReader(updateRib,readRib,readGroupedRib)
+import qualified BGPRib.BGPRib as BGPRib
 import RIBData
 import RibDef
 import MapRib
 import qualified IP4Prefix
+import Stopwatch
 
 shuffle l = do random <- getStdGen
                return $ shuffle' l (length l) random
@@ -150,6 +151,7 @@ test1 = do
     print (last rib)
     stopwatch "printed from rib" t0 t1
 
+{-
 -- timer functions TODO move out of this file
 
 systime = DT.getSystemTime
@@ -164,7 +166,7 @@ stopwatch s t0 t = do
     let showDiffTime tx ty = if 1.0 > dT then printf "%.3f ms" (1000*dT) else printf "%.3f s" dT where dT = diffSystemTime tx ty
     putStrLn $ "elapsed " ++ showDiffTime t0 t' ++ " delta " ++ showDiffTime t t' ++ " " ++ s
     return t'
-
+-}
 test2 = do
     t0 <- systime
     contents <- L.getContents
@@ -175,7 +177,7 @@ test2 = do
     t2 <- stopwatch "after wireformat parse" t0 t1
     let
         bgpMessages = map decodeBGPByteString bgpByteStrings
-        updates = map BGPRib.getUpdate $ filter isUpdate bgpMessages
+        updates = map BGPRib.decodeUpdate $ filter isUpdate bgpMessages
     rib <- BGPRib.newRib BGPRib.dummyPeerData
     mapM_ (updateRib rib) updates
     stopwatch "after full (?) parse into rib" t0 t2
