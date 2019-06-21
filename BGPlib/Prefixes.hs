@@ -29,8 +29,9 @@ import BGPlib.LibCommon
 --
 -- representation of prefixes as 64 bit words: this mapping allows prefixes to be treated as Ints where useful
 
-data Prefix = Prefix !(Word8,Word32) deriving (Eq,Generic,NFData)
-data IPrefix = IPrefix !Int deriving (Eq,Generic,NFData)
+data Prefix = Prefix {-# UNPACK #-} !(Word8,Word32) deriving (Eq,Generic,NFData)
+data IPrefix = IPrefix {-# UNPACK #-} !Int deriving (Eq,Generic,NFData)
+
 toPrefix :: IPrefix -> Prefix
 toPrefix (IPrefix w64) = Prefix (fromIntegral $ unsafeShiftR w64 32, fromIntegral $ 0xffffffff .&. w64)
 fromPrefix :: Prefix -> IPrefix
