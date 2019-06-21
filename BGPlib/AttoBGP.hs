@@ -55,11 +55,11 @@ bgpParser1 = do
 
             2 -> do
                withdrawnLength <- fromIntegral <$> A.anyWord16be
-               withdrawn <- parsePrefixes' withdrawnLength
+               withdrawn <- localParsePrefixes withdrawnLength
                pathLength <- fromIntegral <$> A.anyWord16be
                path <- parseAttributes' pathLength
                let nlriLength = length - withdrawnLength - pathLength - 23
-               nlri <- parsePrefixes' nlriLength
+               nlri <- localParsePrefixes nlriLength
                return $ bgpupdate withdrawn path nlri
 
             3 -> do
@@ -71,13 +71,8 @@ bgpParser1 = do
             4 -> if length == 19 then return BGPKeepalive else fail "invalid length in KeepAlive"
             _ -> fail $ "invalid type code (" ++ show typeCode ++ ")"
 
-    where
-        parsePrefixesBS l = L.fromStrict <$> A.take l
-        parseAttributesBS l = L.fromStrict <$> A.take l
-        parsePrefixes' = parsePrefixes  ; bgpupdate = BGPUpdate2 -- enable the full parser
-        --parsePrefixes' = parsePrefixesBS ; bgpupdate = BGPUpdate -- enable the minimal parser
-        parseAttributes' = parseAttributesBS -- enable the minimal parser
-        --parseAttributes' = parseAttributes -- enable the full parser
+parseAttributesBS l = L.fromStrict <$> A.take l
+parseAttributes' = parseAttributesBS -- enable the minimal parser
 
 
 -- chooinsg different versions of the prefix parser via parseX:
@@ -85,6 +80,10 @@ bgpParser1 = do
 --parseX = parse1 -- this is the original recursive parser
 parseX = parse2 -- this is the case statement parser
 --parseX = parse3 -- this is the simplified versin of parse2
+localParsePrefixes = parsePrefixes  ; prefixBuilder = fromPrefix . Prefix ; bgpupdate = BGPUpdate3
+--localParsePrefixes = parsePrefixes  ; prefixBuilder = Prefix ; bgpupdate = BGPUpdate2
+--parsePrefixes' = parsePrefixesBS ; bgpupdate = BGPUpdate -- enable the minimal parser
+parsePrefixesBS l = L.fromStrict <$> A.take l
 
 --type Prefix = (Word8,Word32)
 -- Attoparsec: Parse Update Prefixes
@@ -93,9 +92,9 @@ parseX = parse2 -- this is the case statement parser
 -- Implementation
 -- The signature of a recursive parser is thus: -}
 
-parsePrefixes :: Int -> Parser [Prefix]
+--parsePrefixes :: Int -> Parser [Prefix]
 parsePrefixes n = parsePrefixes' n []
-parsePrefixes' :: Int -> [Prefix] -> Parser [Prefix]
+--parsePrefixes' :: Int -> [Prefix] -> Parser [Prefix]
 -- The parser is initialized with an empty list and the buffer size.
 -- The recursion terminates when the available buffer is ==0
 
@@ -106,7 +105,7 @@ parsePrefixes' n prefixes = do
     prefixBitLen <- A.anyWord8
     let prefixByteLen = fromIntegral $ (prefixBitLen+7) `div` 8
     prefix <- parseX prefixByteLen
-    parsePrefixes' (n-prefixByteLen-1) (Prefix (prefixBitLen,prefix) : prefixes)
+    parsePrefixes' (n-prefixByteLen-1) (prefixBuilder (prefixBitLen,prefix) : prefixes)
 
 -- This leaves it to define parse1:
 --     parse1 :: Int -> Parser Word32
