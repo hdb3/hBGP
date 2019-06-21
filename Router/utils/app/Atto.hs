@@ -38,15 +38,28 @@ msg = B.concat [ keepAlive, eor, keepAlive ]
 main = do
     args <- getArgs
     if null args then do
-        test "eor" eor
-        test "msg" msg
-        test "update1" update1
-        test "update2" update2
-        test "update3" update3
-        test "update4" update4
-        test "update5" update4
-        test "update7" update4
-        test "update7" update4
+        test "custom" $ mkUpdate [] [] [ "192.168.0.0/16"
+                                     --,"0.0.0.0/0"
+                                     --,"255.255.255.255/1"
+                                     --,"255.255.255.255/8"
+                                     --,"255.0.255.255/9"
+                                     --,"255.0.255.255/16"
+                                     --,"255.0.0.255/17"
+                                     --,"255.0.0.255/23"
+                                     --,"255.255.0.255/24"
+                                     --,"255.255.0.255/31"
+                                     --,"0.255.0.255/32"
+                                     --,"0.0.0.0/33"
+                                     ]
+        --test "eor" eor
+        --test "msg" msg
+        --test "update1" update1
+        --test "update2" update2
+        --test "update3" update3
+        --test "update4" update4
+        --test "update5" update4
+        --test "update7" update4
+        --test "update7" update4
     else if 1 == length args then do
         putStrLn $ "\n*** " ++ (head args) ++ " ***\n"
         bs <- B.readFile (head args)

@@ -11,6 +11,7 @@ import Data.IP
 import Control.Monad(unless)
 
 import BGPlib.RFC4271
+import BGPlib.Prefixes
 import BGPlib.Capabilities
 import BGPlib.LibCommon
 import BGPlib.GetBGPMsg(BGPByteString(..),RcvStatus(..))
@@ -32,6 +33,7 @@ data BGPMessage = BGPOpen { myAutonomousSystem :: Word16, holdTime :: Word16, bg
                   | BGPNotify { code :: EnumNotificationCode, subCode :: NotificationSubcode, errorData :: L.ByteString }
                   -- | BGPNotify { code :: EnumNotificationCode, subCode :: NotificationSubcode, caps :: [ Capability ] }
                   | BGPUpdate { withdrawn :: L.ByteString, attributes :: L.ByteString, nlri :: L.ByteString }
+                  | BGPUpdate2 { withdrawnPrefixes :: [Prefix], attributes :: L.ByteString, nlriPrefixes :: [Prefix] }
                   | BGPTimeout
                   | BGPError String
                   | BGPEndOfStream

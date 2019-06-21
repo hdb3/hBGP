@@ -2,6 +2,7 @@
 module BGPlib.AttoBGP where
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
+import Data.Attoparsec.ByteString(Parser)
 import qualified Data.Attoparsec.ByteString as A
 import qualified Data.Attoparsec.Binary as A
 import Control.Monad(unless)
@@ -10,13 +11,16 @@ import qualified BGPlib.RFC4271
 import BGPlib.Capabilities(parseOptionalParameters)
 import BGPlib.LibCommon(decode8,fromHostAddress)
 import BGPlib.Prefixes
+import BGPlib.BGPparse(BGPMessage(..))
+--import qualified BGPlib.BGPparse as BGP
+import Data.Word
+import Data.Bits
+import Data.ByteString.Base16
 
-import BGPlib.BGPparse
-
-wireParser :: A.Parser [ B.ByteString ]
+wireParser :: Parser [ B.ByteString ]
 wireParser = A.many' wireParser1 A.<?>  "BGP wire format Parser"
 
-wireParser1 :: A.Parser B.ByteString
+wireParser1 :: Parser B.ByteString
 wireParser1 = do
     A.string $ B.replicate 16 0xff
     length <- fromIntegral <$> A.anyWord16be
@@ -26,10 +30,10 @@ wireParser1 = do
     else if typeCode < 1 || typeCode > 4 then fail $ "invalid type code (" ++ show typeCode ++ ")"
     else A.take (length - 18)
 
-bgpParser :: A.Parser [ BGPMessage ]
+bgpParser :: Parser [ BGPMessage ]
 bgpParser = A.many' bgpParser1 A.<?>  "BGP intermediate format Parser"
 
-bgpParser1 :: A.Parser BGPMessage
+bgpParser1 :: Parser BGPMessage
 bgpParser1 = do
     A.string $ B.replicate 16 0xff
     length <- fromIntegral <$> A.anyWord16be
@@ -50,12 +54,16 @@ bgpParser1 = do
                return $ BGPOpen myAutonomousSystem holdTime (fromHostAddress bgpID)  ( parseOptionalParameters optionalParameters )
             2 -> do
                -- todo implment the parsers for prefixes and attributes (prefixes may be already done in zmesg)
-               withdrawnRoutesLength <- fromIntegral <$> A.anyWord16be
-               withdrawnRoutes <- L.fromStrict <$> A.take withdrawnRoutesLength
-               pathAttributesLength <- fromIntegral <$> A.anyWord16be
-               pathAttributes <- L.fromStrict <$> A.take pathAttributesLength
-               nlri <- L.fromStrict <$> A.take ( length - withdrawnRoutesLength - pathAttributesLength - 23 )
-               return $ BGPUpdate withdrawnRoutes pathAttributes nlri
+               withdrawnLength <- fromIntegral <$> A.anyWord16be
+               withdrawn <- parsePrefixes withdrawnLength
+               --withdrawn <- parsePrefixesBS withdrawnLength
+               pathLength <- fromIntegral <$> A.anyWord16be
+               path <- parseAttributesBS pathLength
+               let nlriLength = length - withdrawnLength - pathLength - 23
+               nlri <- parsePrefixes nlriLength
+               --nlri <- parsePrefixesBS nlriLength
+               return $ BGPUpdate2 withdrawn path nlri
+               --return $ BGPUpdate withdrawn path nlri
             3 -> do
                errorCode <- A.anyWord8
                errorSubcode <- A.anyWord8
@@ -64,56 +72,50 @@ bgpParser1 = do
             4 -> if length == 19 then return BGPKeepalive else fail "invalid length in KeepAlive"
             _ -> fail $ "invalid type code (" ++ show typeCode ++ ")"
 
-{-
-parsePrefixes 0 = []
+parsePrefixesBS l = L.fromStrict <$> A.take l
+parseAttributesBS l = L.fromStrict <$> A.take l
 
-parsePrefixes length = do
-    plen <- anyWord8
-    prefix' <-
-        if | plen == 0  -> ( Prefix (0,0) ) : parsePrefixes (length-1)
-           | plen < 9   -> readPrefix1Byte  : parsePrefixes (length-2)
-           | plen < 17  -> readPrefix2Byte  : parsePrefixes (length-3)
-           | plen < 25  -> readPrefix3Byte  : parsePrefixes (length-4)
-           | plen < 33  -> readPrefix4Byte  : parsePrefixes (length-5)
-           | otherwise  -> fail $ "plen > " ++ show plen
-    let v4address = fromHostAddress $ byteSwap32 prefix'
-    return ZPrefixV4{..}
-    where
-        readPrefix1Byte = do
-            b0 <- anyWord8
-            
-            return (unsafeShiftL (fromIntegral b0) 24)
-        readPrefix2Byte = do
-            b0 <- anyWord16be
-            return (unsafeShiftL (fromIntegral b0) 16)
-        readPrefix3Byte = do
-            b0 <- anyWord16be
-            b1 <- anyWord8
-            return (unsafeShiftL (fromIntegral b1) 8 .|. unsafeShiftL (fromIntegral b0) 16)
-        readPrefix4Byte = anyWord32be
 
-    get = label "Prefix" $ do
-        subnet <- getWord8
-        if subnet == 0
-        then return $ Prefix (0,0)
-        else if subnet < 9
-        then do
-            w8 <- getWord8
-            let ip = unsafeShiftL (fromIntegral w8 :: Word32) 24
-            return $ Prefix (subnet,ip)
-        else if subnet < 17
-        then do
-            w16  <- getWord16be
-            let ip = unsafeShiftL (fromIntegral w16  :: Word32) 16
-            return $ Prefix (subnet,ip)
-        else if subnet < 25
-        then do
-            w16  <- getWord16be
-            w8  <- getWord8
-            let ip = unsafeShiftL (fromIntegral w16  :: Word32) 16 .|.
-                     unsafeShiftL (fromIntegral w8 :: Word32) 8
-            return $ Prefix (subnet,ip)
-        else do ip <- getWord32be
-                return $ Prefix (subnet,ip)
 
--}
+--type Prefix = (Word8,Word32)
+-- Attoparsec: Parse Update Prefixes
+-- A list of prefixes is defined by its length in bytes (so misconstructed lists are feasible).
+-- Thus a recursive parser must propagate the remaining buffer size.
+-- Implementation
+-- The signature of a recursive parser is thus: -}
+
+parsePrefixes :: Int -> Parser [Prefix]
+parsePrefixes n = parsePrefixes' n []
+parsePrefixes' :: Int -> [Prefix] -> Parser [Prefix]
+-- The parser is initialized with an empty list and the buffer size.
+-- The recursion terminates when the available buffer is ==0 (or -ve as invalid).
+
+parsePrefixes' 0 prefixes = return $ reverse prefixes
+
+-- The normal path is:
+parsePrefixes' n prefixes = do
+    prefixBitLen <- A.anyWord8
+    let prefixByteLen = fromIntegral $ (prefixBitLen+7) `div` 8
+    prefix <- parse1 prefixByteLen
+    parsePrefixes' (n-prefixByteLen-1) (Prefix (prefixBitLen,prefix) : prefixes)
+
+-- This leaves it to define parse1:
+--     parse1 :: Int -> Parser Word32
+-- An inelegant implementation is a case statement over the byte length size of the prefix.
+-- An elegant solution is recursive: depending on the endianness the accumulator is formed with the next value shifted in some way using the bytecount.
+-- The trick is to ensure that the full shift is applied to a single or short byte cases.
+-- One way to do this is to apply more shifts after a short case accumulator.
+-- Note: the elegant approach extends to IPv6 naturally...  (when 128 bit registers are available!!)
+
+parse1a :: Word32 -> Int -> Parser Word32
+
+--The first parmeter is the accumulator, the second reflects the remaining byte count.
+
+parse1a acc 0 = return acc
+parse1a acc byteIndex = do
+    next <- fromIntegral <$> A.anyWord8
+    parse1a (unsafeShiftL acc 8 .|. next) (byteIndex-1)
+
+--The full prefix parser is thus
+parse1 :: Int -> Parser Word32
+parse1 byteLength = flip unsafeShiftL ( 8 * (4 - byteLength) ) <$> parse1a 0 byteLength
