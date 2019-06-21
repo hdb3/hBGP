@@ -8,6 +8,7 @@ import Data.ByteString.Lazy(toStrict,fromStrict)
 import Data.Attoparsec.ByteString
 import Data.Binary
 import System.Environment(getArgs)
+import Stopwatch
 
 main' = do
     bs <- B.getContents
@@ -63,8 +64,8 @@ main = do
     else if 1 == length args then do
         putStrLn $ "\n*** " ++ (head args) ++ " ***\n"
         bs <- B.readFile (head args)
-        parseCheck wireParser bs
-        parseCheck bgpParser bs
+        timeIO "parseCheck wireParser" $ parseCheck wireParser bs
+        timeIO "parseCheck bgpParser" $ parseCheck bgpParser bs
     else do
         let n = read (args !! 1) :: Int
         putStrLn $ "\n*** " ++ (head args) ++ " " ++ show n ++ " ***\n"
@@ -83,3 +84,5 @@ main = do
               putStrLn $ toHex bs
               parseCheck wireParser bs
               parseCheck bgpParser bs
+              --timeIO "parseCheck wireParser" $ parseCheck wireParser bs
+              --timeIO "parseCheck bgpParser" $ parseCheck bgpParser bs

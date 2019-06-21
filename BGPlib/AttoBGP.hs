@@ -52,30 +52,39 @@ bgpParser1 = do
                optionalParameters <- L.fromStrict <$> A.take optionalParametersLength
                -- TODO implement a native parser for optional parameters
                return $ BGPOpen myAutonomousSystem holdTime (fromHostAddress bgpID)  ( parseOptionalParameters optionalParameters )
+
             2 -> do
-               -- todo implment the parsers for prefixes and attributes (prefixes may be already done in zmesg)
                withdrawnLength <- fromIntegral <$> A.anyWord16be
-               withdrawn <- parsePrefixes withdrawnLength
-               --withdrawn <- parsePrefixesBS withdrawnLength
+               withdrawn <- parsePrefixes' withdrawnLength
                pathLength <- fromIntegral <$> A.anyWord16be
-               path <- parseAttributesBS pathLength
+               path <- parseAttributes' pathLength
                let nlriLength = length - withdrawnLength - pathLength - 23
-               nlri <- parsePrefixes nlriLength
-               --nlri <- parsePrefixesBS nlriLength
-               return $ BGPUpdate2 withdrawn path nlri
-               --return $ BGPUpdate withdrawn path nlri
+               nlri <- parsePrefixes' nlriLength
+               return $ bgpupdate withdrawn path nlri
+
             3 -> do
                errorCode <- A.anyWord8
                errorSubcode <- A.anyWord8
                errorData <- L.fromStrict <$> A.take ( length - 21 )
                return $ BGPNotify (decode8 errorCode) errorSubcode errorData
+
             4 -> if length == 19 then return BGPKeepalive else fail "invalid length in KeepAlive"
             _ -> fail $ "invalid type code (" ++ show typeCode ++ ")"
 
-parsePrefixesBS l = L.fromStrict <$> A.take l
-parseAttributesBS l = L.fromStrict <$> A.take l
+    where
+        parsePrefixesBS l = L.fromStrict <$> A.take l
+        parseAttributesBS l = L.fromStrict <$> A.take l
+        parsePrefixes' = parsePrefixes  ; bgpupdate = BGPUpdate2 -- enable the full parser
+        --parsePrefixes' = parsePrefixesBS ; bgpupdate = BGPUpdate -- enable the minimal parser
+        parseAttributes' = parseAttributesBS -- enable the minimal parser
+        --parseAttributes' = parseAttributes -- enable the full parser
 
 
+-- chooinsg different versions of the prefix parser via parseX:
+
+--parseX = parse1 -- this is the original recursive parser
+parseX = parse2 -- this is the case statement parser
+--parseX = parse3 -- this is the simplified versin of parse2
 
 --type Prefix = (Word8,Word32)
 -- Attoparsec: Parse Update Prefixes
@@ -88,7 +97,7 @@ parsePrefixes :: Int -> Parser [Prefix]
 parsePrefixes n = parsePrefixes' n []
 parsePrefixes' :: Int -> [Prefix] -> Parser [Prefix]
 -- The parser is initialized with an empty list and the buffer size.
--- The recursion terminates when the available buffer is ==0 (or -ve as invalid).
+-- The recursion terminates when the available buffer is ==0
 
 parsePrefixes' 0 prefixes = return $ reverse prefixes
 
@@ -96,7 +105,7 @@ parsePrefixes' 0 prefixes = return $ reverse prefixes
 parsePrefixes' n prefixes = do
     prefixBitLen <- A.anyWord8
     let prefixByteLen = fromIntegral $ (prefixBitLen+7) `div` 8
-    prefix <- parse1 prefixByteLen
+    prefix <- parseX prefixByteLen
     parsePrefixes' (n-prefixByteLen-1) (Prefix (prefixBitLen,prefix) : prefixes)
 
 -- This leaves it to define parse1:
@@ -119,3 +128,27 @@ parse1a acc byteIndex = do
 --The full prefix parser is thus
 parse1 :: Int -> Parser Word32
 parse1 byteLength = flip unsafeShiftL ( 8 * (4 - byteLength) ) <$> parse1a 0 byteLength
+
+
+
+-- It is measured that when compared with merely returning ByteStrings for the prefixes this parser is significantly slower
+--  - by about x10 - for 1,000,000 prefixes in 100,000 updates the respective performance was ~75mS vs ~750mS.
+-- Alternates are possible, e.g. invoke a parser on a fixed length bytestring, or make the inner loop non-recursive (different action depeniding on the prefix len first byte).
+-- Here is the implementation of the second of these:
+
+parse2 :: Int -> Parser Word32
+parse2 k = case k of
+    0 -> return 0
+    1 -> ( flip unsafeShiftL 24 . fromIntegral ) <$>  A.anyWord8
+    2 -> ( flip unsafeShiftL 16 . fromIntegral ) <$>  A.anyWord16be
+    3 -> ( flip unsafeShiftL 8 . fromIntegral ) <$>  anyWord24be
+    4 -> A.anyWord32be
+    where
+    anyWord24be :: Parser Word32
+    anyWord24be = B.foldl' (\n h -> (n `shiftL` 8) .|. fromIntegral h) 0 <$> (A.take 3)
+
+-- Alternate encoding
+
+
+parse3 :: Int -> Parser Word32
+parse3 k = B.foldl' (\n h -> (n `shiftL` 8) .|. fromIntegral h) 0 <$> (A.take k)
