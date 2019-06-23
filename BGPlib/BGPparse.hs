@@ -13,6 +13,7 @@ import Control.Monad(unless)
 import BGPlib.RFC4271
 import BGPlib.Prefixes
 import BGPlib.Capabilities
+import BGPlib.PathAttributes
 import BGPlib.LibCommon
 import BGPlib.GetBGPMsg(BGPByteString(..),RcvStatus(..))
 
@@ -35,6 +36,7 @@ data BGPMessage = BGPOpen { myAutonomousSystem :: Word16, holdTime :: Word16, bg
                   | BGPUpdate { withdrawn :: L.ByteString, attributes :: L.ByteString, nlri :: L.ByteString }
                   | BGPUpdate2 { withdrawnPrefixes :: [Prefix], attributes :: L.ByteString, nlriPrefixes :: [Prefix] }
                   | BGPUpdate3 { withdrawnIPrefixes :: [IPrefix], attributes :: L.ByteString, nlriIPrefixes :: [IPrefix] }
+                  | BGPUpdate4 { withdrawnIPrefixes :: [IPrefix], pathAttributes :: [PathAttribute], nlriIPrefixes :: [IPrefix] }
                   | BGPTimeout
                   | BGPError String
                   | BGPEndOfStream
