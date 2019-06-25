@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 module Main where
 import BGPlib.AttoBGP
 import BGPlib.BGPparse
@@ -6,7 +5,7 @@ import qualified Data.ByteString as B
 import Data.Attoparsec.ByteString
 import System.Environment(getArgs)
 import Control.Exception(evaluate)
-import Control.DeepSeq(force,NFData)
+import Control.DeepSeq(force)
 import System.IO
 import Data.IORef
 
@@ -14,6 +13,7 @@ import Stopwatch
 
 data BGPHandle = BGPHandle Handle (IORef B.ByteString)
 
+main:: IO ()
 main = do
     args <- getArgs
     if null args then putStrLn "?"
@@ -22,6 +22,7 @@ main = do
         putStrLn $ "\n*** " ++ fname ++ " ***\n"
         timeIO "parseCheck terminatingWireParser" $ openFile fname ReadMode >>= bgpHandle >>= readMsgs
 
+readMsgs :: BGPHandle -> IO ()
 readMsgs h = do
     msgs <- collect []
     msgs' <- evaluate $ force msgs
@@ -31,11 +32,14 @@ readMsgs h = do
 
     collect l = do
         next <- getNext h
-        case next of
-           BGPEndOfStream -> return l
-           (BGPError _) -> return l
-           BGPTimeout -> return l
-           _          -> collect (next:l)
+        if endOfStream next then return l
+                            else collect (next:l)
+    endOfStream msg =
+        case msg of
+           BGPEndOfStream -> True
+           (BGPError _)   -> True
+           BGPTimeout     -> True
+           _              -> False
            
 bgpHandle :: Handle -> IO BGPHandle
 bgpHandle h = do
@@ -49,11 +53,11 @@ getNext (BGPHandle stream ioref) = do
     newBuf <- if B.null oldBuf then getBuf else return oldBuf
     result <- complete ( parse terminatingBGPParser newBuf )
     case result of
-        (Done i r) -> do if B.null newBuf then do writeIORef ioref undefined
-                                                  return BGPEndOfStream
-                                          else do writeIORef ioref i
-                                                  evaluate $ force r
-        (Partial cont) -> error "Partial has been removed already by `g`"
+        (Done i r) -> if B.null newBuf then do writeIORef ioref undefined
+                                               return BGPEndOfStream
+                                       else do writeIORef ioref i
+                                               evaluate $ force r
+        (Partial _) -> error "Partial has been removed already by `g`"
         (Fail _ s sx) -> error $ "parse fail in getNext" ++ show (s,sx)
         -- 'production' version in the event that parse fails actually occur
         -- (Fail _ s sx) -> do hPutStrln stderr $ "parse fail in getNext" ++ show (s,sx)
