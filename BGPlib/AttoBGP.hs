@@ -16,7 +16,9 @@ import Data.Word
 import Data.Bits
 import Control.Applicative((<|>))
 
-terminatingWireParser = wireParser1 <|> fail "EOF"
+terminatingWireParser = wireParser1 <|> return B.empty
+eosWireParser = B.null
+--terminatingWireParser = wireParser1 <|> fail "EOF"
 
 
 wireParser :: Parser [ B.ByteString ]
@@ -36,6 +38,7 @@ bgpParser :: Parser [ BGPMessage ]
 bgpParser = A.many' bgpParser1 A.<?>  "BGP intermediate format Parser"
 
 terminatingBGPParser = bgpParser1 <|> return BGPEndOfStream
+eosBGPParser msg = BGPEndOfStream == msg
 bgpParser1 :: Parser BGPMessage
 bgpParser1 = do
     A.string $ B.replicate 16 0xff
