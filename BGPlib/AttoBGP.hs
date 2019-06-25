@@ -14,6 +14,10 @@ import BGPlib.PathAttributes
 import BGPlib.BGPparse(BGPMessage(..))
 import Data.Word
 import Data.Bits
+import Control.Applicative((<|>))
+
+terminatingWireParser = wireParser1 <|> fail "EOF"
+
 
 wireParser :: Parser [ B.ByteString ]
 wireParser = A.many' wireParser1 A.<?>  "BGP wire format Parser"
@@ -31,6 +35,7 @@ wireParser1 = do
 bgpParser :: Parser [ BGPMessage ]
 bgpParser = A.many' bgpParser1 A.<?>  "BGP intermediate format Parser"
 
+terminatingBGPParser = bgpParser1 <|> return BGPEndOfStream
 bgpParser1 :: Parser BGPMessage
 bgpParser1 = do
     A.string $ B.replicate 16 0xff
