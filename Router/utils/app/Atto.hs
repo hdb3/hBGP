@@ -8,6 +8,9 @@ import Data.ByteString.Lazy(toStrict,fromStrict)
 import Data.Attoparsec.ByteString
 import Data.Binary
 import System.Environment(getArgs)
+import Control.Exception(evaluate)
+import Control.DeepSeq(force)
+
 import Stopwatch
 
 main' = do
@@ -15,9 +18,11 @@ main' = do
     parseCheck wireParser bs
 
 parseCheck p bs = do
+    --result <- return $ parseOnly p bs
+    result <- evaluate $ force $ parseOnly p bs
     either (\s -> putStrLn $ "parse failed: " ++ s)
            (\msgs -> putStrLn $ "read " ++ show (length msgs) ++ " messages from " ++ show (B.length bs) ++ " bytes" )
-           ( parseOnly p bs )
+           result
 
 parse_ p bs = either fail
                      id

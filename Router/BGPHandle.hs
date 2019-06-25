@@ -23,13 +23,13 @@ instance Exception BGPIOException
 
 --newtype BGPHandle = BGPHandle Handle
 --data BGPHandle = BGPHandle Handle (MVar(BGPByteString,Maybe ParsedUpdate))
-data BGPHandle = BGPHandle Socket ()
+data BGPHandle = BGPHandle { socket :: Socket , msgQueue :: [BGPMessage] };
  
 getBGPHandle :: Socket -> IO BGPHandle
 getBGPHandle sock = do -- h <- socketToHandle sock ReadWriteMode
                        --mv <- newEmptyMVar
                        --return $ BGPHandle h mv
-                       return $ BGPHandle sock ()
+                       return $ BGPHandle sock []
 
 bgpClose :: BGPHandle -> IO ()
 bgpClose (BGPHandle h _ ) = close h
@@ -46,36 +46,13 @@ bgpSndAll (BGPHandle h _ ) msgs = catchIOError ( sndRawMessages h $ map encode m
                                             (\e -> throw $ BGPIOException (show (e :: IOError)))
 
 bgpRcv :: BGPHandle -> Int -> IO BGPMessage
---bgpRcv (BGPHandle h _ ) t | t > 0     = decodeBGPByteString <$> (getRawMsg h t)
-bgpRcv (BGPHandle h mvar ) t | t > 0     = bgpRcv'
-                             | otherwise = error "state machine should never set zero timeout for a handle read"
+bgpRcv (BGPHandle h q ) t | t > 0     = bgpRcv'
+                          | otherwise = error "state machine should never set zero timeout for a handle read"
     where
     bgpRcv' = do
-    -- for diagnostics, force parse of the message as soon as it is received, and attempt to store it
-    -- getRawMsg returns BGPByteString, which wraps errors and timeouts in an Either over a regular ByteString
-    -- decodeBGPByteString handles all of these cases: delivers BGPMessage which also wraps exceptions, though not in Either
-    -- note: decodeBGPByteString calls (Binary) decode, which can fail....
-    --
-    -- I want to store the lowest level value....
-    -- then force the conversion to BGPMessage (and catch errors immediately)
-    -- and then, when the BGPMessage is BGPUpdate, force full parsing of that
-    -- (again, catch errors immediately)
-    -- in every case we replace the stored value....
-    
-
-
         let
             exBGPMessage :: SomeException -> IO BGPMessage
             exBGPMessage e = die $ "exBGPMessage " ++ show e
-            --exUpdate :: SomeException -> IO (Maybe ParsedUpdate)
-            --exUpdate e = die $ "exUpdate " ++ (show e)
 
         rawMsg <- getRawMsg h t
         handle exBGPMessage ( evaluate $ force $ decodeBGPByteString rawMsg )
-        --let bgpMsg = evaluate $ force $ decodeBGPByteString rawMsg
-        --bgpMsg <- handle exBGPMessage ( evaluate $ force $ decodeBGPByteString rawMsg )
-        --maybeUpdate <- handle exUpdate ( if isUpdate bgpMsg then evaluate $ Just $ force $ decodeUpdate bgpMsg else return Nothing )
-            --maybeUpdate = if isUpdate bgpMsg then Just $ evaluate $ force $ decodeUpdate bgpMsg else Nothing
-        --tryTakeMVar mvar
-        --putMVar mvar (rawMsg,maybeUpdate)
-        --return bgpMsg

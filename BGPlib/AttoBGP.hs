@@ -7,15 +7,13 @@ import qualified Data.Attoparsec.ByteString as A
 import qualified Data.Attoparsec.Binary as A
 import Control.Monad(unless)
 
-import qualified BGPlib.RFC4271
 import BGPlib.Capabilities(parseOptionalParameters)
 import BGPlib.LibCommon(decode8,fromHostAddress)
 import BGPlib.Prefixes
+import BGPlib.PathAttributes
 import BGPlib.BGPparse(BGPMessage(..))
---import qualified BGPlib.BGPparse as BGP
 import Data.Word
 import Data.Bits
-import Data.ByteString.Base16
 
 wireParser :: Parser [ B.ByteString ]
 wireParser = A.many' wireParser1 A.<?>  "BGP wire format Parser"
@@ -57,7 +55,7 @@ bgpParser1 = do
                withdrawnLength <- fromIntegral <$> A.anyWord16be
                withdrawn <- localParsePrefixes withdrawnLength
                pathLength <- fromIntegral <$> A.anyWord16be
-               path <- parseAttributes' pathLength
+               path <- localParseAttributes pathLength
                let nlriLength = length - withdrawnLength - pathLength - 23
                nlri <- localParsePrefixes nlriLength
                return $ bgpupdate withdrawn path nlri
@@ -71,19 +69,24 @@ bgpParser1 = do
             4 -> if length == 19 then return BGPKeepalive else fail "invalid length in KeepAlive"
             _ -> fail $ "invalid type code (" ++ show typeCode ++ ")"
 
+parseAttributes l = decodeAttributes . L.fromStrict <$> A.take l
 parseAttributesBS l = L.fromStrict <$> A.take l
-parseAttributes' = parseAttributesBS -- enable the minimal parser
+parsePrefixesBS l = L.fromStrict <$> A.take l
+--parseAttributes = decodeAttributes . L.fromStrict
+--localParseAttributes = parseAttributesBS -- enable the minimal parser
 
 
 -- chooinsg different versions of the prefix parser via parseX:
 
---parseX = parse1 -- this is the original recursive parser
+--parseX = inline parse1 -- this is the original recursive parser
 parseX = parse2 -- this is the case statement parser
---parseX = parse3 -- this is the simplified versin of parse2
-localParsePrefixes = parsePrefixes  ; prefixBuilder = fromPrefix . Prefix ; bgpupdate = BGPUpdate3
---localParsePrefixes = parsePrefixes  ; prefixBuilder = Prefix ; bgpupdate = BGPUpdate2
---parsePrefixes' = parsePrefixesBS ; bgpupdate = BGPUpdate -- enable the minimal parser
-parsePrefixesBS l = L.fromStrict <$> A.take l
+--parseX = inline parse3 -- this is the simplified version of parse2
+(localParseAttributes, localParsePrefixes, prefixBuilder, bgpupdate) = format4
+
+format1 = ( parseAttributesBS , parsePrefixesBS , Prefix , BGPUpdate )
+format2 = ( parseAttributesBS , parsePrefixes , Prefix , BGPUpdate2 )
+format3 = ( parseAttributesBS , parsePrefixes , fromPrefix . Prefix , BGPUpdate3 )
+format4 = ( parseAttributes , parsePrefixes, fromPrefix . Prefix , BGPUpdate4)
 
 --type Prefix = (Word8,Word32)
 -- Attoparsec: Parse Update Prefixes
@@ -93,6 +96,7 @@ parsePrefixesBS l = L.fromStrict <$> A.take l
 -- The signature of a recursive parser is thus: -}
 
 --parsePrefixes :: Int -> Parser [Prefix]
+{-# INLINE parsePrefixes' #-}
 parsePrefixes n = parsePrefixes' n []
 --parsePrefixes' :: Int -> [Prefix] -> Parser [Prefix]
 -- The parser is initialized with an empty list and the buffer size.
@@ -115,6 +119,7 @@ parsePrefixes' n prefixes = do
 -- One way to do this is to apply more shifts after a short case accumulator.
 -- Note: the elegant approach extends to IPv6 naturally...  (when 128 bit registers are available!!)
 
+{-# INLINE parse1a #-}
 parse1a :: Word32 -> Int -> Parser Word32
 
 --The first parmeter is the accumulator, the second reflects the remaining byte count.
@@ -125,6 +130,7 @@ parse1a acc byteIndex = do
     parse1a (unsafeShiftL acc 8 .|. next) (byteIndex-1)
 
 --The full prefix parser is thus
+{-# INLINE parse1 #-}
 parse1 :: Int -> Parser Word32
 parse1 byteLength = flip unsafeShiftL ( 8 * (4 - byteLength) ) <$> parse1a 0 byteLength
 
@@ -135,6 +141,8 @@ parse1 byteLength = flip unsafeShiftL ( 8 * (4 - byteLength) ) <$> parse1a 0 byt
 -- Alternates are possible, e.g. invoke a parser on a fixed length bytestring, or make the inner loop non-recursive (different action depeniding on the prefix len first byte).
 -- Here is the implementation of the second of these:
 
+{-# INLINE parse2 #-}
+{- this INLINE has a big impact -}
 parse2 :: Int -> Parser Word32
 parse2 k = case k of
     0 -> return 0
@@ -144,10 +152,11 @@ parse2 k = case k of
     4 -> A.anyWord32be
     where
     anyWord24be :: Parser Word32
-    anyWord24be = B.foldl' (\n h -> (n `shiftL` 8) .|. fromIntegral h) 0 <$> (A.take 3)
+    anyWord24be = B.foldl' (\n h -> (n `shiftL` 8) .|. fromIntegral h) 0 <$> A.take 3
 
 -- Alternate encoding
 
 
+{-# INLINE parse3 #-}
 parse3 :: Int -> Parser Word32
-parse3 k = B.foldl' (\n h -> (n `shiftL` 8) .|. fromIntegral h) 0 <$> (A.take k)
+parse3 k = B.foldl' (\n h -> (n `shiftL` 8) .|. fromIntegral h) 0 <$> A.take k
