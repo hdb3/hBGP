@@ -1,6 +1,6 @@
-cabal-version:       2.0
+cabal-version:       2.2
 name:                hbgp
-version:             99.0.0.13
+version:             99.0.0.14
 license:             Apache-2.0
 license-file:        LICENSE
 author:              nic hart
@@ -8,6 +8,7 @@ maintainer:          nic@hdb3.net
 copyright:           Nicholas Hart
 category:            Network
 extra-source-files:  README.md
+build-type:          Simple
 
 executable hbgp
   main-is:             Router/Router.hs
