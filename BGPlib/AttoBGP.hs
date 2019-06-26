@@ -15,10 +15,10 @@ import BGPlib.BGPparse(BGPMessage(..))
 import Data.Word
 import Data.Bits
 import Control.Applicative((<|>))
+import FarmHash(hash64)
 
 terminatingWireParser = wireParser1 <|> return B.empty
 eosWireParser = B.null
---terminatingWireParser = wireParser1 <|> fail "EOF"
 
 
 wireParser :: Parser [ B.ByteString ]
@@ -63,10 +63,13 @@ bgpParser1 = do
                withdrawnLength <- fromIntegral <$> A.anyWord16be
                withdrawn <- localParsePrefixes withdrawnLength
                pathLength <- fromIntegral <$> A.anyWord16be
+               rawPath <- A.take pathLength
                path <- localParseAttributes pathLength
-               let nlriLength = length - withdrawnLength - pathLength - 23
+               let pathHash = fromIntegral $ FarmHash.hash64 rawPath
+                   path = decodeAttributes $ L.fromStrict rawPath
+                   nlriLength = length - withdrawnLength - pathLength - 23
                nlri <- localParsePrefixes nlriLength
-               return $ bgpupdate withdrawn path nlri
+               return $ bgpupdate withdrawn path nlri pathHash
 
             3 -> do
                errorCode <- A.anyWord8
@@ -91,10 +94,10 @@ parseX = parse2 -- this is the case statement parser
 --parseX = inline parse3 -- this is the simplified version of parse2
 (localParseAttributes, localParsePrefixes, prefixBuilder, bgpupdate) = format4
 
-format1 = ( parseAttributesBS , parsePrefixesBS , Prefix , BGPUpdate )
-format2 = ( parseAttributesBS , parsePrefixes , Prefix , BGPUpdate2 )
-format3 = ( parseAttributesBS , parsePrefixes , fromPrefix . Prefix , BGPUpdate3 )
-format4 = ( parseAttributes , parsePrefixes, fromPrefix . Prefix , BGPUpdate4)
+--format1 = ( parseAttributesBS , parsePrefixesBS , Prefix , BGPUpdate )
+--format2 = ( parseAttributesBS , parsePrefixes , Prefix , BGPUpdate2 )
+--format3 = ( parseAttributesBS , parsePrefixes , fromPrefix . Prefix , BGPUpdate3 )
+format4 = ( parseAttributes , parsePrefixes, fromPrefix . Prefix , BGPUpdate)
 
 --type Prefix = (Word8,Word32)
 -- Attoparsec: Parse Update Prefixes
@@ -158,6 +161,7 @@ parse2 k = case k of
     2 -> ( flip unsafeShiftL 16 . fromIntegral ) <$>  A.anyWord16be
     3 -> ( flip unsafeShiftL 8 . fromIntegral ) <$>  anyWord24be
     4 -> A.anyWord32be
+    _ -> fail "impossible prefix length"
     where
     anyWord24be :: Parser Word32
     anyWord24be = B.foldl' (\n h -> (n `shiftL` 8) .|. fromIntegral h) 0 <$> A.take 3

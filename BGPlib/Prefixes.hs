@@ -11,7 +11,7 @@ import Data.Int
 import Data.Bits
 import Data.IP
 import Data.String(IsString,fromString)
-import Control.Monad(liftM)
+import qualified Data.ByteString.Lazy as L
 
 import BGPlib.LibCommon
 
@@ -30,15 +30,22 @@ import BGPlib.LibCommon
 -- representation of prefixes as 64 bit words: this mapping allows prefixes to be treated as Ints where useful
 
 data Prefix = Prefix {-# UNPACK #-} !(Word8,Word32) deriving (Eq,Generic,NFData)
-data IPrefix = IPrefix {-# UNPACK #-} !Int deriving (Eq,Generic,NFData)
+--data IPrefix = IPrefix {-# UNPACK #-} !Int deriving (Eq,Generic,NFData)
+-- need tp performance check this
+newtype IPrefix = IPrefix Int deriving (Eq,Generic,NFData)
 
+subnetOf ( Prefix (s,_)) = s
+--ipOf ( Prefix (_,ip)) = ip
 toPrefix :: IPrefix -> Prefix
 toPrefix (IPrefix w64) = Prefix (fromIntegral $ unsafeShiftR w64 32, fromIntegral $ 0xffffffff .&. w64)
 fromPrefix :: Prefix -> IPrefix
 fromPrefix (Prefix (!l,!v)) = let l' = fromIntegral l :: Int
                                   v' = fromIntegral v :: Int
                               in IPrefix $! unsafeShiftL l' 32 .|. v'
+fromPrefixes :: [Prefix] -> [IPrefix]
 fromPrefixes = map fromPrefix
+
+toPrefixes :: [IPrefix] -> [Prefix]
 toPrefixes = map toPrefix
 
 instance IsString Prefix where
@@ -49,39 +56,31 @@ instance IsString IPrefix where
 
 instance Read IPrefix where
     readsPrec _ = readSipfx where
-        readSipfx s = let (a,s') = head $ readsPrec 0 s in [(fromPrefix $ fromAddrRange a,s')]
+        readSipfx s = let (a,s') = head $ reads s in [(fromPrefix $ fromAddrRange a,s')]
 
 instance Read Prefix where
     readsPrec _ = readSipfx where
-        readSipfx s = let (a,s') = head $ readsPrec 0 s in [(fromAddrRange a,s')]
+        readSipfx s = let (a,s') = head $ reads s in [(fromAddrRange a,s')]
 
 instance Hashable Prefix
 instance Hashable IPv4
 instance Hashable IPv6
 
 instance {-# INCOHERENT #-} Show [Prefix] where
-    show = shorten
-
+    show = shorten where
+                   shorten = shortenLim 4
+                   shortenLim l pfxs = if length pfxs < (l+1) then realShow pfxs else show (take l pfxs) ++ "(+" ++ show (length pfxs - l) ++ ")"
+                   realShow = show . map toAddrRange
+    
 instance {-# INCOHERENT #-} Show [IPrefix] where
-    show = shorten . map toPrefix
+    show = show . map toPrefix
 
 instance Show Prefix where
-    show = show.toAddrRange
+    show = show . toAddrRange
 
 instance Show IPrefix where
-    show = show.toAddrRange.toPrefix
+    show = show . toAddrRange . toPrefix
 
-realShow = show . map toAddrRange
-shortenLim l pfxs = if length pfxs < (l+1) then realShow pfxs else show (take l pfxs) ++ "(+" ++ show (length pfxs - l) ++ ")"
--- shorten pfxs = if length pfxs < 3 then realShow pfxs else show (take 2 pfxs) ++ "(+" ++ show (length pfxs - 2) ++ ")"
-shorten = shortenLim 4
-
-subnet :: Prefix -> Word8
-subnet (Prefix (s,_)) = s
-
-ip :: Prefix -> Word32
-ip (Prefix (_,i)) = i
- 
 instance {-# OVERLAPPING #-} Binary [AddrRange IPv4] where 
     get = fmap (map toAddrRange) getPrefixes where
         getPrefixes :: Get [Prefix]
@@ -90,7 +89,10 @@ instance {-# OVERLAPPING #-} Binary [AddrRange IPv4] where
         putPrefixes :: [Prefix] -> Put
         putPrefixes = put
 
+decodeAddrRange :: L.ByteString -> [AddrRange IPv4]
 decodeAddrRange = map toAddrRange . decode
+
+encodeAddrRange :: [AddrRange IPv4] -> L.ByteString
 encodeAddrRange = encode  . map fromAddrRange
 
 toAddrRange :: Prefix -> AddrRange IPv4
@@ -137,22 +139,31 @@ fromAddrRange ar = Prefix (fromIntegral subnet, byteSwap32 $ toHostAddress ip) w
 -- encodedChunkPrefixes n = map encode . chunkPrefixes n . reverse
 chunkPrefixes :: Int64 -> [Prefix] -> [[Prefix]]
 chunkPrefixes n pfxs = let (xl,l,_) = chunkPrefixes' n pfxs in (l : xl) 
-chunkPrefixes' n = chunkEnumeratedPrefixes n . enumeratePrefixes
+    where
 
--- chunkEnumeratedPrefixes :: Int -> [(Int,Prefix)] -> ([[Prefix]],[Prefix],Int)
-chunkEnumeratedPrefixes n = foldl f ([],[],0) where
-    f (xl,l,accSize) (size,pfx) | accSize + size <= n = (xl,pfx : l, accSize + size)
-                                | otherwise = (l:xl,[pfx],size)
+    chunkPrefixes' n' = chunkEnumeratedPrefixes n' . enumeratePrefixes
 
--- enumeratePrefixes :: [Prefix] -> [(Int,Prefix)]
-enumeratePrefixes = map (\pfx -> (getLength pfx, pfx)) where
-    getLength (Prefix (subnet,_)) | subnet == 0 = 1
-                                   | subnet < 9  = 2
-                                   | subnet < 17 = 3
-                                   | subnet < 25 = 4
-                                   | subnet < 33 = 5
-                                   | otherwise = error $ "subnet mask of " ++ show subnet ++ " is > 32"
+    -- chunkEnumeratedPrefixes :: Int -> [(Int,Prefix)] -> ([[Prefix]],[Prefix],Int)
+    chunkEnumeratedPrefixes n'' = foldl f ([],[],0) where
+        f (xl,l,accSize) (size,pfx) | accSize + size <= n'' = (xl,pfx : l, accSize + size)
+                                    | otherwise = (l:xl,[pfx],size)
+    
+    -- enumeratePrefixes :: [Prefix] -> [(Int,Prefix)]
+    enumeratePrefixes = map (\pfx -> (getLength pfx, pfx)) where
+        getLength (Prefix (subnet,_)) | subnet == 0 = 1
+                                       | subnet < 9  = 2
+                                       | subnet < 17 = 3
+                                       | subnet < 25 = 4
+                                       | subnet < 33 = 5
+                                       | otherwise = error $ "subnet mask of " ++ show subnet ++ " is > 32"
 
+instance Binary IPrefix where 
+    put = (put :: Prefix -> Put) . toPrefix
+
+instance {-# OVERLAPPING #-} Binary [IPrefix] where
+    put = putn
+    get = getn
+ 
 instance Binary Prefix where 
 
     put (Prefix (subnet,ip)) | subnet == 0 = putWord8 0
@@ -189,6 +200,7 @@ instance Binary Prefix where
             return $ Prefix (subnet,ip)
         else do ip <- getWord32be
                 return $ Prefix (subnet,ip)
+
 instance {-# OVERLAPPING #-} Binary [Prefix] where
     put = putn
     get = getn

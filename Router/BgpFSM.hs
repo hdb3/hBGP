@@ -237,7 +237,8 @@ runFSM g@Global{..} socketName peerName handle =
         msg <- bgpRcv handle (getNegotiatedHoldTime osm)
         case msg of
 
-            BGPKeepalive -> do _ <- Rib.ribPush (fromJust ribHandle) NullUpdate
+            BGPKeepalive -> do trace "established: BGPKeepalive"
+                               _ <- Rib.ribPush (fromJust ribHandle) NullUpdate
                                return (Established,st)
 
             update@BGPUpdate{} -> do
@@ -246,7 +247,7 @@ runFSM g@Global{..} socketName peerName handle =
                 -- -- Rib.ribPush (fromJust ribHandle) parsedUpdate
                 -- -- return (Established,st)
 
-                
+                trace "established: BGPUpdate"
                 eitherEParsedUpdate <- try $ evaluate $ force $ decodeUpdate update :: IO ( Either SomeException ParsedUpdate )
 
                 either ( \e -> idle $ "established - Update parse error (" ++ show e ++ ")" )
@@ -300,6 +301,7 @@ runFSM g@Global{..} socketName peerName handle =
     sendLoop handle rh = catch
         ( do
              updates <- Rib.ribPull rh
+             trace $ "sendloop: updates (" ++ show (length updates) ++ ")"
              bgpSndAll handle updates
              sendLoop handle rh
         )

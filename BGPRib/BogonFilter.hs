@@ -44,5 +44,5 @@ bogonFilter pfx
                 | 0 == s = False
                 | otherwise = True
     where ip = toAddrRange pfx
-          s  = subnet pfx
+          s  = subnetOf pfx
 

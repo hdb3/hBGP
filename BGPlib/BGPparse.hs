@@ -33,10 +33,11 @@ data BGPMessage = BGPOpen { myAutonomousSystem :: Word16, holdTime :: Word16, bg
                   | BGPKeepalive
                   | BGPNotify { code :: EnumNotificationCode, subCode :: NotificationSubcode, errorData :: L.ByteString }
                   -- | BGPNotify { code :: EnumNotificationCode, subCode :: NotificationSubcode, caps :: [ Capability ] }
-                  | BGPUpdate { withdrawn :: L.ByteString, attributes :: L.ByteString, nlri :: L.ByteString }
-                  | BGPUpdate2 { withdrawnPrefixes :: [Prefix], attributes :: L.ByteString, nlriPrefixes :: [Prefix] }
-                  | BGPUpdate3 { withdrawnIPrefixes :: [IPrefix], attributes :: L.ByteString, nlriIPrefixes :: [IPrefix] }
-                  | BGPUpdate4 { withdrawnIPrefixes :: [IPrefix], pathAttributes :: [PathAttribute], nlriIPrefixes :: [IPrefix] }
+                  | BGPUpdate { withdrawn :: [IPrefix], attributes :: [PathAttribute], nlri :: [IPrefix], pathHash :: Int }
+                  -- | BGPUpdate { withdrawn :: L.ByteString, attributes :: L.ByteString, nlri :: L.ByteString }
+                  -- | BGPUpdate2 { withdrawnPrefixes :: [Prefix], attributes :: L.ByteString, nlriPrefixes :: [Prefix] }
+                  -- | BGPUpdate3 { withdrawnIPrefixes :: [IPrefix], attributes :: L.ByteString, nlriIPrefixes :: [IPrefix] }
+                  -- | BGPUpdate4 { withdrawnIPrefixes :: [IPrefix], pathAttributes :: [PathAttribute], nlriIPrefixes :: [IPrefix] }
                   | BGPTimeout
                   | BGPError String
                   | BGPEndOfStream
@@ -80,16 +81,19 @@ instance Binary BGPMessage where
                                                               putWord8 $ fromIntegral $ B.length optionalParameters
                                                               putByteString optionalParameters
 
-    put (BGPUpdate withdrawnRoutes pathAttributes nlri) = do
+    put (BGPUpdate withdrawnRoutes pathAttributes nlri _) = do
                                                                putWord8 _BGPUpdate
                                                                putWord16be withdrawnRoutesLength
-                                                               putLazyByteString withdrawnRoutes
+                                                               putLazyByteString withdrawnRoutesBS
                                                                putWord16be pathAttributesLength
-                                                               putLazyByteString pathAttributes
-                                                               putLazyByteString nlri
+                                                               putLazyByteString pathAttributesBS
+                                                               putLazyByteString nlriBS
                                                                where
-                                                                   withdrawnRoutesLength = fromIntegral $ L.length withdrawnRoutes
-                                                                   pathAttributesLength = fromIntegral $ L.length pathAttributes
+                                                                   withdrawnRoutesBS = encode withdrawnRoutes
+                                                                   pathAttributesBS = encode pathAttributes
+                                                                   nlriBS = encode nlri
+                                                                   withdrawnRoutesLength = fromIntegral $ L.length withdrawnRoutesBS
+                                                                   pathAttributesLength = fromIntegral $ L.length pathAttributesBS
 
     put (BGPNotify code subCode caps) = do putWord8 _BGPNotify
                                            putWord8 $ encode8 code
@@ -98,6 +102,8 @@ instance Binary BGPMessage where
 
     put BGPKeepalive                                = putWord8 _BGPKeepalive
 
+    get = undefined
+{-
     get = label "BGPMessage" $ do
              msgType <- getWord8
              if | _BGPOpen == msgType -> do
@@ -128,3 +134,4 @@ instance Binary BGPMessage where
                                            return $ BGPNotify (decode8 errorCode) errorSubcode errorData
                 | _BGPKeepalive == msgType -> return BGPKeepalive
                 | otherwise -> fail "Bad type code"
+-}

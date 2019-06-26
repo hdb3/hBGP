@@ -41,6 +41,7 @@ main = do
     idle where idle = do threadDelay 10000000
                          idle
 
+getConfig :: IO Config
 getConfig = do
     args <- getArgs
     if not $ null $ intersect args ["--version","-V","-v"] then exitSuccess else return ()
@@ -54,6 +55,7 @@ getConfig = do
     --print rawConfig
     return $ buildPeerConfigs rawConfig'
 
+buildGlobal :: Config -> IO Global
 buildGlobal c@Config{..} = do
     let
         config = c

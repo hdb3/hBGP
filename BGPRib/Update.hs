@@ -16,11 +16,12 @@ myHash = fromIntegral . hash64 . L.toStrict
 
 data ParsedUpdate = ParsedUpdate { puPathAttributes :: [PathAttribute], nlri :: [Prefix], withdrawn :: [Prefix], hash :: Int } | NullUpdate deriving ( Show , Generic, NFData)
 
+-- TODO eliminate ParsedUpdate entirely as it is now just a shadow of BGPMessage
 decodeUpdate :: BGPMessage -> ParsedUpdate
-decodeUpdate BGPUpdate{..} = ParsedUpdate { puPathAttributes = decode attributes 
-                                          , nlri = decode nlri 
-                                          , withdrawn = decode withdrawn
-                                          , hash = fromIntegral $ FarmHash.hash64 $ L.toStrict attributes 
+decodeUpdate BGPUpdate{..} = ParsedUpdate { puPathAttributes = attributes 
+                                          , nlri = toPrefixes nlri 
+                                          , withdrawn = toPrefixes withdrawn
+                                          , hash = pathHash
                                           }
 
 modifyPathAttributes :: ([PathAttribute] -> [PathAttribute]) -> ParsedUpdate -> ParsedUpdate
@@ -31,10 +32,11 @@ encodeUpdates = map ungetUpdate
 
 -- TODO rename getUpdate/ungetUpdate encodeUpdate/decodeUpdate
 ungetUpdate :: ParsedUpdate -> BGPMessage
-ungetUpdate ParsedUpdate{..} = BGPUpdate { withdrawn = encode withdrawn , attributes = encode puPathAttributes , nlri = encode nlri } 
+ungetUpdate ParsedUpdate{..} = BGPUpdate { withdrawn = fromPrefixes withdrawn , attributes = puPathAttributes , nlri = fromPrefixes nlri, pathHash = hash } 
 
 endOfRib :: BGPMessage
-endOfRib = BGPUpdate { withdrawn = L.empty , attributes = L.empty , nlri = L.empty }
+--endOfRib = BGPUpdate { withdrawn = L.empty , attributes = L.empty , nlri = L.empty }
+endOfRib = BGPUpdate { withdrawn = [] , attributes = [] , nlri = [] }
 
 originateWithdraw prefixes = ParsedUpdate []  [] prefixes 0
 
