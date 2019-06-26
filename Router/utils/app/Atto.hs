@@ -5,11 +5,14 @@ import BGPlib.BGPlib
 import BGPRib.BGPRib
 import qualified Data.ByteString as B
 import Data.ByteString.Lazy(toStrict,fromStrict)
+import Data.ByteString.Builder
 import Data.Attoparsec.ByteString
 import Data.Binary
 import System.Environment(getArgs)
 import Control.Exception(evaluate)
 import Control.DeepSeq(force)
+import System.Exit
+import Data.Either(fromRight)
 
 import Stopwatch
 
@@ -28,7 +31,7 @@ parse_ p bs = either fail
                      id
                      ( parseOnly p bs )
 
-keepAlive = toStrict $ wireFormat $ encode $ BGPKeepalive
+keepAlive = toStrict $ wireFormat $ encode BGPKeepalive
 mkUpdate a b c = toStrict $ wireFormat $ encode $ ungetUpdate $ makeUpdateSimple a b c
 update1 = mkUpdate [] ["192.168.0.0/16"] []
 update2 = mkUpdate [] ["192.168.0.0/16"] ["192.168.1.0/24"]
@@ -41,15 +44,37 @@ eor = mkUpdate [] [] []
 eors = B.append eor eor
 msg = B.concat [ keepAlive, eor, keepAlive ]
 
+recodeCheck :: B.ByteString -> IO()
+recodeCheck bs = do
+    let wireMessage = strictWireFormat bs
+    parsedMessage <- either (\s -> do putStrLn $ "parse failed: " ++ s
+                                      putStrLn $ toHex bs
+                                      exitFailure )
+                            ( return )
+                            (parseOnly bgpParser1 wireMessage)
+    --let parsedMessage = fromRight undefined $ parseOnly bgpParser1 bs
+    let recodedMessage = toStrict $ encode parsedMessage
+    if bs == recodedMessage
+        then return ()
+        else do putStrLn "recodeCheck fail"
+                putStrLn $ toHex bs
+                print parsedMessage
+                putStrLn $ toHex recodedMessage
+                exitFailure
+
+
+strictWireFormat :: B.ByteString -> B.ByteString
+strictWireFormat bs = toStrict $ toLazyByteString $ byteString (B.replicate 16 0xff) <> word16BE (fromIntegral $ 18 + B.length bs) <> byteString bs 
+
 main = do
     args <- getArgs
     if null args then do
         --test "custom" $ mkUpdate [] [] [ "192.168.0.0/16"
-        test "update1" $ update1
-        test "update2" $ update2
-        test "update3" $ update3
-        test "update4" $ update4
-        test "update5" $ update5
+        test "update1" update1
+        test "update2" update2
+        test "update3" update3
+        test "update4" update4
+        test "update5" update5
         --test "eor" eor
         --test "msg" msg
         --test "update1" update1
@@ -60,13 +85,15 @@ main = do
         --test "update7" update4
         --test "update7" update4
     else if 1 == length args then do
-        putStrLn $ "\n*** " ++ (head args) ++ " ***\n"
+        putStrLn $ "\n*** " ++ head args ++ " ***\n"
         bs <- B.readFile (head args)
         timeIO "parseCheck wireParser" $ parseCheck wireParser bs
         timeIO "parseCheck bgpParser" $ parseCheck bgpParser bs
+        let msgs = parse_ wireParser bs
+        mapM_ recodeCheck msgs
     else do
         let n = read (args !! 1) :: Int
-        putStrLn $ "\n*** " ++ (head args) ++ " " ++ show n ++ " ***\n"
+        putStrLn $ "\n*** " ++ head args ++ " " ++ show n ++ " ***\n"
         bs <- B.readFile (head args)
         let msgs = parse_ wireParser bs
             msg = msgs !! n

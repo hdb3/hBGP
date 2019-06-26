@@ -53,7 +53,7 @@ bgpParser1 = do
                unless (msgVer == 4) (fail "Bad version(Open)")
                myAutonomousSystem <- A.anyWord16be
                holdTime <- A.anyWord16be
-               bgpID <- A.anyWord32be
+               bgpID <- A.anyWord32le
                optionalParametersLength <- fromIntegral <$> A.anyWord8
                optionalParameters <- L.fromStrict <$> A.take optionalParametersLength
                -- TODO implement a native parser for optional parameters

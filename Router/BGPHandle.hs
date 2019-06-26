@@ -63,6 +63,9 @@ bgpClose (BGPHandle h _ ) = close h
 wireFormat :: L.ByteString -> L.ByteString
 wireFormat bs = toLazyByteString $ lazyByteString (L.replicate 16 0xff) <> word16BE (fromIntegral $ 18 + L.length bs) <> lazyByteString bs 
 
+--strictWireFormat :: B.ByteString -> B.ByteString
+--strictWireFormat bs = L.toStrict $ toLazyByteString $ byteString (B.replicate 16 0xff) <> word16BE (fromIntegral $ 18 + B.length bs) <> byteString bs 
+
 bgpSnd :: BGPHandle -> BGPMessage -> IO()
 bgpSnd (BGPHandle h _ ) msg | 4079 > lengthEncodedMsg = catchIOError ( sndRawMessage encodedMsg )
                                                                      (\e -> throw $ BGPIOException (show (e :: IOError)))
