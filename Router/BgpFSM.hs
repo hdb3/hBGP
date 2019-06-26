@@ -48,7 +48,7 @@ bgpFSM global@Global{..} ( sock , peerName ) =
 
                              socketName <- getSocketName sock
                              let (SockAddrInet remotePort remoteIP) = peerName
-                                 (SockAddrInet localPort localIP)   = socketName
+                                 (SockAddrInet _ localIP)   = socketName
                              handle <- getBGPHandle sock
 
                              -- lookup explicit local IP then failover to widlcard adn eventually, if allowed, a dynamic peer
@@ -248,11 +248,15 @@ runFSM g@Global{..} socketName peerName handle =
                 -- -- return (Established,st)
 
                 trace "established: BGPUpdate"
+                Rib.ribPush (fromJust ribHandle) (decodeUpdate update)
+                return (Established,st)
+{-
                 eitherEParsedUpdate <- try $ evaluate $ force $ decodeUpdate update :: IO ( Either SomeException ParsedUpdate )
 
                 either ( \e -> idle $ "established - Update parse error (" ++ show e ++ ")" )
                        ( \u -> Rib.ribPush (fromJust ribHandle) u >> return (Established,st) )
                        eitherEParsedUpdate
+-}
 
 {- -- code to manage parse failure (if detected!)
                 if pushResponse then
@@ -313,7 +317,7 @@ runFSM g@Global{..} socketName peerName handle =
                                | otherwise  = catch
         ( do
              bgpSnd handle BGPKeepalive
-             threadDelay ( 10^6 * timer)
+             threadDelay ( 1000000 * timer)
              keepaliveLoop handle timer
         )
         (\(BGPIOException _) -> return ()

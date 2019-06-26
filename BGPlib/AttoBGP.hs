@@ -64,7 +64,6 @@ bgpParser1 = do
                withdrawn <- localParsePrefixes withdrawnLength
                pathLength <- fromIntegral <$> A.anyWord16be
                rawPath <- A.take pathLength
-               path <- localParseAttributes pathLength
                let pathHash = fromIntegral $ FarmHash.hash64 rawPath
                    path = decodeAttributes $ L.fromStrict rawPath
                    nlriLength = length - withdrawnLength - pathLength - 23

@@ -36,7 +36,7 @@ ungetUpdate ParsedUpdate{..} = BGPUpdate { withdrawn = fromPrefixes withdrawn , 
 
 endOfRib :: BGPMessage
 --endOfRib = BGPUpdate { withdrawn = L.empty , attributes = L.empty , nlri = L.empty }
-endOfRib = BGPUpdate { withdrawn = [] , attributes = [] , nlri = [] }
+endOfRib = BGPUpdate { withdrawn = [] , attributes = [] , nlri = [], pathHash = 0 }
 
 originateWithdraw prefixes = ParsedUpdate []  [] prefixes 0
 
