@@ -4,18 +4,27 @@ import Data.IP
 
 import BGPlib.BGPlib
 
-applyBogonFilter :: [(a, [Prefix])] -> [(a, [Prefix])]
+-- TODO check optimised for IPrefix directly
+applyBogonFilter :: [(a, [IPrefix])] -> [(a, [IPrefix])]
 applyBogonFilter = filter p . map f where
     f (a,pfxs) = (a, filter bogonFilter pfxs)
     p (_,[])   = False
     p _          = True
 
-iPrefixBogonFilter :: IPrefix -> Bool
-iPrefixBogonFilter = bogonFilter . toPrefix
+{-
+applyBogonFilter :: [(a, [Prefix])] -> [(a, [Prefix])]
+applyBogonFilter = filter p . map f where
+    f (a,pfxs) = (a, filter bogonFilter pfxs)
+    p (_,[])   = False
+    p _          = True
+-}
+
+--iPrefixBogonFilter :: IPrefix -> Bool
+--iPrefixBogonFilter = bogonFilter . toPrefix
 
 -- ref https://www.iana.org/assignments/iana-ipv4-special-registry/iana-ipv4-special-registry-1.csv
-bogonFilter :: Prefix -> Bool
-bogonFilter pfx
+bogonFilter :: IPrefix -> Bool
+bogonFilter ipfx
                 | "0.0.0.0/8" >:> ip = False
                 | "10.0.0.0/8" >:> ip = False
                 | "100.64.0.0/10" >:> ip = False
@@ -43,6 +52,6 @@ bogonFilter pfx
                 -- | 25 < s = False
                 | 0 == s = False
                 | otherwise = True
-    where ip = toAddrRange pfx
-          s  = subnetFrom pfx
+    where ip = toAddrRange ipfx
+          s  = subnetIPrefix ipfx
 

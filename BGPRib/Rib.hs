@@ -190,25 +190,25 @@ ribPush' peerData ParsedUpdate{..} rib0 = do
     return rib2
 
 -- TODO - convert ribUpdateMany/ribWithdrawMany to IPrefix based, for consistency...
-ribUpdateMany :: Rib -> PeerData -> [PathAttribute] -> Int -> [Prefix] -> IO()
+ribUpdateMany :: Rib -> PeerData -> [PathAttribute] -> Int -> [IPrefix] -> IO()
 ribUpdateMany rib peerData attrs hash pfxs = modifyMVar_ rib (ribUpdateMany' peerData attrs hash pfxs)
 
-ribUpdateMany' :: PeerData -> [PathAttribute] -> Int -> [Prefix] -> Rib' -> IO Rib'
+ribUpdateMany' :: PeerData -> [PathAttribute] -> Int -> [IPrefix] -> Rib' -> IO Rib'
 ribUpdateMany' peerData pathAttributes routeId pfxs (Rib' prefixTable adjRibOutTables )
     | null pfxs = return (Rib' prefixTable adjRibOutTables ) 
     | otherwise = do
           let routeData = makeRouteData' peerData pathAttributes routeId
-              ( prefixTable' , updates ) = BGPRib.PrefixTable.update prefixTable (fromPrefixes pfxs) routeData
+              ( prefixTable' , updates ) = BGPRib.PrefixTable.update prefixTable pfxs routeData
           updateRibOutWithPeerData peerData routeData updates adjRibOutTables
           return $ Rib' prefixTable' adjRibOutTables
 
 ribWithdrawMany rib peer p = modifyMVar_ rib (ribWithdrawMany' peer p)
 
-ribWithdrawMany' :: PeerData -> [Prefix] -> Rib' -> IO Rib'
+ribWithdrawMany' :: PeerData -> [IPrefix] -> Rib' -> IO Rib'
 ribWithdrawMany' peerData pfxs (Rib' prefixTable adjRibOutTables)
     | null pfxs = return (Rib' prefixTable adjRibOutTables )
     | otherwise = do
-        let ( prefixTable' , withdraws ) = BGPRib.PrefixTable.withdraw prefixTable (fromPrefixes pfxs) peerData
+        let ( prefixTable' , withdraws ) = BGPRib.PrefixTable.withdraw prefixTable pfxs peerData
         -- adjRibOutTables' = updateAdjRibOutTables (updates,0) adjRibOutTables
         -- ** NOTE **
         -- The withdraw entry in the adj-rib-out has a special route value

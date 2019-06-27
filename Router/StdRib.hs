@@ -41,7 +41,7 @@ delPeerByAddress rib port ip = do
     
 ribPull :: RibHandle -> IO [BGPMessage]
 --ribPull :: RibHandle -> IO [ParsedUpdate]
-ribPull (rib,peer) = pullAllUpdates peer rib >>= updateFromAdjRibEntrys rib peer >>= (pure . encodeUpdates)
+ribPull (rib,peer) = pullAllUpdates peer rib >>= updateFromAdjRibEntrys rib peer >>= (return . encodeUpdates)
 
 msgTimeout :: Int -> IO [a] -> IO [a]
 msgTimeout t f = fromMaybe [] <$> timeout (1000000 * t) f
@@ -69,7 +69,7 @@ buildUpdate :: PeerData -> [IPrefix] -> RouteData -> [ParsedUpdate]
 
 buildUpdate target iprefixes RouteData{..} = if isExternal target then egpUpdate else igpUpdate
     where
-    igpUpdate = makeUpdate (toPrefixes iprefixes)
+    igpUpdate = makeUpdate iprefixes
                            []
                            ( sortPathAttributes $
                            setOrigin origin $
@@ -79,7 +79,7 @@ buildUpdate target iprefixes RouteData{..} = if isExternal target then egpUpdate
                            setLocalPref (localPref peerData )
                            pathAttributes 
                            )
-    egpUpdate = makeUpdate (toPrefixes iprefixes)
+    egpUpdate = makeUpdate iprefixes
                            []
                            ( sortPathAttributes $
                            setOrigin origin $

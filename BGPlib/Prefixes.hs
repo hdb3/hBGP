@@ -2,7 +2,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE BangPatterns #-}
-module BGPlib.Prefixes(Prefix,IPrefix,chunkPrefixes,toPrefix,toAddrRange,subnetFrom,toIPrefix,fromIPrefix,fromPrefixes,fromAddrRange , toPrefixes) where
+module BGPlib.Prefixes(IPrefix,chunkPrefixes,toAddrRange,subnetIPrefix,fromIPrefix,fromAddrRange,toIPrefix) where
+--module BGPlib.Prefixes(Prefix,IPrefix,chunkPrefixes,toPrefix,toAddrRange,subnetIPrefix,toIPrefix,fromIPrefix,fromPrefixes,fromAddrRange , toPrefixes) where
 -- chunkPrefixes used in BGPlib.Update
 -- toPrefix , toAddrRange , subnet used in BGPRib.BogonFilter
 -- IPrefix() used in at least BGPRib.PrefixTable , now toIPrefix and fromIPrefix
@@ -17,7 +18,6 @@ import Data.Int
 import Data.Bits
 import Data.IP
 import Data.String(IsString,fromString)
---import Control.Monad(liftM)
 
 import BGPlib.LibCommon
 
@@ -39,13 +39,26 @@ data Prefix = Prefix {-# UNPACK #-} !Word8 !Word32 deriving (Eq,Generic)
 data IPrefix = IPrefix {-# UNPACK #-} !Int deriving (Eq,Generic)
 
 toIPrefix :: Int -> IPrefix
-toIPrefix = IPrefix
+toIPrefix i = IPrefix $! i
+
+mkIPrefix :: Word8 -> Word32 -> IPrefix
+mkIPrefix subnet address = IPrefix $! unsafeShiftL (fromIntegral subnet) 32 .|. (fromIntegral address)
 
 fromIPrefix :: IPrefix -> Int
 fromIPrefix (IPrefix ipfx) = ipfx
 
+unpackIPrefix :: IPrefix -> (Word8,Word32)
+unpackIPrefix (IPrefix w64) = ( fromIntegral $ unsafeShiftR w64 32, fromIntegral $ 0xffffffff .&. w64 )
+
 toPrefix :: IPrefix -> Prefix
 toPrefix (IPrefix w64) = Prefix (fromIntegral $ unsafeShiftR w64 32) (fromIntegral $ 0xffffffff .&. w64)
+
+subnetIPrefix :: IPrefix -> Word8
+subnetIPrefix (IPrefix w64) = fromIntegral $ unsafeShiftR w64 32
+
+addressIPrefix :: IPrefix -> Word32
+addressIPrefix (IPrefix w64) = fromIntegral w64
+
 fromPrefix :: Prefix -> IPrefix
 fromPrefix (Prefix l v) = let l' = fromIntegral l :: Int
                               v' = fromIntegral v :: Int
@@ -65,18 +78,18 @@ instance IsString IPrefix where
 
 instance Read IPrefix where
     readsPrec _ = readSipfx where
-        readSipfx s = let (a,s') = head $ reads s in [(fromPrefix $ fromAddrRange a,s')]
+        readSipfx s = let (a,s') = head $ reads s in [(fromAddrRange a,s')]
 
 instance Read Prefix where
     readsPrec _ = readSipfx where
-        readSipfx s = let (a,s') = head $ reads s in [(fromAddrRange a,s')]
+        readSipfx s = let (a,s') = head $ reads s in [(toPrefix $ fromAddrRange a,s')]
 
 instance Hashable Prefix
 instance Hashable IPrefix
 instance Hashable IPv4
 instance Hashable IPv6
 
-instance {-# INCOHERENT #-} Show [Prefix] where
+instance {-# INCOHERENT #-} Show [IPrefix] where
     show = shorten
         where
         shorten = shortenLim 4
@@ -84,14 +97,14 @@ instance {-# INCOHERENT #-} Show [Prefix] where
         realShow = show . map toAddrRange
 
 
-instance {-# INCOHERENT #-} Show [IPrefix] where
-    show = show . map toPrefix
-
-instance Show Prefix where
-    show = show . toAddrRange
+instance {-# INCOHERENT #-} Show [Prefix] where
+    show = show . fromPrefixes
 
 instance Show IPrefix where
-    show = show . toPrefix
+    show = show . toAddrRange
+
+instance Show Prefix where
+    show = show . fromPrefix
 
 subnetFrom :: Prefix -> Word8
 subnetFrom (Prefix s _) = s
@@ -110,12 +123,14 @@ instance {-# OVERLAPPING #-} Binary [AddrRange IPv4] where
 decodeAddrRange = map toAddrRange . decode
 encodeAddrRange = encode  . map fromAddrRange
 -}
-toAddrRange :: Prefix -> AddrRange IPv4
-toAddrRange (Prefix subnet ip) = makeAddrRange (fromHostAddress $ byteSwap32 ip) (fromIntegral subnet)
+toAddrRange :: IPrefix -> AddrRange IPv4
+toAddrRange ipfx = let (subnet,ip) = unpackIPrefix ipfx in makeAddrRange (fromHostAddress $ byteSwap32 ip) (fromIntegral subnet)
+--toAddrRange (Prefix subnet ip) = makeAddrRange (fromHostAddress $ byteSwap32 ip) (fromIntegral subnet)
 
-fromAddrRange :: AddrRange IPv4 -> Prefix
-fromAddrRange ar = Prefix (fromIntegral subnet) (byteSwap32 $ toHostAddress ip) where
-                   (ip,subnet) = addrRangePair ar
+fromAddrRange :: AddrRange IPv4 -> IPrefix
+--fromAddrRange ar = Prefix (fromIntegral subnet) (byteSwap32 $ toHostAddress ip)
+    --where (ip,subnet) = addrRangePair ar
+fromAddrRange ar = let (ip,subnet) = addrRangePair ar in mkIPrefix (fromIntegral subnet) (byteSwap32 $ toHostAddress ip)
 
 -- binary format for attributes is 1 byte flags, 1 byte type code, 1 or 2 byte length value depending on a flag bit, then payload
 
@@ -148,7 +163,7 @@ fromAddrRange ar = Prefix (fromIntegral subnet) (byteSwap32 $ toHostAddress ip) 
 -}
 
 
-chunkPrefixes :: Int64 -> [Prefix] -> [[Prefix]]
+chunkPrefixes :: Int64 -> [IPrefix] -> [[IPrefix]]
 chunkPrefixes n pfxs = let (xl,l,_) = chunkPrefixes' pfxs in (l : xl)
 
     where
@@ -159,12 +174,7 @@ chunkPrefixes n pfxs = let (xl,l,_) = chunkPrefixes' pfxs in (l : xl)
                                     | otherwise = (l:xl,[pfx],size)
 
     enumeratePrefixes = map (\pfx -> (getLength pfx, pfx)) where
-        getLength (Prefix subnet _)    | subnet == 0 = 1
-                                       | subnet < 9  = 2
-                                       | subnet < 17 = 3
-                                       | subnet < 25 = 4
-                                       | subnet < 33 = 5
-                                       | otherwise = error $ "subnet mask of " ++ show subnet ++ " is > 32"
+        getLength pfx = fromIntegral $ 2 + (subnetIPrefix pfx - 1) `div` 8
 
 instance Binary IPrefix where
     put = putPrefix . toPrefix
