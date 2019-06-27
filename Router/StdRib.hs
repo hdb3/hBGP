@@ -19,13 +19,11 @@ addPeer rib peer = do
     return (rib,peer)
 
 ribPush :: RibHandle -> BGPMessage -> IO Bool
---ribPush :: RibHandle -> ParsedUpdate -> IO()
 ribPush _ BGPKeepalive = return True
 ribPush (rib,peer) update = do
     trace $ "ribPush " ++ show peer ++ ":" ++ show update
     either (\s -> do warn $ s ++ show peer
                      return False )
-           --(BGPRib.ribPush rib peer >> (return True))
            (\parsedUpdate -> do BGPRib.ribPush rib peer parsedUpdate
                                 return True)
            ( processUpdate update )
@@ -38,9 +36,8 @@ delPeerByAddress rib port ip = do
     else do
         when ( length peers > 1 ) $ warn $ "delPeerByAddress failed for (multiplepeers!) " ++ show ip ++ ":" ++ show port
         mapM_ (delPeer rib) peers
-    
+
 ribPull :: RibHandle -> IO [BGPMessage]
---ribPull :: RibHandle -> IO [ParsedUpdate]
 ribPull (rib,peer) = pullAllUpdates peer rib >>= updateFromAdjRibEntrys rib peer >>= (return . encodeUpdates)
 
 msgTimeout :: Int -> IO [a] -> IO [a]
@@ -77,7 +74,7 @@ buildUpdate target iprefixes RouteData{..} = if isExternal target then egpUpdate
                            -- setNextHop (nextHop route) $
                            setNextHop (localIPv4 peerData ) $ -- next hop self!
                            setLocalPref (localPref peerData )
-                           pathAttributes 
+                           pathAttributes
                            )
     egpUpdate = makeUpdate iprefixes
                            []
@@ -86,7 +83,7 @@ buildUpdate target iprefixes RouteData{..} = if isExternal target then egpUpdate
                            -- setNextHop (nextHop route) $ -- reflector default
                            setNextHop (localIPv4 peerData ) $ -- next hop self!
                            prePendAS ( myAS $ globalData peerData )
-                           pathAttributes 
+                           pathAttributes
                            )
 
 updateFromAdjRibEntrys :: Rib -> PeerData -> [AdjRIBEntry] -> IO [ParsedUpdate]

@@ -22,7 +22,7 @@ getASPathLength pas = maybe
 -- normaliseASPath:  eliminate as4 path by replacing the original as2 path with the contens of the as4 path
 -- should be a lossless conversion
 -- the reverse would be needed if talking to an as2 only peer...
-normaliseASPath pas = let toASPath4' (PathAttributeASPath p) = PathAttributeASPath (p)
+normaliseASPath pas = let toASPath4' (PathAttributeASPath p) = PathAttributeASPath p
                           pas' = updatePathAttribute TypeCodePathAttributeASPath toASPath4' pas in
     maybe pas'
           (\(PathAttributeAS4Path path) -> deletePathAttributeType TypeCodePathAttributeAS4Path $ insertPathAttribute (PathAttributeASPath path) pas)

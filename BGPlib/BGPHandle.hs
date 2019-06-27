@@ -18,7 +18,7 @@ instance Exception BGPIOException
 -- Follows the BGPHandle abstraction, which should allow the debugging of data integrity isses and also pluggable alternative socket access
 
 newtype BGPHandle = BGPHandle Handle
- 
+
 getBGPHandle :: Socket -> IO BGPHandle
 getBGPHandle sock = BGPHandle <$> socketToHandle sock ReadWriteMode
 

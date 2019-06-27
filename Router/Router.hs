@@ -29,7 +29,7 @@ main = do
     global <- buildGlobal config
 
     _ <- forkIO (redistribute global)
-    
+
     let
         app = bgpFSM global
 

@@ -26,7 +26,7 @@ raceCheck c bgpid addr = do
     where
     lookupBGPid id [] = Nothing
     lookupBGPid id (s:sx) | id == sessionBgpid s = Just s
-                          | otherwise = lookupBGPid id sx 
+                          | otherwise = lookupBGPid id sx
 
 registerEstablished :: CollisionDetector -> IPv4 -> SockAddr -> IO ()
 registerEstablished c bgpid addr = do
@@ -40,4 +40,4 @@ deregister c = do
     threadID <- myThreadId
     sessions <- takeMVar c
     putMVar c $ purge threadID sessions
-    
+

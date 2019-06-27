@@ -33,27 +33,23 @@ getDB :: PrefixTable -> [(IPrefix,[RouteData])]
 getDB pt = map f (toList pt) where
     f (pfx,routes) = (toIPrefix pfx,SL.fromSortedList routes)
 
---getRIB :: PrefixTable -> [(RouteData,Prefix)]
---getRIB = map (\(a,b) -> (a,toPrefix b)) . getRIB'
-
---TODO get rid of prime annotation now!
-getRIB' :: PrefixTable -> [(RouteData,IPrefix)]
-getRIB' pt = map f (toList pt) where
+getRIB :: PrefixTable -> [(RouteData,IPrefix)]
+getRIB pt = map f (toList pt) where
     f (pfx,routes) = (slHead routes , toIPrefix pfx)
 
 getFIB :: PrefixTable -> [(IPrefix,IPv4)]
-getFIB pt = map f (getRIB' pt) where
+getFIB pt = map f (getRIB pt) where
     f (route,pfx) = (pfx , nextHop route)
 
 getAdjRIBOut :: PrefixTable -> [(RouteData,[IPrefix])]
-getAdjRIBOut = groupBy_ . getRIB'
+getAdjRIBOut = groupBy_ . getRIB
 
 showPrefixTable :: PrefixTable -> String
 showPrefixTable pt = unlines $ map showPrefixTableItem (getDB pt) where
     showPrefixTableItem (k,v) = show k ++ " [" ++ Data.List.intercalate " , " (showRoutes v) ++ "]"
-    showRoutes = map (\route -> ( show.nextHop) route ++ " (" ++ (show.pathLength) route ++ ")" ) 
+    showRoutes = map (\route -> ( show.nextHop) route ++ " (" ++ (show.pathLength) route ++ ")" )
 
 showPrefixTableByRoute :: PrefixTable -> String
-showPrefixTableByRoute = showPrefixTableByRoute' show 
+showPrefixTableByRoute = showPrefixTableByRoute' show
 showPrefixTableByRoute' fr pt = unlines $ map showRoute (getAdjRIBOut pt) where
     showRoute (r,pfxs) = unwords $  fr r : ":" : if length pfxs < 3 then map show pfxs else map show (take 2 pfxs) ++ ["..."]

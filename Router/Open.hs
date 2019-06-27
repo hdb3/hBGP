@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards #-} 
+{-# LANGUAGE RecordWildCards #-}
 module Router.Open where
 import Data.Binary
 import qualified Data.ByteString.Lazy as L
@@ -20,7 +20,7 @@ import BGPlib.BGPlib
 -- it also includes processing of the Hold timer values, AS number and BGPID
 --
 -- from the 'application level' it accepts parameters and shows what has been negotiated
--- 
+--
 -- the application level builds an initial state object
 -- this is called by the FSM when it receives Open or wants to send Open (either ordering)
 -- the response after receiving Open can be +ve or -ve, which should result in either Keepalive or Notification message
@@ -67,7 +67,7 @@ updateOpenStateMachine osm remoteOpen | isOpen remoteOpen = osm { remoteOffer = 
 
 -- this might be better if it returned the Word16 values and allowed consumers to make the cast, but it would break the API for now...
 getNegotiatedHoldTime :: OpenStateMachine -> Int
-getNegotiatedHoldTime OpenStateMachine {..} = let nonZeroMin a b = if a > 0 && b > 0 then min a b else max a b in fromIntegral $ maybe 0 (nonZeroMin ( holdTime localOffer) . holdTime ) remoteOffer 
+getNegotiatedHoldTime OpenStateMachine {..} = let nonZeroMin a b = if a > 0 && b > 0 then min a b else max a b in fromIntegral $ maybe 0 (nonZeroMin ( holdTime localOffer) . holdTime ) remoteOffer
 
 getKeepAliveTimer :: OpenStateMachine -> Int
 getKeepAliveTimer osm | getNegotiatedHoldTime osm > 0 = 1 + fromIntegral (getNegotiatedHoldTime osm) `div` 3
@@ -121,8 +121,8 @@ getResponse osm@OpenStateMachine {..} | isJust remoteOffer = firstMaybe [checkmy
 -- Note - there is no negotiation concept for Optional capabilities, and the responsibility for rejecting a peering lies with the prposer of a capability
 -- which should arise when the peer has not advertised a capability which is required.
 -- The present implementation consists simply of a check that the remote offer contains at least the capabilities in the required list.
---  
---  
+--
+--
 -- this is the mentioned check for presecnce in remote offer of required parameters
 -- return a list of capabilities required but not found in the offer
         checkOptionalCapabilities :: Maybe BGPMessage

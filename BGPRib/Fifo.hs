@@ -56,7 +56,7 @@ fifo l = newMVar ([],reverse l)
 
 showFifo :: Show t => Fifo t -> IO String
 showFifo m = do
-    t <- readMVar m 
+    t <- readMVar m
     return $ show t
 
 -- calls with timeouts....

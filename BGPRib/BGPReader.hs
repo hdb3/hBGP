@@ -27,7 +27,7 @@ bgpReader path = do
     rib <- BGPRib.newRib BGPRib.dummyPeerData
     mapM_ (updateRib rib) updates
     rib' <- BGPRib.getLocRib rib
-    return (getRIB' rib')
+    return (getRIB rib')
 updateRib :: Rib -> ParsedUpdate -> IO ()
 updateRib rib parsedUpdate@ParsedUpdate{..} = BGPRib.ribPush rib BGPRib.dummyPeerData parsedUpdate
 
@@ -42,7 +42,7 @@ readRib :: IO [((Int, [PathAttribute]), IPrefix)]
 readRib = readUngroupedRib
 
 readUngroupedRib :: IO [((Int, [PathAttribute]), IPrefix)]
-readUngroupedRib = fmap ( map normalise ) readRib' 
+readUngroupedRib = fmap ( map normalise ) readRib'
 
 readGroupedRib :: IO [((Int, [PathAttribute]), [IPrefix])]
 readGroupedRib = fmap (map normalise . applyBogonFilter . groupBy_) readRib'

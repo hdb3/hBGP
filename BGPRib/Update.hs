@@ -43,18 +43,18 @@ encodeUpdates = map ungetUpdate
 
 -- TODO rename getUpdate/ungetUpdate encodeUpdate/decodeUpdate
 ungetUpdate :: ParsedUpdate -> BGPMessage
-ungetUpdate ParsedUpdate{..} = BGPUpdate { withdrawn = encode withdrawn , attributes = encode puPathAttributes , nlri = encode nlri } 
+ungetUpdate ParsedUpdate{..} = BGPUpdate { withdrawn = encode withdrawn , attributes = encode puPathAttributes , nlri = encode nlri }
 
 endOfRib :: BGPMessage
 endOfRib = BGPUpdate { withdrawn = L.empty , attributes = L.empty , nlri = L.empty }
 
 getUpdate :: BGPMessage -> ParsedUpdate
 getUpdate BGPUpdate{..} = ParsedUpdate { puPathAttributes = a , nlri = n , withdrawn = w,
-                                        hash = myHash attributes  }
+                                        hash = myHash attributes }
                                where (a,n,w) = validResult $ parseUpdate attributes nlri withdrawn
 
 processUpdate :: BGPMessage -> Either String ParsedUpdate
-processUpdate ( BGPUpdate w a n ) = 
+processUpdate ( BGPUpdate w a n ) =
     let parsedResult = parseUpdate a n w
         (puPathAttributes,nlri,withdrawn) = validResult parsedResult
         hash = myHash a
@@ -65,7 +65,7 @@ processUpdate ( BGPUpdate w a n ) =
         parseErrorMesgs parsedResult ++
         diagoseResult parsedResult (a,n,w)
 
-originateWithdraw prefixes = ParsedUpdate []  [] prefixes 0
+originateWithdraw prefixes = ParsedUpdate [] [] prefixes 0
 
 originateUpdate :: Word8 -> [ASSegment Word32] -> IPv4 -> [IPrefix] -> ParsedUpdate
 originateUpdate origin path nextHop prefixes = ParsedUpdate attributes prefixes [] hash where
@@ -73,7 +73,7 @@ originateUpdate origin path nextHop prefixes = ParsedUpdate attributes prefixes 
     hash = myHash $ encode attributes
 
 makeUpdateSimple :: [PathAttribute] -> [IPrefix] -> [IPrefix] -> ParsedUpdate
-makeUpdateSimple p n w  = head $ makeUpdate n w p
+makeUpdateSimple p n w = head $ makeUpdate n w p
 
 makeUpdate :: [IPrefix] -> [IPrefix] -> [PathAttribute] -> [ParsedUpdate]
 makeUpdate = makeSegmentedUpdate

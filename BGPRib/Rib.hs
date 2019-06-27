@@ -4,7 +4,6 @@ import Control.Concurrent
 import qualified Data.Map.Strict as Data.Map
 import Control.Monad(unless,when,void)
 import Data.List(intercalate)
---import Data.Maybe(catMaybes)
 
 import BGPlib.BGPlib
 
@@ -20,7 +19,7 @@ type Rib = MVar Rib'
 -- and create a type 'AdjRIBMapEntry = (PeerData,AdjRIBTable)'
 
 type AdjRIB = Data.Map.Map PeerData AdjRIBTable
-data Rib' = Rib' { 
+data Rib' = Rib' {
                    prefixTable :: PrefixTable
                  , adjRib :: AdjRIB
                  }
@@ -77,7 +76,7 @@ delPeer' peer Rib' {..} = do
 addPeer :: Rib -> PeerData -> IO ()
 addPeer rib peer = modifyMVar_ rib ( addPeer' peer )
 
-addPeer' ::  PeerData -> Rib' -> IO Rib'
+addPeer' :: PeerData -> Rib' -> IO Rib'
 addPeer' peer Rib' {..} = do
         -- get a complete RIB dump for the new peer...
     let ribDump = map f (PrefixTableUtils.getAdjRIBOut prefixTable) where
@@ -91,7 +90,7 @@ addPeer' peer Rib' {..} = do
 queryRib :: Rib -> IPrefix -> IO (Maybe RouteData)
 queryRib rib prefix = do
     rib' <- readMVar rib
-    return $ queryPrefixTable (prefixTable rib') prefix 
+    return $ queryPrefixTable (prefixTable rib') prefix
 
 -- adjRibQueryRib extends queryRib by checking that the current route hash matches the one saved when the AdjRIbOut entry was created
 --    this is useful because if it has changed then probably the correct action is to discard the result
@@ -100,7 +99,7 @@ queryRib rib prefix = do
 --    however the caller should not use this function since there is no valid Just value which can represent the withdraw
 --    instead the caller should merely use queryRib and discard the withdraw if the return value is not Nothing
 adjRibQueryRib :: Rib -> IPrefix -> Int -> IO (Maybe RouteData)
-adjRibQueryRib rib iprefix routeHash = 
+adjRibQueryRib rib iprefix routeHash =
     maybe Nothing (\route -> if routeHash == routeId route then Just route else Nothing) <$> queryRib rib iprefix
 
 lookupRoutes :: Rib -> AdjRIBEntry -> IO [(RouteData,[IPrefix])]
@@ -125,7 +124,7 @@ lookupRoutes rib (iprefixes,routeHash) = do
 pullAllUpdates :: PeerData -> Rib -> IO [AdjRIBEntry]
 pullAllUpdates peer rib = do
     (Rib' _ arot) <- readMVar rib
-    dequeueAll (arot Data.Map.! peer) 
+    dequeueAll (arot Data.Map.! peer)
 -- TODO write and use the function 'getAdjRibForPeer'
 
 
@@ -139,7 +138,7 @@ pullAllUpdatesTimeout t peer rib = do
 pullUpdates :: Int -> PeerData -> Rib -> IO [AdjRIBEntry]
 pullUpdates n peer rib = do
     (Rib' _ arot) <- readMVar rib
-    dequeueN n (arot Data.Map.! peer) 
+    dequeueN n (arot Data.Map.! peer)
 
 getLocRib :: Rib -> IO PrefixTable
 getLocRib rib = do
@@ -186,16 +185,15 @@ ribPush' :: PeerData -> ParsedUpdate -> Rib' -> IO Rib'
 -- ribPush' peerData ParsedUpdate{..} = ribUpdateMany' peerData puPathAttributes hash nlri >>= ribWithdrawMany' peerData withdrawn
 ribPush' peerData ParsedUpdate{..} rib0 = do
     rib1 <- ribUpdateMany' peerData puPathAttributes hash nlri rib0
-    rib2 <- ribWithdrawMany' peerData withdrawn rib1 
+    rib2 <- ribWithdrawMany' peerData withdrawn rib1
     return rib2
 
--- TODO - convert ribUpdateMany/ribWithdrawMany to IPrefix based, for consistency...
 ribUpdateMany :: Rib -> PeerData -> [PathAttribute] -> Int -> [IPrefix] -> IO()
 ribUpdateMany rib peerData attrs hash pfxs = modifyMVar_ rib (ribUpdateMany' peerData attrs hash pfxs)
 
 ribUpdateMany' :: PeerData -> [PathAttribute] -> Int -> [IPrefix] -> Rib' -> IO Rib'
 ribUpdateMany' peerData pathAttributes routeId pfxs (Rib' prefixTable adjRibOutTables )
-    | null pfxs = return (Rib' prefixTable adjRibOutTables ) 
+    | null pfxs = return (Rib' prefixTable adjRibOutTables )
     | otherwise = do
           let routeData = makeRouteData' peerData pathAttributes routeId
               ( prefixTable' , updates ) = BGPRib.PrefixTable.update prefixTable pfxs routeData
@@ -216,4 +214,3 @@ ribWithdrawMany' peerData pfxs (Rib' prefixTable adjRibOutTables)
         -- probably just using Either monad?
         updateRibOutWithPeerData peerData nullRoute withdraws adjRibOutTables
         return $ Rib' prefixTable' adjRibOutTables
-
