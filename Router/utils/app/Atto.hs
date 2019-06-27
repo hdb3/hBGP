@@ -91,6 +91,7 @@ main = do
         timeIO "parseCheck bgpParser" $ parseCheck bgpParser bs
         let msgs = parse_ wireParser bs
         mapM_ recodeCheck msgs
+        putStrLn "recodeCheck passed without exception"
     else do
         let n = read (args !! 1) :: Int
         putStrLn $ "\n*** " ++ head args ++ " " ++ show n ++ " ***\n"
