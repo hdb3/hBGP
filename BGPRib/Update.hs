@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
-module BGPRib.Update(modifyPathAttributes,endOfRib,encodeUpdates,processUpdate,getUpdate,ungetUpdate,ParsedUpdate(..),makeUpdate,makeUpdateSimple,igpUpdate,originateWithdraw,originateUpdate,myHash) where
+module BGPRib.Update(modifyPathAttributes,endOfRib,encodeUpdates,processUpdate,getUpdate,encodeUpdate,ParsedUpdate(..),makeUpdate,makeUpdateSimple,igpUpdate,originateWithdraw,originateUpdate,myHash) where
 import qualified Data.ByteString.Lazy as L
 import Data.Int
 import Data.Binary
@@ -39,11 +39,11 @@ diagoseResult (a',n',w') (a,n,w) = diagnose "attributes" a' a ++
     diagnose t (Left (_,n,_)) x = "Error parsing " ++ t ++ " at position " ++ show n ++ "\n" ++ toHex' x
 
 encodeUpdates :: [ParsedUpdate] -> [BGPMessage]
-encodeUpdates = map ungetUpdate
+encodeUpdates = map encodeUpdate
 
 -- TODO rename getUpdate/ungetUpdate encodeUpdate/decodeUpdate
-ungetUpdate :: ParsedUpdate -> BGPMessage
-ungetUpdate ParsedUpdate{..} = BGPUpdate { withdrawn = encode withdrawn , attributes = encode puPathAttributes , nlri = encode nlri }
+encodeUpdate :: ParsedUpdate -> BGPMessage
+encodeUpdate ParsedUpdate{..} = BGPUpdate { withdrawn = encode withdrawn , attributes = encode puPathAttributes , nlri = encode nlri }
 
 endOfRib :: BGPMessage
 endOfRib = BGPUpdate { withdrawn = L.empty , attributes = L.empty , nlri = L.empty }
@@ -53,14 +53,14 @@ getUpdate BGPUpdate{..} = ParsedUpdate { puPathAttributes = a , nlri = n , withd
                                         hash = myHash attributes }
                                where (a,n,w) = validResult $ parseUpdate attributes nlri withdrawn
 
-processUpdate :: BGPMessage -> Either String ParsedUpdate
+processUpdate :: BGPMessage -> ParsedUpdate
 processUpdate ( BGPUpdate w a n ) =
     let parsedResult = parseUpdate a n w
         (puPathAttributes,nlri,withdrawn) = validResult parsedResult
         hash = myHash a
     in
-    if parseSuccess parsedResult then Right (ParsedUpdate puPathAttributes nlri withdrawn hash)
-    else Left $
+    if parseSuccess parsedResult then (ParsedUpdate puPathAttributes nlri withdrawn hash)
+    else error $
         "parsing failed: " ++
         parseErrorMesgs parsedResult ++
         diagoseResult parsedResult (a,n,w)

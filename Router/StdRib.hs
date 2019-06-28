@@ -22,11 +22,8 @@ ribPush :: RibHandle -> BGPMessage -> IO Bool
 ribPush _ BGPKeepalive = return True
 ribPush (rib,peer) update = do
     trace $ "ribPush " ++ show peer ++ ":" ++ show update
-    either (\s -> do warn $ s ++ show peer
-                     return False )
-           (\parsedUpdate -> do BGPRib.ribPush rib peer parsedUpdate
-                                return True)
-           ( processUpdate update )
+    BGPRib.ribPush rib peer ( getUpdate update )
+    return True
 
 delPeerByAddress :: Rib -> Word16 -> IPv4 -> IO ()
 delPeerByAddress rib port ip = do
