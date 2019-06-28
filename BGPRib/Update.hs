@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
-module BGPRib.Update(modifyPathAttributes,endOfRib,encodeUpdates,getUpdate,encodeUpdate,ParsedUpdate(..),makeUpdate,makeUpdateSimple,igpUpdate,originateWithdraw,originateUpdate,myHash) where
+module BGPRib.Update(modifyPathAttributes,endOfRib,parseUpdate,deparseUpdate,ParsedUpdate(..),makeUpdate,makeUpdateSimple,igpUpdate,originateWithdraw,originateUpdate,myHash) where
 import qualified Data.ByteString.Lazy as L
 import Data.Int
 import Data.Binary
@@ -18,23 +18,22 @@ data ParsedUpdate = ParsedUpdate { puPathAttributes :: [PathAttribute], nlri :: 
 modifyPathAttributes :: ([PathAttribute] -> [PathAttribute]) -> ParsedUpdate -> ParsedUpdate
 modifyPathAttributes f pu = pu { puPathAttributes = f $ puPathAttributes pu }
 
-encodeUpdates = map encodeUpdate
-
-encodeUpdate :: ParsedUpdate -> BGPMessage
-encodeUpdate ParsedUpdate{..} = BGPUpdate { withdrawn = encode withdrawn , attributes = encode puPathAttributes , nlri = encode nlri }
+deparseUpdate :: ParsedUpdate -> BGPMessage
+deparseUpdate ParsedUpdate{..} = BGPUpdate { withdrawn = encode withdrawn , attributes = encode puPathAttributes , nlri = encode nlri }
 
 endOfRib :: BGPMessage
 endOfRib = BGPUpdate { withdrawn = L.empty , attributes = L.empty , nlri = L.empty }
 
-getUpdate :: BGPMessage -> ParsedUpdate
-getUpdate BGPUpdate{..} = ParsedUpdate { puPathAttributes = decode attributes , nlri = decode nlri , withdrawn = decode withdrawn , hash = myHash attributes }
+parseUpdate :: BGPMessage -> ParsedUpdate
+parseUpdate BGPUpdate{..} = ParsedUpdate { puPathAttributes = decode attributes , nlri = decode nlri , withdrawn = decode withdrawn , hash = myHash attributes }
 
 originateWithdraw prefixes = ParsedUpdate [] [] prefixes 0
 
 originateUpdate :: Word8 -> [ASSegment Word32] -> IPv4 -> [IPrefix] -> ParsedUpdate
-originateUpdate origin path nextHop prefixes = ParsedUpdate attributes prefixes [] hash where
-    attributes = [PathAttributeOrigin origin, PathAttributeASPath (ASPath4 path), PathAttributeNextHop nextHop]
-    hash = myHash $ encode attributes
+originateUpdate origin path nextHop prefixes =
+     head $ makeUpdate prefixes
+                       []
+                       [PathAttributeOrigin origin, PathAttributeASPath (ASPath4 path), PathAttributeNextHop nextHop]
 
 makeUpdateSimple :: [PathAttribute] -> [IPrefix] -> [IPrefix] -> ParsedUpdate
 makeUpdateSimple p n w = head $ makeUpdate n w p
