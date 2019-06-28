@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
-module BGPRib.Update(modifyPathAttributes,endOfRib,encodeUpdates,processUpdate,getUpdate,encodeUpdate,ParsedUpdate(..),makeUpdate,makeUpdateSimple,igpUpdate,originateWithdraw,originateUpdate,myHash) where
+module BGPRib.Update(modifyPathAttributes,endOfRib,encodeUpdates,getUpdate,encodeUpdate,ParsedUpdate(..),makeUpdate,makeUpdateSimple,igpUpdate,originateWithdraw,originateUpdate,myHash) where
 import qualified Data.ByteString.Lazy as L
 import Data.Int
 import Data.Binary
@@ -18,30 +18,8 @@ data ParsedUpdate = ParsedUpdate { puPathAttributes :: [PathAttribute], nlri :: 
 modifyPathAttributes :: ([PathAttribute] -> [PathAttribute]) -> ParsedUpdate -> ParsedUpdate
 modifyPathAttributes f pu = pu { puPathAttributes = f $ puPathAttributes pu }
 
-parseUpdate a n w = (decodedAttributes,decodedNlri,decodedWithdrawn)
-    where
-        decodedAttributes = decodeOrFail a :: Either (L.ByteString, Int64, String) (L.ByteString, Int64, [PathAttribute])
-        decodedNlri = decodeOrFail n :: Either (L.ByteString, Int64, String) (L.ByteString, Int64, [IPrefix])
-        decodedWithdrawn = decodeOrFail w :: Either (L.ByteString, Int64, String) (L.ByteString, Int64, [IPrefix])
-
-parseSuccess (a,n,w) = isRight a && isRight n && isRight w
-parseErrorMesgs (a,n,w) = concat [getMsgA a,getMsgP n,getMsgP w]
-    where getMsgP (Right _) = ""
-          getMsgP (Left(_,_,s)) = s
-          getMsgA (Right _) = ""
-          getMsgA (Left(_,_,s)) = s
-validResult (a,n,w) = (f a,f n, f w) where f (Right (_, _, x)) = x
-
-diagoseResult (a',n',w') (a,n,w) = diagnose "attributes" a' a ++
-                                   diagnose "NLRI" n' n ++
-                                   diagnose "withdrawn" w' w where
-    diagnose _ (Right _) _ = ""
-    diagnose t (Left (_,n,_)) x = "Error parsing " ++ t ++ " at position " ++ show n ++ "\n" ++ toHex' x
-
-encodeUpdates :: [ParsedUpdate] -> [BGPMessage]
 encodeUpdates = map encodeUpdate
 
--- TODO rename getUpdate/ungetUpdate encodeUpdate/decodeUpdate
 encodeUpdate :: ParsedUpdate -> BGPMessage
 encodeUpdate ParsedUpdate{..} = BGPUpdate { withdrawn = encode withdrawn , attributes = encode puPathAttributes , nlri = encode nlri }
 
@@ -49,21 +27,7 @@ endOfRib :: BGPMessage
 endOfRib = BGPUpdate { withdrawn = L.empty , attributes = L.empty , nlri = L.empty }
 
 getUpdate :: BGPMessage -> ParsedUpdate
-getUpdate BGPUpdate{..} = ParsedUpdate { puPathAttributes = a , nlri = n , withdrawn = w,
-                                        hash = myHash attributes }
-                               where (a,n,w) = validResult $ parseUpdate attributes nlri withdrawn
-
-processUpdate :: BGPMessage -> ParsedUpdate
-processUpdate ( BGPUpdate w a n ) =
-    let parsedResult = parseUpdate a n w
-        (puPathAttributes,nlri,withdrawn) = validResult parsedResult
-        hash = myHash a
-    in
-    if parseSuccess parsedResult then (ParsedUpdate puPathAttributes nlri withdrawn hash)
-    else error $
-        "parsing failed: " ++
-        parseErrorMesgs parsedResult ++
-        diagoseResult parsedResult (a,n,w)
+getUpdate BGPUpdate{..} = ParsedUpdate { puPathAttributes = decode attributes , nlri = decode nlri , withdrawn = decode withdrawn , hash = myHash attributes }
 
 originateWithdraw prefixes = ParsedUpdate [] [] prefixes 0
 
