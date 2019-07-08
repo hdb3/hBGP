@@ -22,6 +22,7 @@ ribPush :: RibHandle -> BGPMessage -> IO Bool
 ribPush _ BGPKeepalive = return True
 ribPush (rib,peer) update = do
     trace $ "ribPush " ++ show peer ++ ":" ++ show update
+    --BGPRib.ribPush rib peer update
     BGPRib.ribPush rib peer ( parseUpdate update )
     return True
 
