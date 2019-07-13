@@ -1,13 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE BangPatterns #-}
-module BGPlib.Prefixes(Prefix,IPrefix,chunkPrefixes,toPrefix,toAddrRange,subnet,toIPrefix,fromIPrefix,fromPrefixes,fromAddrRange , toPrefixes) where
--- chunkPrefixes used in BGPlib.Update
--- toPrefix , toAddrRange , subnet used in BGPRib.BogonFilter
--- IPrefix() used in at least BGPRib.PrefixTable , now toIPrefix and fromIPrefix
--- fromPrefixes used in BGPRib/Rib
--- fromAddrRange , toPrefixes used in Router/StdRib
+module BGPlib.Prefixes(IPrefix,chunkPrefixes,toAddrRange,toIPrefix,fromIPrefix,fromAddrRange,lengthIPrefix) where
 import Data.Binary
 import Data.Hashable
 import GHC.Generics(Generic)
@@ -35,82 +29,51 @@ import BGPlib.LibCommon
 --
 -- representation of prefixes as 64 bit words: this mapping allows prefixes to be treated as Ints where useful
 
-data Prefix = Prefix !(Word8,Word32) deriving (Eq,Generic)
+-- todo make this Word64 not Int?
 newtype IPrefix = IPrefix Int deriving (Eq,Generic)
 
 toIPrefix :: Int -> IPrefix
-toIPrefix i = IPrefix i
+toIPrefix = IPrefix
+
+mkIPrefix :: Word8 -> Word32 -> IPrefix
+mkIPrefix l v = IPrefix $! unsafeShiftL (fromIntegral l) 32 .|. fromIntegral v
 
 fromIPrefix :: IPrefix -> Int
 fromIPrefix (IPrefix ipfx) = ipfx
 
-toPrefix :: IPrefix -> Prefix
-toPrefix (IPrefix w64) = Prefix (fromIntegral $ unsafeShiftR w64 32, fromIntegral $ 0xffffffff .&. w64)
-fromPrefix :: Prefix -> IPrefix
-fromPrefix (Prefix (!l,!v)) = let l' = fromIntegral l :: Int
-                                  v' = fromIntegral v :: Int
-                              in IPrefix $! unsafeShiftL l' 32 .|. v'
-fromPrefixes = map fromPrefix
-toPrefixes = map toPrefix
+lengthIPrefix :: IPrefix -> Int
+lengthIPrefix (IPrefix ipfx) = fromIntegral $ unsafeShiftR ipfx 32
 
-instance IsString Prefix where
-    fromString = read
+addressIPrefix :: IPrefix -> Word32
+addressIPrefix (IPrefix ipfx) = fromIntegral $ 0xffffffff .&. ipfx
 
 instance IsString IPrefix where
     fromString = read
 
 instance Read IPrefix where
     readsPrec _ = readSipfx where
-        readSipfx s = let (a,s') = head $ readsPrec 0 s in [(fromPrefix $ fromAddrRange a,s')]
+        readSipfx s = let (a,s') = head $ reads s in [(fromAddrRange a,s')]
 
-instance Read Prefix where
-    readsPrec _ = readSipfx where
-        readSipfx s = let (a,s') = head $ readsPrec 0 s in [(fromAddrRange a,s')]
-
-instance Hashable Prefix
 instance Hashable IPrefix
 instance Hashable IPv4
 instance Hashable IPv6
 
-instance {-# INCOHERENT #-} Show [Prefix] where
+instance {-# INCOHERENT #-} Show [IPrefix] where
     show = shorten
 
-instance {-# INCOHERENT #-} Show [IPrefix] where
-    show = shorten . map toPrefix
-
-instance Show Prefix where
-    show = show.toAddrRange
-
 instance Show IPrefix where
-    show = show.toAddrRange.toPrefix
+    show = show.toAddrRange
 
 realShow = show . map toAddrRange
 shortenLim l pfxs = if length pfxs < (l+1) then realShow pfxs else show (take l pfxs) ++ "(+" ++ show (length pfxs - l) ++ ")"
 -- shorten pfxs = if length pfxs < 3 then realShow pfxs else show (take 2 pfxs) ++ "(+" ++ show (length pfxs - 2) ++ ")"
 shorten = shortenLim 4
 
-subnet :: Prefix -> Word8
-subnet (Prefix (s,_)) = s
+toAddrRange :: IPrefix -> AddrRange IPv4
+toAddrRange ipfx = makeAddrRange (fromHostAddress $ byteSwap32 $ addressIPrefix ipfx) (lengthIPrefix ipfx)
 
-ip :: Prefix -> Word32
-ip (Prefix (_,i)) = i
-
-instance {-# OVERLAPPING #-} Binary [AddrRange IPv4] where
-    get = fmap (map toAddrRange) getPrefixes where
-        getPrefixes :: Get [Prefix]
-        getPrefixes = get
-    put = putPrefixes . liftM fromAddrRange where
-        putPrefixes :: [Prefix] -> Put
-        putPrefixes = put
-
-decodeAddrRange = map toAddrRange . decode
-encodeAddrRange = encode  . map fromAddrRange
-
-toAddrRange :: Prefix -> AddrRange IPv4
-toAddrRange (Prefix (subnet,ip)) = makeAddrRange (fromHostAddress $ byteSwap32 ip) (fromIntegral subnet)
-
-fromAddrRange :: AddrRange IPv4 -> Prefix
-fromAddrRange ar = Prefix (fromIntegral subnet, byteSwap32 $ toHostAddress ip) where
+fromAddrRange :: AddrRange IPv4 -> IPrefix
+fromAddrRange ar = mkIPrefix (fromIntegral subnet) (byteSwap32 $ toHostAddress ip) where
                    (ip,subnet) = addrRangePair ar
 
 -- binary format for attributes is 1 byte flags, 1 byte type code, 1 or 2 byte length value depending on a flag bit, then payload
@@ -148,7 +111,7 @@ fromAddrRange ar = Prefix (fromIntegral subnet, byteSwap32 $ toHostAddress ip) w
 -- segmentBinaryPrefix n lbs | L.length lbs <= n = [lbs]
 
 -- encodedChunkPrefixes n = map encode . chunkPrefixes n . reverse
-chunkPrefixes :: Int64 -> [Prefix] -> [[Prefix]]
+chunkPrefixes :: Int64 -> [IPrefix] -> [[IPrefix]]
 chunkPrefixes n pfxs = let (xl,l,_) = chunkPrefixes' n pfxs in (l : xl)
 chunkPrefixes' n = chunkEnumeratedPrefixes n . enumeratePrefixes
 
@@ -158,62 +121,49 @@ chunkEnumeratedPrefixes n = foldl f ([],[],0) where
                                 | otherwise = (l:xl,[pfx],size)
 
 -- enumeratePrefixes :: [Prefix] -> [(Int,Prefix)]
-enumeratePrefixes = map (\pfx -> (getLength pfx, pfx)) where
-    getLength (Prefix (subnet,_)) | subnet == 0 = 1
-                                   | subnet < 9  = 2
-                                   | subnet < 17 = 3
-                                   | subnet < 25 = 4
-                                   | subnet < 33 = 5
-                                   | otherwise = error $ "subnet mask of " ++ show subnet ++ " is > 32"
+enumeratePrefixes = map (\pfx -> (fromIntegral $ lengthIPrefix pfx, pfx))
 
-instance Binary IPrefix where 
-    put = putPrefix . toPrefix
-        where
-            putPrefix = put :: Prefix -> Put
-    get = fromPrefix <$> getPrefix
-        where
-            getPrefix = get :: Get Prefix
+
+
 
 instance {-# OVERLAPPING #-} Binary [IPrefix] where
     put = putn
     get = getn
 
-instance Binary Prefix where
+instance Binary IPrefix where
 
-    put (Prefix (subnet,ip)) | subnet == 0 = putWord8 0
-                             | subnet < 9  = do putWord8 subnet
-                                                putWord8 (fromIntegral $ unsafeShiftR ip 24)
-                             | subnet < 17 = do putWord8 subnet
-                                                putWord16be  (fromIntegral $ unsafeShiftR ip 16)
-                             | subnet < 25 = do putWord8 subnet
-                                                putWord16be  (fromIntegral $ unsafeShiftR ip 16)
-                                                putWord8 (fromIntegral $ unsafeShiftR ip 8)
-                             | otherwise   = do putWord8 subnet
-                                                putWord32be  ip
+    put ipfx | subnet == 0 = putWord8 0
+             | subnet < 9  = do putWord8 subnet
+                                putWord8 (fromIntegral $ unsafeShiftR ip 24)
+             | subnet < 17 = do putWord8 subnet
+                                putWord16be  (fromIntegral $ unsafeShiftR ip 16)
+             | subnet < 25 = do putWord8 subnet
+                                putWord16be  (fromIntegral $ unsafeShiftR ip 16)
+                                putWord8 (fromIntegral $ unsafeShiftR ip 8)
+             | otherwise   = do putWord8 subnet
+                                putWord32be  ip
+        where subnet = fromIntegral $ lengthIPrefix ipfx
+              ip = addressIPrefix ipfx
 
     get = label "Prefix" $ do
         subnet <- getWord8
         if subnet == 0
-        then return $ Prefix (0,0)
+        then return $ mkIPrefix 0 0
         else if subnet < 9
         then do
             w8 <- getWord8
             let ip = unsafeShiftL (fromIntegral w8 :: Word32) 24
-            return $ Prefix (subnet,ip)
+            return $ mkIPrefix subnet ip
         else if subnet < 17
         then do
             w16  <- getWord16be
             let ip = unsafeShiftL (fromIntegral w16  :: Word32) 16
-            return $ Prefix (subnet,ip)
+            return $ mkIPrefix subnet ip
         else if subnet < 25
         then do
             w16  <- getWord16be
             w8  <- getWord8
             let ip = unsafeShiftL (fromIntegral w16  :: Word32) 16 .|.
                      unsafeShiftL (fromIntegral w8 :: Word32) 8
-            return $ Prefix (subnet,ip)
-        else do ip <- getWord32be
-                return $ Prefix (subnet,ip)
-instance {-# OVERLAPPING #-} Binary [Prefix] where
-    put = putn
-    get = getn
+            return $ mkIPrefix subnet ip
+        else mkIPrefix subnet <$> getWord32be

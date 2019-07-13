@@ -21,7 +21,7 @@ bgpMsgReader path = do
 bgpUpdateMsgReader :: FilePath -> IO [ParsedUpdate]
 bgpUpdateMsgReader = fmap ( map getUpdate . filter isUpdate ) . bgpMsgReader
 
-bgpReader :: FilePath -> IO [(BGPRib.RouteData, Prefix)]
+bgpReader :: FilePath -> IO [(BGPRib.RouteData, IPrefix)]
 bgpReader path = do
     updates <- bgpUpdateMsgReader path
     rib <- BGPRib.newRib BGPRib.dummyPeerData
@@ -38,19 +38,19 @@ updateRib rib parsedUpdate@ParsedUpdate{..} = BGPRib.ribPush rib BGPRib.dummyPee
 --  However, it only contains the last version of the table, so earlier updates in the stream which were superceded are not returned
 
 
-readRib :: IO [((Int, [PathAttribute]), Prefix)]
+readRib :: IO [((Int, [PathAttribute]), IPrefix)]
 readRib = readUngroupedRib
 
-readUngroupedRib :: IO [((Int, [PathAttribute]), Prefix)]
+readUngroupedRib :: IO [((Int, [PathAttribute]), IPrefix)]
 readUngroupedRib = fmap ( map normalise ) readRib' 
 
-readGroupedRib :: IO [((Int, [PathAttribute]), [Prefix])]
+readGroupedRib :: IO [((Int, [PathAttribute]), [IPrefix])]
 readGroupedRib = fmap (map normalise . applyBogonFilter . groupBy_) readRib'
 
-readGroupedRibF :: IO [((Int, [PathAttribute]), [Prefix])]
+readGroupedRibF :: IO [((Int, [PathAttribute]), [IPrefix])]
 readGroupedRibF = fmap applyBogonFilter readGroupedRib
 
-pathReadRib :: FilePath -> IO [((Int, [PathAttribute]), [Prefix])]
+pathReadRib :: FilePath -> IO [((Int, [PathAttribute]), [IPrefix])]
 pathReadRib path = fmap ( applyPathFilter . map normalise . applyBogonFilter . groupBy_ ) ( bgpReader path)
 
 readMsgs :: IO [BGPMessage]
@@ -67,7 +67,7 @@ readMsgs = do
             return (take n msgs)
 
 -- TODO convert the readrib chain to use readMsgs.....
-readRib' :: IO [(RouteData, Prefix)]
+readRib' :: IO [(RouteData, IPrefix)]
 readRib' = do
     args <- getArgs
     let n = if 1 < length args then read (args !! 1) :: Int else 0

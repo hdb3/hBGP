@@ -98,7 +98,7 @@ getLocRib rib = do
     rib' <- readMVar rib
     return (prefixTable rib')
 
-evalLocalPref :: PeerData -> [PathAttribute] -> [Prefix] -> IO Word32
+evalLocalPref :: PeerData -> [PathAttribute] -> [IPrefix] -> IO Word32
 evalLocalPref peerData pathAttributes pfxs = return (peerLocalPref peerData)
 
 ribPush :: Rib -> PeerData -> ParsedUpdate -> IO()
@@ -111,21 +111,21 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
         rib1 <- ribUpdateMany peerData puPathAttributes hash nlri rib0
         ribWithdrawMany peerData withdrawn rib1
 
-    ribUpdateMany :: PeerData -> [PathAttribute] -> Int -> [Prefix] -> Rib' -> IO Rib'
+    ribUpdateMany :: PeerData -> [PathAttribute] -> Int -> [IPrefix] -> Rib' -> IO Rib'
     ribUpdateMany peerData pathAttributes routeId pfxs (Rib' prefixTable adjRibOutTables )
         | null pfxs = return (Rib' prefixTable adjRibOutTables )
         | otherwise = do
               localPref <- evalLocalPref peerData pathAttributes pfxs
               let routeData = makeRouteData peerData pathAttributes routeId localPref
-                  ( prefixTable' , updates ) = BGPRib.PrefixTable.update prefixTable (fromPrefixes pfxs) routeData
+                  ( prefixTable' , updates ) = BGPRib.PrefixTable.update prefixTable pfxs routeData
               updateRibOutWithPeerData peerData routeData updates adjRibOutTables
               return $ Rib' prefixTable' adjRibOutTables
 
-    ribWithdrawMany :: PeerData -> [Prefix] -> Rib' -> IO Rib'
+    ribWithdrawMany :: PeerData -> [IPrefix] -> Rib' -> IO Rib'
     ribWithdrawMany peerData pfxs (Rib' prefixTable adjRibOutTables)
         | null pfxs = return (Rib' prefixTable adjRibOutTables )
         | otherwise = do
-            let ( prefixTable' , withdraws ) = BGPRib.PrefixTable.withdraw prefixTable (fromPrefixes pfxs) peerData
+            let ( prefixTable' , withdraws ) = BGPRib.PrefixTable.withdraw prefixTable pfxs peerData
             -- adjRibOutTables' = updateAdjRibOutTables (updates,0) adjRibOutTables
             -- ** NOTE **
             -- The withdraw entry in the adj-rib-out has a special route value

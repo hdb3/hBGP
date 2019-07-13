@@ -13,7 +13,7 @@ import BGPRib.Common
 myHash :: L.ByteString -> Int
 myHash = fromIntegral . hash64 . L.toStrict
 
-data ParsedUpdate = ParsedUpdate { puPathAttributes :: [PathAttribute], nlri :: [Prefix], withdrawn :: [Prefix], hash :: Int } | NullUpdate deriving Show
+data ParsedUpdate = ParsedUpdate { puPathAttributes :: [PathAttribute], nlri :: [IPrefix], withdrawn :: [IPrefix], hash :: Int } | NullUpdate deriving Show
 
 modifyPathAttributes :: ([PathAttribute] -> [PathAttribute]) -> ParsedUpdate -> ParsedUpdate
 modifyPathAttributes f pu = pu { puPathAttributes = f $ puPathAttributes pu }
@@ -21,8 +21,8 @@ modifyPathAttributes f pu = pu { puPathAttributes = f $ puPathAttributes pu }
 parseUpdate a n w = (decodedAttributes,decodedNlri,decodedWithdrawn)
     where
         decodedAttributes = decodeOrFail a :: Either (L.ByteString, Int64, String) (L.ByteString, Int64, [PathAttribute])
-        decodedNlri = decodeOrFail n :: Either (L.ByteString, Int64, String) (L.ByteString, Int64, [Prefix])
-        decodedWithdrawn = decodeOrFail w :: Either (L.ByteString, Int64, String) (L.ByteString, Int64, [Prefix])
+        decodedNlri = decodeOrFail n :: Either (L.ByteString, Int64, String) (L.ByteString, Int64, [IPrefix])
+        decodedWithdrawn = decodeOrFail w :: Either (L.ByteString, Int64, String) (L.ByteString, Int64, [IPrefix])
 
 parseSuccess (a,n,w) = isRight a && isRight n && isRight w
 parseErrorMesgs (a,n,w) = concat [getMsgA a,getMsgP n,getMsgP w]
@@ -67,19 +67,19 @@ processUpdate ( BGPUpdate w a n ) =
 
 originateWithdraw prefixes = ParsedUpdate []  [] prefixes 0
 
-originateUpdate :: Word8 -> [ASSegment Word32] -> IPv4 -> [Prefix] -> ParsedUpdate
+originateUpdate :: Word8 -> [ASSegment Word32] -> IPv4 -> [IPrefix] -> ParsedUpdate
 originateUpdate origin path nextHop prefixes = ParsedUpdate attributes prefixes [] hash where
     attributes = [PathAttributeOrigin origin, PathAttributeASPath (ASPath4 path), PathAttributeNextHop nextHop]
     hash = myHash $ encode attributes
 
-makeUpdateSimple :: [PathAttribute] -> [Prefix] -> [Prefix] -> ParsedUpdate
+makeUpdateSimple :: [PathAttribute] -> [IPrefix] -> [IPrefix] -> ParsedUpdate
 makeUpdateSimple p n w  = head $ makeUpdate n w p
 
-makeUpdate :: [Prefix] -> [Prefix] -> [PathAttribute] -> [ParsedUpdate]
+makeUpdate :: [IPrefix] -> [IPrefix] -> [PathAttribute] -> [ParsedUpdate]
 makeUpdate = makeSegmentedUpdate
 makeUpdate' nlri withdrawn attributes = ParsedUpdate attributes nlri withdrawn ( myHash $ encode attributes)
 
-makeSegmentedUpdate :: [Prefix] -> [Prefix] -> [PathAttribute] -> [ParsedUpdate]
+makeSegmentedUpdate :: [IPrefix] -> [IPrefix] -> [PathAttribute] -> [ParsedUpdate]
 makeSegmentedUpdate nlri withdrawn attributes = result where
                                                     pathAttributesLength = L.length (encode attributes)
                                                     nonPrefixLength = 16 + 2 + 1 + 2 + 2 + pathAttributesLength

@@ -18,7 +18,7 @@ import qualified Data.SortedList as SL -- package sorted-list
 import qualified Data.List
 import Data.IP
 
-import BGPlib.BGPlib (IPrefix,toIPrefix, toPrefix, Prefix)
+import BGPlib.BGPlib (IPrefix,toIPrefix)
 import BGPRib.Common
 import BGPRib.BGPData
 import BGPRib.PrefixTable(PrefixTable,slHead)
@@ -33,19 +33,16 @@ getDB :: PrefixTable -> [(IPrefix,[RouteData])]
 getDB pt = map f (toList pt) where
     f (pfx,routes) = (toIPrefix pfx,SL.fromSortedList routes)
 
-getRIB :: PrefixTable -> [(RouteData,Prefix)]
-getRIB = map (\(a,b) -> (a,toPrefix b)) . getRIB'
-
-getRIB' :: PrefixTable -> [(RouteData,IPrefix)]
-getRIB' pt = map f (toList pt) where
+getRIB :: PrefixTable -> [(RouteData,IPrefix)]
+getRIB pt = map f (toList pt) where
     f (pfx,routes) = (slHead routes , toIPrefix pfx)
 
-getFIB :: PrefixTable -> [(Prefix,IPv4)]
+getFIB :: PrefixTable -> [(IPrefix,IPv4)]
 getFIB pt = map f (getRIB pt) where
     f (route,pfx) = (pfx , nextHop route)
 
 getAdjRIBOut :: PrefixTable -> [(RouteData,[IPrefix])]
-getAdjRIBOut = groupBy_ . getRIB'
+getAdjRIBOut = groupBy_ . getRIB
 
 showPrefixTable :: PrefixTable -> String
 showPrefixTable pt = unlines $ map showPrefixTableItem (getDB pt) where

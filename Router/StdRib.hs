@@ -69,7 +69,7 @@ buildUpdate :: PeerData -> [IPrefix] -> RouteData -> [ParsedUpdate]
 
 buildUpdate target iprefixes RouteData{..} = if isExternal target then egpUpdate else igpUpdate
     where
-    igpUpdate = makeUpdate (toPrefixes iprefixes)
+    igpUpdate = makeUpdate iprefixes
                            []
                            ( sortPathAttributes $
                            setOrigin origin $
@@ -79,7 +79,7 @@ buildUpdate target iprefixes RouteData{..} = if isExternal target then egpUpdate
                            setLocalPref localPref
                            pathAttributes 
                            )
-    egpUpdate = makeUpdate (toPrefixes iprefixes)
+    egpUpdate = makeUpdate iprefixes
                            []
                            ( sortPathAttributes $
                            setOrigin origin $

@@ -31,10 +31,10 @@ redistribute global@Global{..} = do
 
             let routeInstall (route, nextHop) = do
                     trace $ "install " ++ show route ++ " via " ++ show nextHop
-                    addRoute zStreamOut (toAddrRange $ toPrefix route) nextHop
+                    addRoute zStreamOut (toAddrRange route) nextHop
                 routeDelete route = do
                     trace $ "delete " ++ show route
-                    delRoute zStreamOut (toAddrRange $ toPrefix route)
+                    delRoute zStreamOut (toAddrRange route)
 
             ribUpdateListener (routeInstall,routeDelete) global ( localPeer gd ) 1
 
