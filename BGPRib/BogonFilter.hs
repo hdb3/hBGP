@@ -4,17 +4,17 @@ import Data.IP
 
 import BGPlib.BGPlib
 
-applyBogonFilter :: [(a, [IPrefix])] -> [(a, [IPrefix])]
+applyBogonFilter :: [(a, [Prefix])] -> [(a, [Prefix])]
 applyBogonFilter = filter p . map f where
     f (a,pfxs) = (a, filter bogonFilter pfxs)
     p (_,[])   = False
     p _          = True
 
-iPrefixBogonFilter :: IPrefix -> Bool
+iPrefixBogonFilter :: Prefix -> Bool
 iPrefixBogonFilter = bogonFilter
 
 -- ref https://www.iana.org/assignments/iana-ipv4-special-registry/iana-ipv4-special-registry-1.csv
-bogonFilter :: IPrefix -> Bool
+bogonFilter :: Prefix -> Bool
 bogonFilter pfx
                 | "0.0.0.0/8" >:> ip = False
                 | "10.0.0.0/8" >:> ip = False
@@ -44,5 +44,5 @@ bogonFilter pfx
                 | 0 == s = False
                 | otherwise = True
     where ip = toAddrRange pfx
-          s  = lengthIPrefix pfx
+          s  = lengthPrefix pfx
 

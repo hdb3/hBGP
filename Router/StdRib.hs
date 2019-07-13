@@ -52,7 +52,7 @@ addRouteRib rib peer prefix nextHop = BGPRib.ribPush rib peer (igpUpdate nextHop
 delRouteRib :: Rib -> PeerData -> AddrRange IPv4 -> IO()
 delRouteRib rib peer prefix = BGPRib.ribPush rib peer (originateWithdraw [fromAddrRange prefix])
 
-buildUpdate :: PeerData -> [IPrefix] -> RouteData -> [ParsedUpdate]
+buildUpdate :: PeerData -> [Prefix] -> RouteData -> [ParsedUpdate]
 -- there are three distinct 'peers' and associated PeerData potentially in scope here
 --     the peer which originated the route
 --     the peer which will receive this update ('target')
@@ -98,10 +98,10 @@ updateFromAdjRibEntrys rib target = concatMapM (updateFromAdjRibEntry rib target
     updateFromAdjRibEntry rib target (iprefixes,routeHash) =
         concatMap (\(route,iprefixes) -> buildUpdate target iprefixes route) <$> lookupRoutes rib (iprefixes,routeHash)
 
-routesFromAdjRibEntrys :: Rib -> [AdjRIBEntry] -> IO [(IPrefix,IPv4)]
+routesFromAdjRibEntrys :: Rib -> [AdjRIBEntry] -> IO [(Prefix,IPv4)]
 routesFromAdjRibEntrys rib = concatMapM (routesFromAdjRibEntry rib)
     where
 
-    routesFromAdjRibEntry :: Rib -> AdjRIBEntry -> IO [(IPrefix,IPv4)]
+    routesFromAdjRibEntry :: Rib -> AdjRIBEntry -> IO [(Prefix,IPv4)]
     routesFromAdjRibEntry rib (iprefixes,routeHash) =
         concatMap (\(route,iprefixes) -> map (,nextHop route) iprefixes ) <$> lookupRoutes rib (iprefixes,routeHash)

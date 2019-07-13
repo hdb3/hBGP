@@ -23,7 +23,7 @@ import BGPRib.Fifo
 -- Update Path Attributes
 --
 
-type AdjRIBEntry = ( [IPrefix], Int )
+type AdjRIBEntry = ( [Prefix], Int )
 type AdjRIBTable = Fifo AdjRIBEntry
 
 showAdjRIBTable :: AdjRIBTable -> IO String

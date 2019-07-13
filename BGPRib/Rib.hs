@@ -60,14 +60,14 @@ addPeer rib peer = modifyMVar_ rib ( addPeer' peer )
     addPeer' peer Rib' {..} = do
             -- get a complete RIB dump for the new peer...
         let ribDump = map f (PrefixTableUtils.getAdjRIBOut prefixTable)
-            f (rd,ipfxs) = (ipfxs , routeId rd)
+            f (rd,pfxs) = (pfxs , routeId rd)
             -- make the RIB dump into a Fifo
         aro <- fifo ribDump
             -- TODO - this would be the place to insert an end-of-rib marker
         let adjRib' = Data.Map.insert peer aro adjRib
         return $ Rib' prefixTable adjRib'
 
-lookupRoutes :: Rib -> AdjRIBEntry -> IO [(RouteData,[IPrefix])]
+lookupRoutes :: Rib -> AdjRIBEntry -> IO [(RouteData,[Prefix])]
 lookupRoutes rib (iprefixes,routeHash) = group_ <$> mapM (\pfx -> (,pfx) <$> adjRibQueryRib rib pfx routeHash) iprefixes
 
     where
@@ -77,11 +77,11 @@ lookupRoutes rib (iprefixes,routeHash) = group_ <$> mapM (\pfx -> (,pfx) <$> adj
     --    but it could on lookup, in which case the correct behaviour would be to discard the withdraw if the prefix is found
     --    however the caller should not use this function since there is no valid Just value which can represent the withdraw
     --    instead the caller should merely use queryRib and discard the withdraw if the return value is not Nothing
-    adjRibQueryRib :: Rib -> IPrefix -> Int -> IO (Maybe RouteData)
+    adjRibQueryRib :: Rib -> Prefix -> Int -> IO (Maybe RouteData)
     adjRibQueryRib rib iprefix routeHash =
         maybe Nothing (\route -> if routeHash == routeId route then Just route else Nothing) <$> queryRib rib iprefix
 
-    queryRib :: Rib -> IPrefix -> IO (Maybe RouteData)
+    queryRib :: Rib -> Prefix -> IO (Maybe RouteData)
     queryRib rib prefix = do
         rib' <- readMVar rib
         return $ queryPrefixTable (prefixTable rib') prefix
@@ -98,7 +98,7 @@ getLocRib rib = do
     rib' <- readMVar rib
     return (prefixTable rib')
 
-evalLocalPref :: PeerData -> [PathAttribute] -> [IPrefix] -> IO Word32
+evalLocalPref :: PeerData -> [PathAttribute] -> [Prefix] -> IO Word32
 evalLocalPref peerData pathAttributes pfxs = return (peerLocalPref peerData)
 
 ribPush :: Rib -> PeerData -> ParsedUpdate -> IO()
@@ -111,7 +111,7 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
         rib1 <- ribUpdateMany peerData puPathAttributes hash nlri rib0
         ribWithdrawMany peerData withdrawn rib1
 
-    ribUpdateMany :: PeerData -> [PathAttribute] -> Int -> [IPrefix] -> Rib' -> IO Rib'
+    ribUpdateMany :: PeerData -> [PathAttribute] -> Int -> [Prefix] -> Rib' -> IO Rib'
     ribUpdateMany peerData pathAttributes routeId pfxs (Rib' prefixTable adjRibOutTables )
         | null pfxs = return (Rib' prefixTable adjRibOutTables )
         | otherwise = do
@@ -121,7 +121,7 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
               updateRibOutWithPeerData peerData routeData updates adjRibOutTables
               return $ Rib' prefixTable' adjRibOutTables
 
-    ribWithdrawMany :: PeerData -> [IPrefix] -> Rib' -> IO Rib'
+    ribWithdrawMany :: PeerData -> [Prefix] -> Rib' -> IO Rib'
     ribWithdrawMany peerData pfxs (Rib' prefixTable adjRibOutTables)
         | null pfxs = return (Rib' prefixTable adjRibOutTables )
         | otherwise = do
@@ -145,7 +145,7 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
 
 -- NOTE!!!! - we can be called with a null route in which case only the routeId is defined, and is equal 0!!!
 -- this is OK since we only get the routeId in this function
-updateRibOutWithPeerData :: PeerData -> RouteData -> [IPrefix] -> AdjRIB -> IO ()
+updateRibOutWithPeerData :: PeerData -> RouteData -> [Prefix] -> AdjRIB -> IO ()
 updateRibOutWithPeerData originPeer routeData updates adjRib = do
     let updateWithKey destinationPeer table = when ( destinationPeer /= originPeer )
                                                    ( insertAdjRIBTable (updates, routeId routeData ) table )
