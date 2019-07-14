@@ -47,9 +47,9 @@ getAdjRIBOut = groupBy_ . getRIB
 showPrefixTable :: PrefixTable -> String
 showPrefixTable pt = unlines $ map showPrefixTableItem (getDB pt) where
     showPrefixTableItem (k,v) = show k ++ " [" ++ Data.List.intercalate " , " (showRoutes v) ++ "]"
-    showRoutes = map (\route -> ( show.nextHop) route ++ " (" ++ (show.pathLength) route ++ ")" ) 
+    showRoutes = map (\route -> ( show.nextHop) route ++ " (" ++ (show.pathLength) route ++ ")" )
 
 showPrefixTableByRoute :: PrefixTable -> String
-showPrefixTableByRoute = showPrefixTableByRoute' show 
+showPrefixTableByRoute = showPrefixTableByRoute' show
 showPrefixTableByRoute' fr pt = unlines $ map showRoute (getAdjRIBOut pt) where
     showRoute (r,pfxs) = unwords $  fr r : ":" : if length pfxs < 3 then map show pfxs else map show (take 2 pfxs) ++ ["..."]

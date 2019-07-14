@@ -34,7 +34,7 @@ flagCheck _ TypeCodePathAttributeUnknown = True
 flagCheck flags code = (flags .&. 0xc0) == flagsOf code
 
 flagsOf :: PathAttributeTypeCode -> Word8
-flagsOf e | e == TypeCodePathAttributeOrigin = transitive 
+flagsOf e | e == TypeCodePathAttributeOrigin = transitive
           | e == TypeCodePathAttributeASPath = transitive
           | e == TypeCodePathAttributeNextHop = transitive
           | e == TypeCodePathAttributeMultiExitDisc = optional

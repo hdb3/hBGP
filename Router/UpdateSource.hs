@@ -49,7 +49,7 @@ initSource peer startPrefix tableSize groupSize burstSize burstDelay oneShotMode
 
                              burst' = if n == 0 then markFirst burst else burst
                              burst'' = if n + burstSize >= tableSize then markLast burst' else burst'
-                             markFirst (a:ax) = (mark a : ax)
+                             markFirst (a:ax) = mark a : ax
                              markLast ax = init ax ++ [mark $ last ax]
                              mark = modifyPathAttributes (setOrigin _BGP_ORIGIN_EGP)
 
@@ -59,7 +59,7 @@ initSource peer startPrefix tableSize groupSize burstSize burstDelay oneShotMode
                          -- modified behaviour, marking first and last updates
                          return $ encodeUpdates burst''
 
-                         
+
                      else if repeatDelay > 0 then do
                          _ <- takeMVar mv
                          putMVar mv 0
@@ -67,7 +67,7 @@ initSource peer startPrefix tableSize groupSize burstSize burstDelay oneShotMode
                          -- this is not going to work for small values of hold timer
                          f mv
                          --return []
-                     else do
+                     else
                          -- empty list tells CustomRib that the update stream is now empty
                          return []
                  else do
@@ -92,7 +92,7 @@ main = do
 
 update :: PeerData -> AddrRange IPv4 -> Word32 -> Word32 -> Word32 -> [ParsedUpdate] -- the return value is only multiple to cope with the fact that a very large prefix list couls spill over the BGP message limit
                                                                                      -- ideally, a lower level encoder should capture this, i.e. at the first binary conversion stage......
-update peer startPrefix tableSize groupSize n = buildUpdate peer 
+update peer startPrefix tableSize groupSize n = buildUpdate peer
                                                                 (1 + n `mod` tableSize) -- these are the AS numbers to build the AS path
                                                                 (1 + n `div` tableSize) -- these are the AS numbers to build the AS path
                                                                 ( group startPrefix groupSize $ n `mod` tableSize)

@@ -36,11 +36,11 @@ getNextTimeout t bsock = let t' = t * 1000000 in
 getNext:: Handle -> IO BGPByteString
 getNext h = catchIOError (getNext' h)
                          (\e -> return (BGPByteString $ Left (Error (show e)) ))
-             
+
 getNext':: Handle -> IO BGPByteString
 getNext' h = do
     header <- L.hGet h 18
-    if  L.length header < 18 then 
+    if  L.length header < 18 then
         return $ BGPByteString $ Left EndOfStream
     else do
         let (m,l) = L.splitAt 16 header
@@ -58,7 +58,7 @@ getNext' h = do
     getWord16' :: [Word16] -> Word16
     getWord16' (l0:l1:_) = l1 .|. unsafeShiftL l0 8
 
-instance Binary BGPByteString where 
+instance Binary BGPByteString where
 
     put (BGPByteString (Right bs)) | msgLength > 4096 = fail $ "trying to put an overlong BGPByteString, " ++ show msgLength ++ " bytes"
                                    | otherwise = do
@@ -91,7 +91,7 @@ instance {-# OVERLAPPING #-} Binary [BGPByteString] where
 
 -- simple replacement for Binary instance of BGPByteString
 wireFormat :: L.ByteString -> L.ByteString
-wireFormat bs = toLazyByteString $ lazyByteString lBGPMarker <> word16BE (fromIntegral $ 18 + L.length bs) <> lazyByteString bs 
+wireFormat bs = toLazyByteString $ lazyByteString lBGPMarker <> word16BE (fromIntegral $ 18 + L.length bs) <> lazyByteString bs
 
 sndRawMessage :: Handle -> L.ByteString -> IO ()
 sndRawMessage h bgpMsg = L.hPut h $ wireFormat bgpMsg

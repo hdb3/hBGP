@@ -76,7 +76,7 @@ buildPeerConfigs inConfig = inConfig { configOfferedCapabilities = outConfigOffe
 
    outConfigOfferedCapabilities = setAS (configAS inConfig) (configOfferedCapabilities inConfig)
 
-   allPeers = map (fixAS4 inConfig) ( (configConfiguredPeers inConfig) ++ constructedPeers )
+   allPeers = map (fixAS4 inConfig) ( configConfiguredPeers inConfig ++ constructedPeers )
 
    constructedPeers = map ( fillConfig inConfig) (enabledIPv4s \\ configuredIPv4s)
        where
@@ -110,6 +110,6 @@ setASfromConfig config = map setAS'
    -- construct complete peer configurations from bare IPs
 fillConfig :: Config -> IPv4 -> PeerConfig
 fillConfig config ip = defaultPeerConfig { peerConfigIPv4 = ("0.0.0.0",ip)
-                                         , peerConfigOfferedCapabilities = setASfromConfig config $ configOfferedCapabilities config 
+                                         , peerConfigOfferedCapabilities = setASfromConfig config $ configOfferedCapabilities config
                                          , peerConfigRequiredCapabilities = setASfromConfig config $ configRequiredCapabilities config
                                          }

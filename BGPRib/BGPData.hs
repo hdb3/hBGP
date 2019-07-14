@@ -11,7 +11,7 @@ import Data.Hashable
 
 import BGPlib.BGPlib
 
-data GlobalData = GlobalData { myAS :: Word32 
+data GlobalData = GlobalData { myAS :: Word32
                              , myBGPid :: IPv4
                              -- TODO add a default local address - usually is going to be myBGPid but this might not be routable in some cases
                              }

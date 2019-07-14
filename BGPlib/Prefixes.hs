@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveGeneric #-}
 module BGPlib.Prefixes(Prefix,chunkPrefixes,toAddrRange,toPrefix,fromPrefix,fromAddrRange,lengthPrefix) where
+{-# LANGUAGE Strict #-}
 import Data.Binary
 import Data.Hashable
 import GHC.Generics(Generic)
@@ -11,7 +12,6 @@ import Data.Int
 import Data.Bits
 import Data.IP
 import Data.String(IsString,fromString)
-import Control.Monad(liftM)
 
 import BGPlib.LibCommon
 
@@ -34,6 +34,15 @@ newtype Prefix = Prefix Int deriving (Eq,Generic)
 
 toPrefix :: Int -> Prefix
 toPrefix = Prefix
+{-
+data IPrefix = IPrefix {-# UNPACK #-} !Int deriving (Eq,Generic)
+
+toIPrefix :: Int -> IPrefix
+toIPrefix i = IPrefix $! i
+
+mkIPrefix :: Word8 -> Word32 -> IPrefix
+mkIPrefix subnet address = IPrefix $! unsafeShiftL (fromIntegral subnet) 32 .|. fromIntegral address
+-}
 
 mkPrefix :: Word8 -> Word32 -> Prefix
 mkPrefix l v = Prefix $! unsafeShiftL (fromIntegral l) 32 .|. fromIntegral v
@@ -43,6 +52,16 @@ fromPrefix (Prefix pfx) = pfx
 
 lengthPrefix :: Prefix -> Int
 lengthPrefix (Prefix pfx) = fromIntegral $ unsafeShiftR pfx 32
+{-
+unpackIPrefix :: IPrefix -> (Word8,Word32)
+unpackIPrefix (IPrefix w64) = ( fromIntegral $ unsafeShiftR w64 32, fromIntegral $ 0xffffffff .&. w64 )
+
+subnetIPrefix :: IPrefix -> Word8
+subnetIPrefix (IPrefix w64) = fromIntegral $ unsafeShiftR w64 32
+
+addressIPrefix :: IPrefix -> Word32
+addressIPrefix (IPrefix w64) = fromIntegral w64
+-}
 
 addressPrefix :: Prefix -> Word32
 addressPrefix (Prefix pfx) = fromIntegral $ 0xffffffff .&. pfx
@@ -77,7 +96,6 @@ fromAddrRange ar = mkPrefix (fromIntegral subnet) (byteSwap32 $ toHostAddress ip
                    (ip,subnet) = addrRangePair ar
 
 -- binary format for attributes is 1 byte flags, 1 byte type code, 1 or 2 byte length value depending on a flag bit, then payload
-
 {-RFC4271 page 20:
  -
  -          Reachability information is encoded as one or more 2-tuples of
@@ -107,28 +125,18 @@ fromAddrRange ar = mkPrefix (fromIntegral subnet) (byteSwap32 $ toHostAddress ip
 -}
 
 
--- segmentBinaryPrefix :: Int -> L.ByteString -> [L.ByteString]
--- segmentBinaryPrefix n lbs | L.length lbs <= n = [lbs]
-
--- encodedChunkPrefixes n = map encode . chunkPrefixes n . reverse
 chunkPrefixes :: Int64 -> [Prefix] -> [[Prefix]]
-chunkPrefixes n pfxs = let (xl,l,_) = chunkPrefixes' n pfxs in (l : xl)
-chunkPrefixes' n = chunkEnumeratedPrefixes n . enumeratePrefixes
+chunkPrefixes n pfxs = let (xl,l,_) = chunkPrefixes' pfxs in (l : xl)
 
--- chunkEnumeratedPrefixes :: Int -> [(Int,Prefix)] -> ([[Prefix]],[Prefix],Int)
-chunkEnumeratedPrefixes n = foldl f ([],[],0) where
-    f (xl,l,accSize) (size,pfx) | accSize + size <= n = (xl,pfx : l, accSize + size)
-                                | otherwise = (l:xl,[pfx],size)
+    where
+    chunkPrefixes' = chunkEnumeratedPrefixes . enumeratePrefixes
 
--- enumeratePrefixes :: [Prefix] -> [(Int,Prefix)]
-enumeratePrefixes = map (\pfx -> (fromIntegral $ lengthPrefix pfx, pfx))
+    chunkEnumeratedPrefixes = foldl f ([],[],0) where
+        f (xl,l,accSize) (size,pfx) | accSize + size <= n = (xl,pfx : l, accSize + size)
+                                    | otherwise = (l:xl,[pfx],size)
 
-
-
-
-instance {-# OVERLAPPING #-} Binary [Prefix] where
-    put = putn
-    get = getn
+    enumeratePrefixes = map (\pfx -> (getLength pfx, pfx)) where
+        getLength pfx = fromIntegral $ 2 + (lengthPrefix pfx - 1) `div` 8
 
 instance Binary Prefix where
 
@@ -161,9 +169,13 @@ instance Binary Prefix where
             return $ mkPrefix subnet ip
         else if subnet < 25
         then do
-            w16  <- getWord16be
+            w16 <- getWord16be
             w8  <- getWord8
-            let ip = unsafeShiftL (fromIntegral w16  :: Word32) 16 .|.
+            let ip = unsafeShiftL (fromIntegral w16 :: Word32) 16 .|.
                      unsafeShiftL (fromIntegral w8 :: Word32) 8
             return $ mkPrefix subnet ip
         else mkPrefix subnet <$> getWord32be
+
+instance {-# OVERLAPPING #-} Binary [Prefix] where
+    put = putn
+    get = getn

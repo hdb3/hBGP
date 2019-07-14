@@ -98,13 +98,13 @@ addPeer _ peer = do
 
     updateSource <- if testMode == Passive then nullInitSource else initSource peer startPrefix tableSize groupSize burstSize burstDelay oneShotMode repeatDelay
     info $ show thread ++ " - customRib operating in mode: " ++ show testMode
-    mvCRib <- newMVar $ CRib { msgCount = 0
-                             , pullActive = False
-                             , active = False
-                             , firstPull = zeroDay
-                             , lastPull = start
-                             , firstUpdate = undefined
-                             , lastUpdate = undefined  }
+    mvCRib <- newMVar CRib { msgCount = 0
+                           , pullActive = False
+                           , active = False
+                           , firstPull = zeroDay
+                           , lastPull = start
+                           , firstUpdate = undefined
+                           , lastUpdate = undefined  }
 
     return RibHandle{..}
 
@@ -162,14 +162,14 @@ ribPull rh =  do
          )
     updates <- updateSource rh
     if null updates then do
-        when pullActive ( do info $ "ribPull: update stream ended"
+        when pullActive ( do info "ribPull: update stream ended"
                              info $ deltaFirstPull ++ " pull " ++ show ( peer rh)
                         )
         threadDelay $ 10^12 -- should just return if the stream REALYY is empty forever.....
     else do
         slp rh
         setPullActive rh
-        trace $ "ribPull: stream active"
+        trace "ribPull: stream active"
     return updates
 
 msgTimeout :: Int -> IO [a] -> IO [a]

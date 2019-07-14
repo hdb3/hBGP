@@ -36,7 +36,7 @@ import BGPlib.LibCommon
 type ASNumber = Word32
 type ASPath = [ASSegment]
 
-data ASSegment = ASSet [ASNumber] | ASSequence [ASNumber] deriving (Show,Eq,Generic) 
+data ASSegment = ASSet [ASNumber] | ASSequence [ASNumber] deriving (Show,Eq,Generic)
 --instance Hashable ASPath
 instance Hashable ASSegment
 
@@ -55,7 +55,7 @@ isSingletonASSet _ = False
 
 -- i really wanted fmap bu don't know how to make the list a functor....
 -- also this looks like a fold, but.....
---gmap :: (a -> b) -> [ASSegment a] -> [ASSegment b] 
+--gmap :: (a -> b) -> [ASSegment a] -> [ASSegment b]
 --gmap _ [] = []
 --gmap f (ASSet a : ax) = ASSet (fmap f a) : gmap f ax
 --gmap f (ASSequence a : ax) = ASSequence (fmap f a) : gmap f ax
@@ -107,12 +107,12 @@ putASSegmentElement code asns = do putWord8 (encode8 code)
                                    putWord8 (fromIntegral $ length asns)
                                    putn asns
 
-instance Binary ASSegment where 
+instance Binary ASSegment where
 
     put (ASSet asns) = putASSegmentElement EnumASSet asns
     put (ASSequence asns) = putASSegmentElement EnumASSequence asns
 
-    get = label "ASSegment" $ do 
+    get = label "ASSegment" $ do
              code'  <- getWord8
              let code = decode8 code'
              len <- getWord8
@@ -128,7 +128,7 @@ instance Binary ASSegment where
                                          return (asn:asns)
 
 
-decodeAS4 = fromRight' . parseOnly path . L.toStrict 
+decodeAS4 = fromRight' . parseOnly path . L.toStrict
     where
     fromRight' (Right b ) = b
 

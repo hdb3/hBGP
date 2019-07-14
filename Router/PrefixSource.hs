@@ -23,8 +23,8 @@ prefixes startPrefix tableSize groupSize n = (n `div` tableSize, n `mod` tableSi
     where
     group startPrefix groupSize index = map ip4 $ seeds (ip4' ip) groupSize index
     (ip,prefixLength) = addrRangePair startPrefix
-    ip4  =  (flip makeAddrRange) prefixLength . fromHostAddress . byteSwap32 . (flip shiftL) (32-prefixLength)
-    ip4' = (flip shiftR) (32-prefixLength) . byteSwap32 . toHostAddress
+    ip4  =  flip makeAddrRange prefixLength . fromHostAddress . byteSwap32 . flip shiftL (32-prefixLength)
+    ip4' = flip shiftR (32-prefixLength) . byteSwap32 . toHostAddress
     seeds base groupSize index = map (base + index * groupSize +) [0..groupSize-1]
 
 main = do

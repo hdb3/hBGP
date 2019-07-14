@@ -1,4 +1,4 @@
-module Paths_router where
+module Paths_hbgp where
 import Data.Version
 
 version :: Version

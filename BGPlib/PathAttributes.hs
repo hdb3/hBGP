@@ -33,7 +33,7 @@ getPathAttribute :: PathAttributeTypeCode -> [PathAttribute] -> Maybe PathAttrib
 getPathAttribute code pas = find ((code ==) . identify) pas
 
 deletePathAttributeType :: PathAttributeTypeCode -> [PathAttribute] -> [PathAttribute]
-deletePathAttributeType t = filter ( not . (t ==) . identify )
+deletePathAttributeType t = filter ( (t /=) . identify )
 
 insertPathAttribute :: PathAttribute -> [PathAttribute] -> [PathAttribute]
 -- replaces an existing attribute of the same type
@@ -130,12 +130,12 @@ putShortAttributeByteString code b = do putWord8 (flagsOf code)
                                         putWord8 (fromIntegral $ L.length b) -- length of payload
                                         putLazyByteString b
 
--- use for attributes not known to be less than 256 bytes in length 
+-- use for attributes not known to be less than 256 bytes in length
 putFlexAttributeByteString :: PathAttributeTypeCode -> L.ByteString -> Put
 putFlexAttributeByteString code b | L.length b > 255 = putAttributeByteString code b
                                   | otherwise = putShortAttributeByteString code b
 
-instance Binary PathAttribute where 
+instance Binary PathAttribute where
 
     put (PathAttributeOrigin a) = putAttributeWord8 TypeCodePathAttributeOrigin a
     put (PathAttributeNextHop a) = putAttributeWord32 TypeCodePathAttributeNextHop (byteSwap32 $ toHostAddress a)
@@ -159,12 +159,12 @@ instance Binary PathAttribute where
              code'  <- getWord8
              let code = decode8 code'
              len <- if extendedBitTest flags then do l <- getWord16be
-                                                     return (fromIntegral l :: Int)  
+                                                     return (fromIntegral l :: Int)
                                              else do l <- getWord8
-                                                     return (fromIntegral l :: Int)  
+                                                     return (fromIntegral l :: Int)
              unless (flagCheck flags code) (fail $ "Bad Flags - flags=" ++ show flags ++ " code=" ++ show code' ++ " (" ++ show code ++ ")")
 
-             if | TypeCodePathAttributeOrigin == code -> do 
+             if | TypeCodePathAttributeOrigin == code -> do
                  unless (len == 1) (fail "Bad Length")
                  v  <- getWord8
                  unless (v < 3) (fail "Bad Origin Code")
@@ -189,17 +189,17 @@ instance Binary PathAttribute where
                 | TypeCodePathAttributeAtomicAggregate == code -> return PathAttributeAtomicAggregate
 
                 | TypeCodePathAttributeAggregator == code -> do
-                    as <- if (len == 6) then do
+                    as <- if len == 6 then do
                         as2 <- getWord16be
                         return $ fromIntegral as2
-                    else if (len == 8) then
+                    else if len == 8 then
                         getWord32be
-                    else fail $ "Bad length in PathAttributeAggregator: " ++ show len 
+                    else fail $ "Bad length in PathAttributeAggregator: " ++ show len
                     bgpid <- getWord32le
                     return $ PathAttributeAggregator (as,fromHostAddress bgpid)
 
                 | TypeCodePathAttributeCommunities == code -> do
-                    ws <- getMany ( len `div` 4) 
+                    ws <- getMany ( len `div` 4)
                     return $ PathAttributeCommunities ws
 
                 | TypeCodePathAttributeMPREachNLRI == code -> do

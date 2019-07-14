@@ -30,7 +30,7 @@ import BGPlib.BGPlib (Prefix,toPrefix,fromPrefix)
 -- Contrived worst cases could involve huge numbers of transient prefixes, e.g. /32s
 -- This could be mitigated by grooming the table at (quiet) ointervals
 
-type PrefixTableEntry = SL.SortedList RouteData 
+type PrefixTableEntry = SL.SortedList RouteData
 type PrefixTable = IntMap.IntMap PrefixTableEntry
 type PrefixTableElement = (Int,SL.SortedList RouteData)
 
@@ -139,7 +139,7 @@ withdrawPrefixTable pt pfx peer = (pt', wasBestRoute) where
                                routes' = SL.filter (notPeer peer) routes
                            in if null routes' then Nothing else Just routes'
     -- notPeer :: PeerData -> RouteData -> Bool
-    -- notPeer pd rd = pd /= peerData rd 
+    -- notPeer pd rd = pd /= peerData rd
     --oldBestRoute = slHead oldRouteList -- 'head' operation guaranteed safe as long as the precondition that empty prefix list are removed immediately...
     --wasBestRoute = peerData oldBestRoute == peer
     -- oldBestRoute = slHead oldRouteList -- 'head' operation guaranteed safe as long as the precondition that empty prefix list are removed immediately...

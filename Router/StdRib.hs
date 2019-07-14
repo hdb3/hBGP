@@ -19,16 +19,12 @@ addPeer rib peer = do
     return (rib,peer)
 
 ribPush :: RibHandle -> BGPMessage -> IO Bool
---ribPush :: RibHandle -> ParsedUpdate -> IO()
 ribPush _ BGPKeepalive = return True
 ribPush (rib,peer) update = do
     trace $ "ribPush " ++ show peer ++ ":" ++ show update
-    either (\s -> do warn $ s ++ show peer
-                     return False )
-           --(BGPRib.ribPush rib peer >> (return True))
-           (\parsedUpdate -> do BGPRib.ribPush rib peer parsedUpdate
-                                return True)
-           ( processUpdate update )
+    --BGPRib.ribPush rib peer update
+    BGPRib.ribPush rib peer ( parseUpdate update )
+    return True
 
 delPeerByAddress :: Rib -> Word16 -> IPv4 -> IO ()
 delPeerByAddress rib port ip = do
@@ -38,10 +34,9 @@ delPeerByAddress rib port ip = do
     else do
         when ( length peers > 1 ) $ warn $ "delPeerByAddress failed for (multiplepeers!) " ++ show ip ++ ":" ++ show port
         mapM_ (delPeer rib) peers
-    
+
 ribPull :: RibHandle -> IO [BGPMessage]
---ribPull :: RibHandle -> IO [ParsedUpdate]
-ribPull (rib,peer) = pullAllUpdates peer rib >>= updateFromAdjRibEntrys rib peer >>= (pure . encodeUpdates)
+ribPull (rib,peer) = pullAllUpdates peer rib >>= updateFromAdjRibEntrys rib peer >>= (return . map deparseUpdate)
 
 msgTimeout :: Int -> IO [a] -> IO [a]
 msgTimeout t f = fromMaybe [] <$> timeout (1000000 * t) f
@@ -86,7 +81,7 @@ buildUpdate target iprefixes RouteData{..} = if isExternal target then egpUpdate
                            -- setNextHop (nextHop route) $ -- reflector default
                            setNextHop (localIPv4 peerData ) $ -- next hop self!
                            prePendAS ( myAS $ globalData peerData )
-                           pathAttributes 
+                           pathAttributes
                            )
 
 updateFromAdjRibEntrys :: Rib -> PeerData -> [AdjRIBEntry] -> IO [ParsedUpdate]
