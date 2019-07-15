@@ -1,4 +1,4 @@
-module Router.BGPHandle where
+module Router.BGPHandle(BGPIOException(..),BGPHandle,getBGPHandle,bgpSnd,bgpRcv,bgpSndAll,bgpClose) where
 
 import BGPlib.BGPparse(BGPMessage(..),encodeBGPMessage)
 import Network.Socket(Socket,close)
@@ -47,7 +47,6 @@ bgpRcv (BGPHandle stream ioref) _ = do
 
     where
 
-    --getBuf = B.hGetNonBlocking stream 4096
     getBuf = recv stream 4096
 
     complete :: Result BGPMessage -> IO (Result BGPMessage)
@@ -63,34 +62,14 @@ bgpClose (BGPHandle h _ ) = close h
 wireFormat :: L.ByteString -> L.ByteString
 wireFormat bs = toLazyByteString $ lazyByteString (L.replicate 16 0xff) <> word16BE (fromIntegral $ 18 + L.length bs) <> lazyByteString bs 
 
---strictWireFormat :: B.ByteString -> B.ByteString
---strictWireFormat bs = L.toStrict $ toLazyByteString $ byteString (B.replicate 16 0xff) <> word16BE (fromIntegral $ 18 + B.length bs) <> byteString bs 
-
 bgpSnd :: BGPHandle -> BGPMessage -> IO()
-bgpSnd (BGPHandle h _ ) msg | 4079 > lengthEncodedMsg = catchIOError ( sndRawMessage encodedMsg )
-                                                                     (\e -> throw $ BGPIOException (show (e :: IOError)))
-                            | otherwise = error $ "encoded message too long in bgpSnd " ++ show lengthEncodedMsg
-                         where encodedMsg = encodeBGPMessage msg
-                               lengthEncodedMsg = L.length encodedMsg
-                               sndRawMessage bgpMsg = void $ L.send h $ wireFormat bgpMsg
+bgpSnd h m = bgpSndAll h [m]
 
 bgpSndAll :: BGPHandle -> [BGPMessage] -> IO()
 bgpSndAll (BGPHandle h _ ) msgs = catchIOError ( sndRawMessages $ map encode msgs )
                                             (\e -> throw $ BGPIOException (show (e :: IOError)))
     where
-    sndRawMessages bgpMsgs = void $ L.send h $ L.concat $ map wireFormat bgpMsgs
-
-{-
--- keeping this as reference for an exception handler
-bgpRcv :: BGPHandle -> Int -> IO BGPMessage
-bgpRcv (BGPHandle h q ) t | t > 0     = bgpRcv'
-                          | otherwise = error "state machine should never set zero timeout for a handle read"
-    where
-    bgpRcv' = do
-        let
-            exBGPMessage :: SomeException -> IO BGPMessage
-            exBGPMessage e = die $ "exBGPMessage " ++ show e
-
-        rawMsg <- getRawMsg h t
-        handle exBGPMessage ( evaluate $ force $ decodeBGPByteString rawMsg )
--}
+    sndRawMessages bgpMsgs = do let msg = L.concat $ map wireFormat bgpMsgs
+                                -- diagostic for sent message
+                                -- print (length bgpMsgs , L.length msg)
+                                void $ L.sendAll h msg

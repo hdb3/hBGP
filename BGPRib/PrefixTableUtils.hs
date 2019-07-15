@@ -33,6 +33,9 @@ getDB :: PrefixTable -> [(Prefix,[RouteData])]
 getDB pt = map f (toList pt) where
     f (pfx,routes) = (toPrefix pfx,SL.fromSortedList routes)
 
+lengthRIB :: PrefixTable -> Int
+lengthRIB pt = length (toList pt)
+
 getRIB :: PrefixTable -> [(RouteData,Prefix)]
 getRIB pt = map f (toList pt) where
     f (pfx,routes) = (slHead routes , toPrefix pfx)

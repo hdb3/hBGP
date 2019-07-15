@@ -89,7 +89,11 @@ lookupRoutes rib (iprefixes,routeHash) = group_ <$> mapM (\pfx -> (,pfx) <$> adj
 pullAllUpdates :: PeerData -> Rib -> IO [AdjRIBEntry]
 pullAllUpdates peer rib = do
     (Rib' _ arot) <- readMVar rib
-    dequeueAll (arot Data.Map.! peer)
+    --dequeueAll (arot Data.Map.! peer)
+    rval <- dequeueAll (arot Data.Map.! peer)
+    -- diagnostic for sent updates - TODO convert to trace
+    --print $ length rval
+    return rval
 -- TODO write and use the function 'getAdjRibForPeer'
 
 getLocRib :: Rib -> IO PrefixTable
@@ -108,6 +112,8 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
     ribPush' :: PeerData -> ParsedUpdate -> Rib' -> IO Rib'
     ribPush' peerData ParsedUpdate{..} rib0 = do
         rib1 <- ribUpdateMany peerData puPathAttributes hash nlri rib0
+        -- diagnostic for received updates - TODO convert to trace
+        --print (PrefixTableUtils.lengthRIB $ prefixTable rib0 , PrefixTableUtils.lengthRIB $ prefixTable rib1)
         ribWithdrawMany peerData withdrawn rib1
 
     ribUpdateMany :: PeerData -> [PathAttribute] -> Int -> [Prefix] -> Rib' -> IO Rib'
