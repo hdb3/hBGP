@@ -61,7 +61,7 @@ _CapCodeCiscoRefresh = 128
 --see RFC6793
 --the capability is just the local 32bit ASN
 --
-data Capability = CapMultiprotocol Word16 Word8 
+data Capability = CapMultiprotocol Word16 Word8
                 | CapGracefulRestart Bool Word16
                 | CapAS4 Word32
                 | CapRouteRefresh
@@ -158,7 +158,7 @@ buildOptionalParameters capabilities | not $ null capabilities = let caps = L.co
 parseOptionalParameters :: L.ByteString -> [ Capability ]
 
 parseOptionalParameters bs = concatMap (decode . value) capabilityParameters where
-                                 parameters = decode bs :: [TLV] 
+                                 parameters = decode bs :: [TLV]
                                  capabilityParameters = filter ((2 ==) . typeCode) parameters
 
 data TLV = TLV { typeCode :: Word8 , value :: L.ByteString }

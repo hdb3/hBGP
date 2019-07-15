@@ -11,7 +11,7 @@ import Data.Hashable
 
 import BGPlib.BGPlib
 
-data GlobalData = GlobalData { myAS :: Word32 
+data GlobalData = GlobalData { myAS :: Word32
                              , myBGPid :: IPv4
                              -- TODO add a default local address - usually is going to be myBGPid but this might not be routable in some cases
                              }
@@ -25,7 +25,7 @@ data PeerData = PeerData { globalData :: GlobalData
                          ,  peerPort :: Word16
                          ,  localIPv4 :: IPv4
                          ,  localPort :: Word16
-                         ,  localPref :: Word32
+                         ,  peerLocalPref :: Word32
                          }
 
 data RouteData =  RouteData { peerData :: PeerData
@@ -36,13 +36,14 @@ data RouteData =  RouteData { peerData :: PeerData
                             , origin :: Word8
                             , med :: Word32
                             , fromEBGP :: Bool
+                            , localPref :: Word32
                             }
 
 instance Hashable RouteData where
     hashWithSalt _ = routeId
 
 nullRoute :: RouteData
-nullRoute = RouteData undefined undefined 0 undefined undefined undefined undefined undefined
+nullRoute = RouteData undefined undefined 0 undefined undefined undefined undefined undefined undefined
 
 localPeer gd = PeerData { globalData = gd
                     , isExternal = False
@@ -52,7 +53,7 @@ localPeer gd = PeerData { globalData = gd
                     , peerPort  = 0
                     , localIPv4 = "127.0.0.1"
                     , localPort = 0
-                    , localPref = 0
+                    , peerLocalPref = 0
                     }
 
 dummyPeerData :: PeerData
@@ -64,7 +65,7 @@ instance Show PeerData where
     show pd = " peer-AS=" ++ show (peerAS pd) ++ " peer-IP=" ++ show (peerBGPid pd)
 
 instance Show RouteData where
-    show rd = "pathlength=" ++ show (pathLength rd) ++ show (peerData rd)
+    show rd = "pathlength=" ++ show (pathLength rd) ++ "localPref=" ++ show (localPref rd) ++ show (peerData rd)
 
 instance Eq RouteData where
     a == b = routeId a == routeId b
@@ -75,8 +76,7 @@ instance Eq PeerData where
 instance Ord PeerData where
     compare p1 p2 = compare (peerBGPid p1) (peerBGPid p2)
 
--- TODO - LocalPref should be a route not peer level value!!!!!
 instance Ord RouteData where
 
-  compare rd1 rd2 = compare (localPref (peerData rd1), pathLength rd1, origin rd1, med rd1, not $ fromEBGP rd1, peerBGPid (peerData rd1), peerIPv4 (peerData rd1))
-                            (localPref (peerData rd2), pathLength rd2, origin rd2, med rd2, not $ fromEBGP rd2, peerBGPid (peerData rd2), peerIPv4 (peerData rd2))
+  compare rd1 rd2 = compare (localPref rd1, pathLength rd1, origin rd1, med rd1, not $ fromEBGP rd1, peerBGPid (peerData rd1), peerIPv4 (peerData rd1))
+                            (localPref rd2, pathLength rd2, origin rd2, med rd2, not $ fromEBGP rd2, peerBGPid (peerData rd2), peerIPv4 (peerData rd2))

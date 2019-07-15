@@ -18,7 +18,7 @@ import qualified Data.SortedList as SL -- package sorted-list
 import qualified Data.List
 import Data.IP
 
-import BGPlib.BGPlib (IPrefix(..), toPrefix, Prefix)
+import BGPlib.BGPlib (Prefix,toPrefix)
 import BGPRib.Common
 import BGPRib.BGPData
 import BGPRib.PrefixTable(PrefixTable,slHead)
@@ -29,30 +29,27 @@ import BGPRib.PrefixTable(PrefixTable,slHead)
 --
 -- ===================================================
 
-getDB :: PrefixTable -> [(IPrefix,[RouteData])]
+getDB :: PrefixTable -> [(Prefix,[RouteData])]
 getDB pt = map f (toList pt) where
-    f (pfx,routes) = (IPrefix pfx,SL.fromSortedList routes)
+    f (pfx,routes) = (toPrefix pfx,SL.fromSortedList routes)
 
 getRIB :: PrefixTable -> [(RouteData,Prefix)]
-getRIB = map (\(a,b) -> (a,toPrefix b)) . getRIB'
-
-getRIB' :: PrefixTable -> [(RouteData,IPrefix)]
-getRIB' pt = map f (toList pt) where
-    f (pfx,routes) = (slHead routes , IPrefix pfx)
+getRIB pt = map f (toList pt) where
+    f (pfx,routes) = (slHead routes , toPrefix pfx)
 
 getFIB :: PrefixTable -> [(Prefix,IPv4)]
 getFIB pt = map f (getRIB pt) where
     f (route,pfx) = (pfx , nextHop route)
 
-getAdjRIBOut :: PrefixTable -> [(RouteData,[IPrefix])]
-getAdjRIBOut = groupBy_ . getRIB'
+getAdjRIBOut :: PrefixTable -> [(RouteData,[Prefix])]
+getAdjRIBOut = groupBy_ . getRIB
 
 showPrefixTable :: PrefixTable -> String
 showPrefixTable pt = unlines $ map showPrefixTableItem (getDB pt) where
     showPrefixTableItem (k,v) = show k ++ " [" ++ Data.List.intercalate " , " (showRoutes v) ++ "]"
-    showRoutes = map (\route -> ( show.nextHop) route ++ " (" ++ (show.pathLength) route ++ ")" ) 
+    showRoutes = map (\route -> ( show.nextHop) route ++ " (" ++ (show.pathLength) route ++ ")" )
 
 showPrefixTableByRoute :: PrefixTable -> String
-showPrefixTableByRoute = showPrefixTableByRoute' show 
+showPrefixTableByRoute = showPrefixTableByRoute' show
 showPrefixTableByRoute' fr pt = unlines $ map showRoute (getAdjRIBOut pt) where
     showRoute (r,pfxs) = unwords $  fr r : ":" : if length pfxs < 3 then map show pfxs else map show (take 2 pfxs) ++ ["..."]

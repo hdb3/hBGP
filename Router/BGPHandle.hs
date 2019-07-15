@@ -38,7 +38,7 @@ bgpRcv (BGPHandle stream ioref) _ = do
         (Done i r) -> if B.null newBuf then do writeIORef ioref undefined
                                                return BGPEndOfStream
                                        else do writeIORef ioref i
-                                               evaluate $ force r
+                                               evaluate r
         (Partial _) -> error "Partial has been removed already by `g`"
         (Fail _ s sx) -> error $ "parse fail in getNext" ++ show (s,sx)
         -- 'production' version in the event that parse fails actually occur

@@ -63,12 +63,12 @@ bgpParser1 = do
                withdrawnLength <- fromIntegral <$> A.anyWord16be
                withdrawn <- localParsePrefixes withdrawnLength
                pathLength <- fromIntegral <$> A.anyWord16be
-               rawPath <- A.take pathLength
-               let pathHash = fromIntegral $ FarmHash.hash64 rawPath
-                   path = decodeAttributes $ L.fromStrict rawPath
+               rawPath <- L.fromStrict <$> A.take pathLength
+               let --pathHash = fromIntegral $ FarmHash.hash64 rawPath
+                   --path = decodeAttributes $ L.fromStrict rawPath
                    nlriLength = length - withdrawnLength - pathLength - 23
                nlri <- localParsePrefixes nlriLength
-               return $ bgpupdate withdrawn path nlri pathHash
+               return $ bgpupdate withdrawn rawPath nlri
 
             3 -> do
                errorCode <- A.anyWord8
@@ -96,8 +96,10 @@ parseX = parse2 -- this is the case statement parser
 --format1 = ( parseAttributesBS , parsePrefixesBS , Prefix , BGPUpdate )
 --format2 = ( parseAttributesBS , parsePrefixes , Prefix , BGPUpdate2 )
 --format3 = ( parseAttributesBS , parsePrefixes , fromPrefix . Prefix , BGPUpdate3 )
-format4 = ( parseAttributes , parsePrefixes, fromPrefix . Prefix , BGPUpdate)
+--format4 = ( parseAttributes , parsePrefixes, fromPrefix . Prefix , BGPUpdate)
+format4 = ( parseAttributes , parsePrefixes, mkpfx , BGPUpdate)
 
+mkpfx (a,b) = mkPrefix a b 
 --type Prefix = (Word8,Word32)
 -- Attoparsec: Parse Update Prefixes
 -- A list of prefixes is defined by its length in bytes (so misconstructed lists are feasible).

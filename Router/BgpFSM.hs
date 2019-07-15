@@ -13,7 +13,7 @@ import Control.Applicative ((<|>))
 
 import BGPlib.BGPlib
 
-import BGPRib.BGPRib(ParsedUpdate(NullUpdate),decodeUpdate,PeerData(..),myBGPid,myAS)
+import BGPRib.BGPRib(ParsedUpdate(NullUpdate),parseUpdate,PeerData(..),myBGPid,myAS)
 -- TODO = move Update.hs, and ppssibly some or all of BGPData, from bgprib to bgplib, so that bgprib does not need to be imported here.....
 --        the needed thing in BGPData is PeerData, but what else should move to is less obvious
 --        there are some things which any BGP application needs.....
@@ -219,7 +219,7 @@ runFSM g@Global{..} socketName peerName handle =
             peerPort = fromIntegral pp
             localIPv4 = fromHostAddress localIP
             localPort = fromIntegral lp
-            localPref = 0 -- TODO - source this somewhere sensible - config?
+            peerLocalPref = 0 -- TODO - source this somewhere sensible - config?
             isExternal = peerAS /= myAS gd
             peerData = PeerData { .. }
         registerEstablished collisionDetector peerBGPid peerName
@@ -248,7 +248,7 @@ runFSM g@Global{..} socketName peerName handle =
                 -- -- return (Established,st)
 
                 trace "established: BGPUpdate"
-                Rib.ribPush (fromJust ribHandle) (decodeUpdate update)
+                Rib.ribPush (fromJust ribHandle) (parseUpdate update)
                 return (Established,st)
 {-
                 eitherEParsedUpdate <- try $ evaluate $ force $ decodeUpdate update :: IO ( Either SomeException ParsedUpdate )

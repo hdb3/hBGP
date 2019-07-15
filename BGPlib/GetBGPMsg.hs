@@ -3,9 +3,9 @@ module BGPlib.GetBGPMsg where
 
 import System.Timeout(timeout)
 import System.IO.Error(catchIOError)
---import System.IO(Handle)
-import Network.Socket hiding (recv,send)
-import Network.Socket.ByteString.Lazy
+import qualified System.IO as SI
+import qualified Network.Socket as NS
+import Network.Socket.ByteString.Lazy as NSB
 import Data.Bits
 import Data.Binary
 import Data.Binary.Get
@@ -18,49 +18,69 @@ import Data.Monoid((<>))
 
 import BGPlib.LibCommon
 
+type NSSocket = NS.Socket
+type SIHandle = SI.Handle
+
+instance Handle SIHandle where
+    hPut = L.hPut
+    hGet = L.hGet
+hGetRawMsg :: SIHandle -> Int -> IO BGPByteString
+hGetRawMsg = getRawMsg
+
+instance Handle NSSocket where
+    hPut h s = NSB.send h s >> return ()
+    hGet h n = NSB.recv h (fromIntegral n) -- Network.Socket uses Int64 not Int !
+
 lBGPMarker = L.replicate 16 0xff
 _BGPMarker = B.replicate 16 0xff
+
 data RcvStatus =   Timeout | EndOfStream | Error String deriving (Eq,Show)
 
 newtype BGPByteString = BGPByteString (Either RcvStatus L.ByteString) deriving Eq
 
-getRawMsg :: Socket -> Int -> IO BGPByteString
-getRawMsg h t = getNextTimeout t h
+--hGetRawMsg :: SIHandle -> Int -> IO BGPByteString
 
-getNextTimeout :: Int -> Socket -> IO BGPByteString
-getNextTimeout t bsock = let t' = t * 1000000 in
-             do resMaybe <- timeout t' (getNext bsock)
-                maybe
-                    (return (BGPByteString $ Left Timeout ))
-                    return
-                    resMaybe
+class Handle handle where 
+    hPut :: handle -> L.ByteString -> IO ()
+    hGet :: handle -> Int -> IO L.ByteString
 
-getNext:: Socket -> IO BGPByteString
-getNext h = catchIOError (getNext' h)
-                         (\e -> return (BGPByteString $ Left (Error (show e)) ))
-             
-getNext':: Socket -> IO BGPByteString
-getNext' h = do
-    header <- recv h 18
-    if  L.length header < 18 then 
-        return $ BGPByteString $ Left EndOfStream
-    else do
-        let (m,l) = L.splitAt 16 header
-            l' = fromIntegral $ getWord16 l
-        if m /= lBGPMarker then return $ BGPByteString $ Left $ Error "Bad marker in GetBGPByteString"
-        else if l' < 19 || l' > 4096 then return $ BGPByteString $ Left $ Error "Bad length in GetBGPByteString"
+    getRawMsg :: handle -> Int -> IO BGPByteString
+    getRawMsg h t = getNextTimeout t h
+    
+    getNextTimeout :: Int -> handle -> IO BGPByteString
+    getNextTimeout t bsock = let t' = t * 1000000 in
+                 do resMaybe <- timeout t' (getNext bsock)
+                    maybe
+                        (return (BGPByteString $ Left Timeout ))
+                        return
+                        resMaybe
+    
+    getNext:: handle -> IO BGPByteString
+    getNext h = catchIOError (getNext' h)
+                             (\e -> return (BGPByteString $ Left (Error (show e)) ))
+    
+    getNext':: handle -> IO BGPByteString
+    getNext' h = do
+        header <- hGet h 18
+        if  L.length header < 18 then
+            return $ BGPByteString $ Left EndOfStream
         else do
-            let bl = l' - 18
-            body <- recv h bl
-            if  L.length body /= fromIntegral bl then return $ BGPByteString $ Left EndOfStream
-            else return $ BGPByteString $ Right body
-    where
-    getWord16 :: L.ByteString -> Word16
-    getWord16 lbs = getWord16' $ map fromIntegral (L.unpack lbs)
-    getWord16' :: [Word16] -> Word16
-    getWord16' (l0:l1:_) = l1 .|. unsafeShiftL l0 8
+            let (m,l) = L.splitAt 16 header
+                l' = fromIntegral $ getWord16 l
+            if m /= lBGPMarker then return $ BGPByteString $ Left $ Error "Bad marker in GetBGPByteString"
+            else if l' < 19 || l' > 4096 then return $ BGPByteString $ Left $ Error "Bad length in GetBGPByteString"
+            else do
+                let bl = l' - 18
+                body <- hGet h bl
+                if  L.length body /= fromIntegral bl then return $ BGPByteString $ Left EndOfStream
+                else return $ BGPByteString $ Right body
+        where
+        getWord16 :: L.ByteString -> Word16
+        getWord16 lbs = getWord16' $ map fromIntegral (L.unpack lbs)
+        getWord16' :: [Word16] -> Word16
+        getWord16' (l0:l1:_) = l1 .|. unsafeShiftL l0 8
 
-instance Binary BGPByteString where 
+instance Binary BGPByteString where
 
     put (BGPByteString (Right bs)) | msgLength > 4096 = fail $ "trying to put an overlong BGPByteString, " ++ show msgLength ++ " bytes"
                                    | otherwise = do
@@ -93,10 +113,16 @@ instance {-# OVERLAPPING #-} Binary [BGPByteString] where
 
 -- simple replacement for Binary instance of BGPByteString
 wireFormat :: L.ByteString -> L.ByteString
-wireFormat bs = toLazyByteString $ lazyByteString lBGPMarker <> word16BE (fromIntegral $ 18 + L.length bs) <> lazyByteString bs 
+wireFormat bs = toLazyByteString $ lazyByteString lBGPMarker <> word16BE (fromIntegral $ 18 + L.length bs) <> lazyByteString bs
 
-sndRawMessage :: Socket -> L.ByteString -> IO ()
+sndRawMessage :: NSSocket -> L.ByteString -> IO ()
 sndRawMessage h bgpMsg = void $ send h $ wireFormat bgpMsg
 
-sndRawMessages :: Socket -> [L.ByteString] -> IO ()
+sndRawMessages :: NSSocket -> [L.ByteString] -> IO ()
 sndRawMessages h bgpMsgs = void $ send h $ L.concat $ map wireFormat bgpMsgs
+
+hSndRawMessage :: SIHandle -> L.ByteString -> IO ()
+hSndRawMessage h bgpMsg = void $ L.hPut h $ wireFormat bgpMsg
+
+hSndRawMessages :: SIHandle -> [L.ByteString] -> IO ()
+hSndRawMessages h bgpMsgs = void $ L.hPut h $ L.concat $ map wireFormat bgpMsgs

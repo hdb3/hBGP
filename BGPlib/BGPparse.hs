@@ -32,16 +32,12 @@ decodeBGPByteString (BGPByteString (Right lbs)) = decode lbs :: BGPMessage
 data BGPMessage = BGPOpen { myAutonomousSystem :: Word16, holdTime :: Word16, bgpID :: IPv4, caps :: [ Capability ] }
                   | BGPKeepalive
                   | BGPNotify { code :: EnumNotificationCode, subCode :: NotificationSubcode, errorData :: L.ByteString }
-                  -- | BGPNotify { code :: EnumNotificationCode, subCode :: NotificationSubcode, caps :: [ Capability ] }
-                  | BGPUpdate { withdrawn :: [IPrefix], attributes :: [PathAttribute], nlri :: [IPrefix], pathHash :: Int }
-                  -- | BGPUpdate { withdrawn :: L.ByteString, attributes :: L.ByteString, nlri :: L.ByteString }
-                  -- | BGPUpdate2 { withdrawnPrefixes :: [Prefix], attributes :: L.ByteString, nlriPrefixes :: [Prefix] }
-                  -- | BGPUpdate3 { withdrawnIPrefixes :: [IPrefix], attributes :: L.ByteString, nlriIPrefixes :: [IPrefix] }
-                  -- | BGPUpdate4 { withdrawnIPrefixes :: [IPrefix], pathAttributes :: [PathAttribute], nlriIPrefixes :: [IPrefix] }
+                  -- | BGPUpdate { withdrawn :: [Prefix], attributes :: [PathAttribute], nlri :: [Prefix], pathHash :: Int }
+                  | BGPUpdate { withdrawn :: [Prefix], attributes :: L.ByteString, nlri :: [Prefix] }
                   | BGPTimeout
                   | BGPError String
                   | BGPEndOfStream
-                    deriving (Show,Eq,Generic, NFData)
+                    deriving (Show,Eq,Generic)
 
 toAS2 :: Word32 -> Word16
 toAS2 as | as < 0x10000 = fromIntegral as
@@ -81,7 +77,7 @@ instance Binary BGPMessage where
                                                               putWord8 $ fromIntegral $ B.length optionalParameters
                                                               putByteString optionalParameters
 
-    put (BGPUpdate withdrawnRoutes pathAttributes nlri _) = do
+    put (BGPUpdate withdrawnRoutes pathAttributes nlri ) = do
                                                                putWord8 _BGPUpdate
                                                                putWord16be withdrawnRoutesLength
                                                                putLazyByteString withdrawnRoutesBS

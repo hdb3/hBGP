@@ -19,7 +19,7 @@ bgpMsgReader path = do
     return bgpMessages
 
 bgpUpdateMsgReader :: FilePath -> IO [ParsedUpdate]
-bgpUpdateMsgReader = fmap ( map decodeUpdate . filter isUpdate ) . bgpMsgReader
+bgpUpdateMsgReader = fmap ( map parseUpdate . filter isUpdate ) . bgpMsgReader
 
 bgpReader :: FilePath -> IO [(BGPRib.RouteData, Prefix)]
 bgpReader path = do
@@ -42,7 +42,7 @@ readRib :: IO [((Int, [PathAttribute]), Prefix)]
 readRib = readUngroupedRib
 
 readUngroupedRib :: IO [((Int, [PathAttribute]), Prefix)]
-readUngroupedRib = fmap ( map normalise ) readRib' 
+readUngroupedRib = fmap ( map normalise ) readRib'
 
 readGroupedRib :: IO [((Int, [PathAttribute]), [Prefix])]
 readGroupedRib = fmap (map normalise . applyBogonFilter . groupBy_) readRib'

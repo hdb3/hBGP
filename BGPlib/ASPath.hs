@@ -42,10 +42,10 @@ class (Eq a, Num a, Integral a, Show a, Read a, Binary a) => ASNumber a where
 
 instance ASNumber Word16 where
 instance ASNumber Word32 where
-data ASPath = ASPath2 [ASSegment Word16] | ASPath4 [ASSegment Word32] deriving (Show,Eq,Generic,NFData)
+data ASPath = ASPath2 [ASSegment Word16] | ASPath4 [ASSegment Word32] deriving (Show,Eq,Generic)
 
 instance Hashable ASPath
-data ASSegment asn = ASSet [asn] | ASSequence [asn] deriving (Show,Eq,Generic,NFData)
+data ASSegment asn = ASSet [asn] | ASSequence [asn] deriving (Show,Eq,Generic)
 
 instance Hashable ( ASSegment Word16 )
 instance Hashable ( ASSegment Word32 )
@@ -65,7 +65,7 @@ instance Functor ASSegment where
 
 -- i really wanted fmap bu don't know how to make the list a functor....
 -- also this looks like a fold, but.....
-gmap :: (a -> b) -> [ASSegment a] -> [ASSegment b] 
+gmap :: (a -> b) -> [ASSegment a] -> [ASSegment b]
 gmap _ [] = []
 gmap f (ASSet a : ax) = ASSet (fmap f a) : gmap f ax
 gmap f (ASSequence a : ax) = ASSequence (fmap f a) : gmap f ax
@@ -117,12 +117,12 @@ decodeAsASPath2 bytes = ASPath2 (decode bytes)
 decodeAsASPath4 :: L.ByteString -> ASPath
 decodeAsASPath4 bytes = ASPath4 (decode bytes)
 
-instance (ASNumber asn) => Binary (ASSegment asn) where 
+instance (ASNumber asn) => Binary (ASSegment asn) where
 
     put (ASSet asns) = putASSegmentElement EnumASSet asns
     put (ASSequence asns) = putASSegmentElement EnumASSequence asns
 
-    get = label "ASSegment" $ do 
+    get = label "ASSegment" $ do
              code'  <- getWord8
              let code = decode8 code'
              len <- getWord8
@@ -140,7 +140,7 @@ instance (ASNumber asn) => Binary (ASSegment asn) where
 
 
 
-decodeAS4 = fromRight' . parseOnly path . L.toStrict 
+decodeAS4 = fromRight' . parseOnly path . L.toStrict
     where
     fromRight' (Right b ) = b
 

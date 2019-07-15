@@ -31,10 +31,10 @@ redistribute global@Global{..} = do
 
             let routeInstall (route, nextHop) = do
                     trace $ "install " ++ show route ++ " via " ++ show nextHop
-                    addRoute zStreamOut (toAddrRange $ toPrefix route) nextHop
+                    addRoute zStreamOut (toAddrRange route) nextHop
                 routeDelete route = do
                     trace $ "delete " ++ show route
-                    delRoute zStreamOut (toAddrRange $ toPrefix route)
+                    delRoute zStreamOut (toAddrRange route)
 
             ribUpdateListener (routeInstall,routeDelete) global ( localPeer gd ) 1
 
@@ -43,7 +43,7 @@ ribUpdateListener (routeInstall,routeDelete) global@Global{..} peer timeout = do
     updates <- Rib.msgTimeout timeout (pullAllUpdates peer rib)
     if null updates then
         yield -- null op - could check if exit from thread is needed...
-    else do 
+    else do
         trace $ show (length updates) ++ " updates for " ++ show peer
         let (update,withdraw) = foldl disc ([],[]) updates
             disc (u,w) (pfxs,0) = (u,w++pfxs) -- withdraw has 0 for the route index
@@ -66,10 +66,8 @@ zservReader Global{..} peer ( zStreamIn, zStreamOut ) = do
     loop stream = do
         msg <- Streams.read stream
         maybe ( trace "end of messages")
-              ( \zMsg -> do 
-                              -- print zMsg
+              ( \zMsg -> do
                               maybe (trace "--")
-                                    -- (\s -> putStrLn $ "local route:" ++ show s)
                                     (\(pfx,maybeNH) -> maybe (do trace $ "delete route: " ++ show pfx
                                                                  Rib.delRouteRib rib peer pfx )
                                                              (\nh -> do trace $ "add route: " ++ show pfx ++ " via " ++ show nh
@@ -78,8 +76,6 @@ zservReader Global{..} peer ( zStreamIn, zStreamOut ) = do
 
                                     )
                                     ( getZRoute zMsg )
-                              -- let route = getZRoute zMsg
-                              -- print route
                               loop stream )
               msg
 

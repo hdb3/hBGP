@@ -10,9 +10,6 @@ applyBogonFilter = filter p . map f where
     p (_,[])   = False
     p _          = True
 
-iPrefixBogonFilter :: IPrefix -> Bool
-iPrefixBogonFilter = bogonFilter . toPrefix
-
 -- ref https://www.iana.org/assignments/iana-ipv4-special-registry/iana-ipv4-special-registry-1.csv
 bogonFilter :: Prefix -> Bool
 bogonFilter pfx
@@ -44,5 +41,4 @@ bogonFilter pfx
                 | 0 == s = False
                 | otherwise = True
     where ip = toAddrRange pfx
-          s  = subnetOf pfx
-
+          s  = lengthPrefix pfx

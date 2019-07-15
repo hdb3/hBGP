@@ -84,7 +84,7 @@ session port defaultApp localIPv4 peers enableInbound = do
     raceCheck blocking mapMVar address = do
     -- get the specific MVar out of the Map
     -- if it doesn't exist then insert it and take it
-    -- this is non-blocking so if it does exist but is empty then just exit 
+    -- this is non-blocking so if it does exist but is empty then just exit
         -- threadId <- myThreadId
         map <- takeMVar mapMVar
         let maybePeerMVar = Data.Map.lookup address map
@@ -118,7 +118,7 @@ listener state@State{..} = do
                                                forkIO $ listenClient s ))
         eSock
     where
-    
+
     bindSock' port ip = do
         sock <- NS.socket NS.AF_INET NS.Stream NS.defaultProtocol
         NS.setSocketOption sock NS.ReuseAddr 1
@@ -127,19 +127,19 @@ listener state@State{..} = do
         NS.listen sock 100
         return ( sock , addr )
 
-    
+
     listenClient (sock, NS.SockAddrInet _ remoteHostAddress) = do
             ( NS.SockAddrInet _ localHostAddress ) <- NS.getSocketName sock
             let addressPair = ( fromHostAddress localHostAddress ,fromHostAddress remoteHostAddress)
             logger $ "listener - connect request (src/dst): " ++ show addressPair
             unblocked <- raceCheckNonBlock addressPair
             if unblocked then do
-                wrap state defaultApp sock 
+                wrap state defaultApp sock
                 raceCheckUnblock addressPair
             else do
                 logger "listener - connect reject due to race"
                 NS.close sock
-    
+
 wrap :: State -> ((NS.Socket, NS.SockAddr) -> IO a) -> NS.Socket -> IO ()
 wrap State{..} app sock = do
     peerAddress <- NS.getPeerName sock

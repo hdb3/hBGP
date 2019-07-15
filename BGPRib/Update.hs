@@ -1,6 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
-module BGPRib.Update(decodeUpdate,modifyPathAttributes,endOfRib,encodeUpdates,ungetUpdate,ParsedUpdate(..),makeUpdate,makeUpdateSimple,igpUpdate,originateWithdraw,originateUpdate,myHash) where
+module BGPRib.Update(modifyPathAttributes,endOfRib,parseUpdate,deparseUpdate,ParsedUpdate(..),makeUpdate,makeUpdateSimple,igpUpdate,originateWithdraw,originateUpdate,myHash) where
 import qualified Data.ByteString.Lazy as L
 import Data.Int
 import Data.Binary
@@ -14,39 +13,30 @@ import BGPRib.Common
 myHash :: L.ByteString -> Int
 myHash = fromIntegral . hash64 . L.toStrict
 
-data ParsedUpdate = ParsedUpdate { puPathAttributes :: [PathAttribute], nlri :: [Prefix], withdrawn :: [Prefix], hash :: Int } | NullUpdate deriving ( Show , Generic, NFData)
-
--- TODO eliminate ParsedUpdate entirely as it is now just a shadow of BGPMessage
-decodeUpdate :: BGPMessage -> ParsedUpdate
-decodeUpdate BGPUpdate{..} = ParsedUpdate { puPathAttributes = attributes 
-                                          , nlri = toPrefixes nlri 
-                                          , withdrawn = toPrefixes withdrawn
-                                          , hash = pathHash
-                                          }
+data ParsedUpdate = ParsedUpdate { puPathAttributes :: [PathAttribute], nlri :: [Prefix], withdrawn :: [Prefix], hash :: Int } | NullUpdate deriving Show
 
 modifyPathAttributes :: ([PathAttribute] -> [PathAttribute]) -> ParsedUpdate -> ParsedUpdate
 modifyPathAttributes f pu = pu { puPathAttributes = f $ puPathAttributes pu }
 
-encodeUpdates :: [ParsedUpdate] -> [BGPMessage]
-encodeUpdates = map ungetUpdate
-
--- TODO rename getUpdate/ungetUpdate encodeUpdate/decodeUpdate
-ungetUpdate :: ParsedUpdate -> BGPMessage
-ungetUpdate ParsedUpdate{..} = BGPUpdate { withdrawn = fromPrefixes withdrawn , attributes = puPathAttributes , nlri = fromPrefixes nlri, pathHash = hash } 
+deparseUpdate :: ParsedUpdate -> BGPMessage
+deparseUpdate ParsedUpdate{..} = BGPUpdate { withdrawn = withdrawn , attributes = encode puPathAttributes , nlri = nlri }
 
 endOfRib :: BGPMessage
---endOfRib = BGPUpdate { withdrawn = L.empty , attributes = L.empty , nlri = L.empty }
-endOfRib = BGPUpdate { withdrawn = [] , attributes = [] , nlri = [], pathHash = 0 }
+endOfRib = BGPUpdate { withdrawn = [] , attributes = L.empty , nlri = [] }
 
-originateWithdraw prefixes = ParsedUpdate []  [] prefixes 0
+parseUpdate :: BGPMessage -> ParsedUpdate
+parseUpdate BGPUpdate{..} = ParsedUpdate { puPathAttributes = decode attributes , nlri = nlri , withdrawn = withdrawn , hash = myHash attributes }
+
+originateWithdraw prefixes = ParsedUpdate [] [] prefixes 0
 
 originateUpdate :: Word8 -> [ASSegment Word32] -> IPv4 -> [Prefix] -> ParsedUpdate
-originateUpdate origin path nextHop prefixes = ParsedUpdate attributes prefixes [] hash where
-    attributes = [PathAttributeOrigin origin, PathAttributeASPath (ASPath4 path), PathAttributeNextHop nextHop]
-    hash = myHash $ encode attributes
+originateUpdate origin path nextHop prefixes =
+     head $ makeUpdate prefixes
+                       []
+                       [PathAttributeOrigin origin, PathAttributeASPath (ASPath4 path), PathAttributeNextHop nextHop]
 
 makeUpdateSimple :: [PathAttribute] -> [Prefix] -> [Prefix] -> ParsedUpdate
-makeUpdateSimple p n w  = head $ makeUpdate n w p
+makeUpdateSimple p n w = head $ makeUpdate n w p
 
 makeUpdate :: [Prefix] -> [Prefix] -> [PathAttribute] -> [ParsedUpdate]
 makeUpdate = makeSegmentedUpdate
