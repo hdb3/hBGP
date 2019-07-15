@@ -66,6 +66,8 @@ isUpdate _ = False
 instance {-# OVERLAPPING #-} Binary [BGPMessage] where
     put _ = error "it would not make sense to encode BGPmessage list without a wireformat envelope"
 
+encodeBGPMessage :: BGPMessage -> L.ByteString
+encodeBGPMessage = encode
 instance Binary BGPMessage where
 
     put (BGPOpen myAutonomousSystem holdTime bgpID caps) = do putWord8 _BGPOpen
@@ -82,14 +84,14 @@ instance Binary BGPMessage where
                                                                putWord16be withdrawnRoutesLength
                                                                putLazyByteString withdrawnRoutesBS
                                                                putWord16be pathAttributesLength
-                                                               putLazyByteString pathAttributesBS
+                                                               putLazyByteString pathAttributes
                                                                putLazyByteString nlriBS
                                                                where
                                                                    withdrawnRoutesBS = encode withdrawnRoutes
-                                                                   pathAttributesBS = encode pathAttributes
+                                                                   --pathAttributesBS = encode pathAttributes
                                                                    nlriBS = encode nlri
                                                                    withdrawnRoutesLength = fromIntegral $ L.length withdrawnRoutesBS
-                                                                   pathAttributesLength = fromIntegral $ L.length pathAttributesBS
+                                                                   pathAttributesLength = fromIntegral $ L.length pathAttributes
 
     put (BGPNotify code subCode errData) = do putWord8 _BGPNotify
                                               putWord8 $ encode8 code

@@ -1,6 +1,6 @@
 module Router.BGPHandle where
 
-import BGPlib.BGPparse(BGPMessage(..))
+import BGPlib.BGPparse(BGPMessage(..),encodeBGPMessage)
 import Network.Socket(Socket,close)
 import Network.Socket.ByteString(recv)
 import System.IO.Error(catchIOError)
@@ -70,7 +70,7 @@ bgpSnd :: BGPHandle -> BGPMessage -> IO()
 bgpSnd (BGPHandle h _ ) msg | 4079 > lengthEncodedMsg = catchIOError ( sndRawMessage encodedMsg )
                                                                      (\e -> throw $ BGPIOException (show (e :: IOError)))
                             | otherwise = error $ "encoded message too long in bgpSnd " ++ show lengthEncodedMsg
-                         where encodedMsg = encode msg
+                         where encodedMsg = encodeBGPMessage msg
                                lengthEncodedMsg = L.length encodedMsg
                                sndRawMessage bgpMsg = void $ L.send h $ wireFormat bgpMsg
 
