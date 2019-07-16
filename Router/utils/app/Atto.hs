@@ -22,7 +22,7 @@ main' = do
 
 parseCheck p bs = do
     --result <- return $ parseOnly p bs
-    result <- evaluate $ force $ parseOnly p bs
+    result <- evaluate $ parseOnly p bs
     either (\s -> putStrLn $ "parse failed: " ++ s)
            (\msgs -> putStrLn $ "read " ++ show (length msgs) ++ " messages from " ++ show (B.length bs) ++ " bytes" )
            result
@@ -32,7 +32,7 @@ parse_ p bs = either fail
                      ( parseOnly p bs )
 
 keepAlive = toStrict $ wireFormat $ encode BGPKeepalive
-mkUpdate a b c = toStrict $ wireFormat $ encode $ ungetUpdate $ makeUpdateSimple a b c
+mkUpdate a b c = toStrict $ wireFormat $ encode $ deparseUpdate $ makeUpdateSimple a b c
 update1 = mkUpdate [] ["192.168.0.0/16"] []
 update2 = mkUpdate [] ["192.168.0.0/16"] ["192.168.1.0/24"]
 update3 = mkUpdate [] [] []

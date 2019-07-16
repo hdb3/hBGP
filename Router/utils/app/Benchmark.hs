@@ -161,7 +161,7 @@ test2 = do
     t2 <- stopwatch "after wireformat parse" t0 t1
     let
         bgpMessages = map decodeBGPByteString bgpByteStrings
-        updates = map BGPRib.decodeUpdate $ filter isUpdate bgpMessages
+        updates = map BGPRib.parseUpdate $ filter isUpdate bgpMessages
     rib <- BGPRib.newRib BGPRib.dummyPeerData
     mapM_ (updateRib rib) updates
     stopwatch "after full (?) parse into rib" t0 t2

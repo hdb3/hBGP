@@ -31,37 +31,23 @@ import BGPlib.LibCommon
 -- todo make this Word64 not Int?
 newtype Prefix = Prefix Int deriving (Eq,Generic)
 
+{-# INLINE toPrefix #-}
 toPrefix :: Int -> Prefix
 toPrefix = Prefix
-{-
-data IPrefix = IPrefix {-# UNPACK #-} !Int deriving (Eq,Generic)
 
-toIPrefix :: Int -> IPrefix
-toIPrefix i = IPrefix $! i
-
-mkIPrefix :: Word8 -> Word32 -> IPrefix
-mkIPrefix subnet address = IPrefix $! unsafeShiftL (fromIntegral subnet) 32 .|. fromIntegral address
--}
-
+{-# INLINE mkPrefix #-}
 mkPrefix :: Word8 -> Word32 -> Prefix
 mkPrefix l v = Prefix $! unsafeShiftL (fromIntegral l) 32 .|. fromIntegral v
 
+{-# INLINE fromPrefix #-}
 fromPrefix :: Prefix -> Int
 fromPrefix (Prefix pfx) = pfx
 
+{-# INLINE lengthPrefix #-}
 lengthPrefix :: Prefix -> Int
 lengthPrefix (Prefix pfx) = fromIntegral $ unsafeShiftR pfx 32
-{-
-unpackIPrefix :: IPrefix -> (Word8,Word32)
-unpackIPrefix (IPrefix w64) = ( fromIntegral $ unsafeShiftR w64 32, fromIntegral $ 0xffffffff .&. w64 )
 
-subnetIPrefix :: IPrefix -> Word8
-subnetIPrefix (IPrefix w64) = fromIntegral $ unsafeShiftR w64 32
-
-addressIPrefix :: IPrefix -> Word32
-addressIPrefix (IPrefix w64) = fromIntegral w64
--}
-
+{-# INLINE addressPrefix #-}
 addressPrefix :: Prefix -> Word32
 addressPrefix (Prefix pfx) = fromIntegral $ 0xffffffff .&. pfx
 
@@ -87,9 +73,11 @@ shortenLim l pfxs = if length pfxs < (l+1) then realShow pfxs else show (take l 
 -- shorten pfxs = if length pfxs < 3 then realShow pfxs else show (take 2 pfxs) ++ "(+" ++ show (length pfxs - 2) ++ ")"
 shorten = shortenLim 4
 
+{-# INLINE toAddrRange #-}
 toAddrRange :: Prefix -> AddrRange IPv4
 toAddrRange pfx = makeAddrRange (fromHostAddress $ byteSwap32 $ addressPrefix pfx) (lengthPrefix pfx)
 
+{-# INLINE fromAddrRange #-}
 fromAddrRange :: AddrRange IPv4 -> Prefix
 fromAddrRange ar = mkPrefix (fromIntegral subnet) (byteSwap32 $ toHostAddress ip) where
                    (ip,subnet) = addrRangePair ar

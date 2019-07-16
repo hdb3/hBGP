@@ -100,8 +100,8 @@ instance Binary BGPMessage where
 
     put BGPKeepalive                                = putWord8 _BGPKeepalive
 
-    get = undefined
-{-
+    --get = undefined
+
     get = label "BGPMessage" $ do
              msgType <- getWord8
              if | _BGPOpen == msgType -> do
@@ -121,7 +121,7 @@ instance Binary BGPMessage where
                                            pathAttributesLength <- getWord16be
                                            pathAttributes <- getLazyByteString $ fromIntegral pathAttributesLength
                                            nlri <- getRemainingLazyByteString
-                                           return $ BGPUpdate withdrawnRoutes pathAttributes nlri
+                                           return $ BGPUpdate (decode withdrawnRoutes) pathAttributes (decode nlri)
                 | _BGPNotify == msgType -> do
                                            errorCode <- getWord8
                                            errorSubcode <- getWord8
@@ -132,4 +132,3 @@ instance Binary BGPMessage where
                                            return $ BGPNotify (decode8 errorCode) errorSubcode errorData
                 | _BGPKeepalive == msgType -> return BGPKeepalive
                 | otherwise -> fail "Bad type code"
--}

@@ -27,14 +27,13 @@ analyseMessageTypes msgs = do
 
 analysePrefixes msgs = do
     let prefixes = foldl f (0,0) msgs
-        prefixCount bs = length (decode bs :: [Prefix]) 
-        f (u,w) BGPUpdate{..} = ( u + prefixCount nlri , w + prefixCount withdrawn )
+        --prefixCount bs = length (decode bs :: [Prefix]) 
+        f (u,w) BGPUpdate{..} = ( u + length nlri , w + length withdrawn )
         f (u,w) _ = (u,w)
     putStrLn $ "count (update,withdrawn) = " ++ show prefixes
 
 getUpdateHashes :: BGPMessage -> (Int,Int,Int)
 getUpdateHashes msg@BGPUpdate{..} = (hashPrefixList nlri, hashPrefixList withdrawn, myHash attributes)
 
-hashPrefixList :: Data.ByteString.Lazy.ByteString -> Int
-hashPrefixList = Data.Hashable.hash . decodePrefixes
-    where decodePrefixes bs = decode bs :: [Prefix]
+hashPrefixList :: [Prefix] -> Int
+hashPrefixList = Data.Hashable.hash
