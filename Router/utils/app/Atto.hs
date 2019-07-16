@@ -10,7 +10,6 @@ import Data.Attoparsec.ByteString
 import Data.Binary
 import System.Environment(getArgs)
 import Control.Exception(evaluate)
-import Control.DeepSeq(force)
 import System.Exit
 import Data.Either(fromRight)
 

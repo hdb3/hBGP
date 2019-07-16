@@ -20,7 +20,7 @@ main = do
     args <- getArgs
     if null args then putStrLn "?"
     else do
-        putStrLn $ "\n*** " ++ (head args) ++ " ***\n"
+        putStrLn $ "\n*** " ++ head args ++ " ***\n"
 
         h <- openFile (head args) ReadMode -- (head args)
         ior <- newIORef B.empty :: IO (IORef B.ByteString)
@@ -44,7 +44,7 @@ collect eos p stream ioref = go []
     where
     go l = do
         next <- getNext p stream ioref
-        either (\left -> return $ (left,l))
+        either (\left -> return (left,l))
                (\right -> if eos right then nullStatus l else go (right:l))
                next
 

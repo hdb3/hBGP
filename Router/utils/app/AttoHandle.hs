@@ -5,7 +5,6 @@ import qualified Data.ByteString as B
 import Data.Attoparsec.ByteString
 import System.Environment(getArgs)
 import Control.Exception(evaluate)
-import Control.DeepSeq(force)
 import System.IO
 import Data.IORef
 
