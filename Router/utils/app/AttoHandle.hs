@@ -20,7 +20,7 @@ main = do
     else do
         let fname = head args
         putStrLn $ "\n*** " ++ fname ++ " ***\n"
-        timeIO "parseCheck terminatingWireParser" $ openFile fname ReadMode >>= bgpHandle >>= readMsgs
+        timeIO "parseCheck terminatingBGPParser" $ openFile fname ReadMode >>= bgpHandle >>= readMsgs
 
 readMsgs :: BGPHandle -> IO ()
 readMsgs h = do
@@ -51,7 +51,8 @@ getNext (BGPHandle stream ioref) = do
 
     oldBuf <- readIORef ioref
     newBuf <- if B.null oldBuf then getBuf else return oldBuf
-    result <- complete ( parse terminatingBGPParser newBuf )
+    -- result <- complete ( parse terminatingBGPParser newBuf )
+    result <- complete ( parse bgpParser1 newBuf )
     case result of
         (Done i r) -> if B.null newBuf then do writeIORef ioref undefined
                                                return BGPEndOfStream

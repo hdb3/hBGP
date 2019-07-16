@@ -5,7 +5,6 @@ import qualified Data.ByteString as B
 import Data.Attoparsec.ByteString
 import System.Environment(getArgs)
 import Control.Exception(evaluate)
-import Control.DeepSeq(force,NFData)
 import System.IO
 import Data.IORef
 
@@ -13,7 +12,7 @@ import Stopwatch
 
 parseCheck eos p stream ioref = do
     (status, msgs) <- collect eos p stream ioref
-    msgs' <- evaluate $ force msgs
+    msgs' <- evaluate msgs
     putStrLn $ "read " ++ show (length msgs') ++ " messages"
     putStrLn $ "exit status: " ++ show status
 
@@ -31,7 +30,8 @@ main = do
         h <- openFile (head args) ReadMode -- (head args)
         ior <- newIORef B.empty :: IO (IORef B.ByteString)
 
-        timeIO "parseCheck terminatingBGPParser" $ parseCheck eosBGPParser terminatingBGPParser h ior
+        timeIO "parseCheck terminatingBGPParser" $ parseCheck eosBGPParser bgpParser1 h ior
+        --timeIO "parseCheck terminatingBGPParser" $ parseCheck eosBGPParser terminatingBGPParser h ior
 
 --getBuf h = B.hGetNonBlocking h 1024
 getBuf h = B.hGetNonBlocking h (1024*1024)
@@ -39,7 +39,7 @@ getBuf h = B.hGetNonBlocking h (1024*1024)
 nullStatus :: [a] -> IO (([String], String),[a])
 nullStatus ax = return (([],""),ax)
 
-collect :: (Control.DeepSeq.NFData a) => (a -> Bool) -> Parser a -> Handle -> IORef B.ByteString -> IO (([String], String),[a])
+collect :: (a -> Bool) -> Parser a -> Handle -> IORef B.ByteString -> IO (([String], String),[a])
 collect eos p stream ioref = go []
     where
     go l = do
@@ -48,7 +48,7 @@ collect eos p stream ioref = go []
                (\right -> if eos right then nullStatus l else go (right:l))
                next
 
-getNext :: (Control.DeepSeq.NFData a) => Parser a -> Handle -> IORef B.ByteString -> IO ( Either ([String], String)  a)
+getNext :: Parser a -> Handle -> IORef B.ByteString -> IO ( Either ([String], String)  a)
 getNext p stream ioref = do
 
     oldBuf <- readIORef ioref
@@ -57,7 +57,7 @@ getNext p stream ioref = do
     result' <- g (getBuf stream) result
     case result' of
         (Done i r) -> do if B.null newBuf then writeIORef ioref undefined else writeIORef ioref i
-                         evaluate $ force $ Right r
+                         evaluate $ Right r
                          --return $ Right r
         (Partial cont) -> error "Partial has been removed already by `g`"
         (Fail _ s sx) -> return $ Left (s,sx)
