@@ -10,12 +10,12 @@ import Control.Monad(unless)
 import BGPlib.Capabilities(parseOptionalParameters)
 import BGPlib.LibCommon(decode8,fromHostAddress)
 import BGPlib.Prefixes
-import BGPlib.PathAttributes
+--import BGPlib.PathAttributes
 import BGPlib.BGPparse(BGPMessage(..))
 import Data.Word
 import Data.Bits
 import Control.Applicative((<|>))
-import FarmHash(hash64)
+--import FarmHash(hash64)
 
 terminatingWireParser = wireParser1 <|> return B.empty
 eosWireParser = B.null
@@ -39,6 +39,8 @@ bgpParser = A.many' bgpParser1 A.<?>  "BGP intermediate format Parser"
 
 terminatingBGPParser = bgpParser1 <|> return BGPEndOfStream
 eosBGPParser msg = BGPEndOfStream == msg
+
+{-# INLINE bgpParser1 #-}
 bgpParser1 :: Parser BGPMessage
 bgpParser1 = do
     A.string $ B.replicate 16 0xff
@@ -61,14 +63,12 @@ bgpParser1 = do
 
             2 -> do
                withdrawnLength <- fromIntegral <$> A.anyWord16be
-               withdrawn <- localParsePrefixes withdrawnLength
+               withdrawn <- parsePrefixes withdrawnLength
                pathLength <- fromIntegral <$> A.anyWord16be
                rawPath <- L.fromStrict <$> A.take pathLength
-               let --pathHash = fromIntegral $ FarmHash.hash64 rawPath
-                   --path = decodeAttributes $ L.fromStrict rawPath
-                   nlriLength = length - withdrawnLength - pathLength - 23
-               nlri <- localParsePrefixes nlriLength
-               return $ bgpupdate withdrawn rawPath nlri
+               let nlriLength = length - withdrawnLength - pathLength - 23
+               nlri <- parsePrefixes nlriLength
+               return $ BGPUpdate withdrawn rawPath nlri
 
             3 -> do
                errorCode <- A.anyWord8
@@ -79,28 +79,14 @@ bgpParser1 = do
             4 -> if length == 19 then return BGPKeepalive else fail "invalid length in KeepAlive"
             _ -> fail $ "invalid type code (" ++ show typeCode ++ ")"
 
-parseAttributes l = decodeAttributes . L.fromStrict <$> A.take l
-parseAttributesBS l = L.fromStrict <$> A.take l
-parsePrefixesBS l = L.fromStrict <$> A.take l
---parseAttributes = decodeAttributes . L.fromStrict
---localParseAttributes = parseAttributesBS -- enable the minimal parser
-
-
--- chooinsg different versions of the prefix parser via parseX:
+-- choosing different versions of the prefix parser via parseX:
 
 --parseX = inline parse1 -- this is the original recursive parser
 parseX = parse2 -- this is the case statement parser
 --parseX = inline parse3 -- this is the simplified version of parse2
-(localParseAttributes, localParsePrefixes, prefixBuilder, bgpupdate) = format4
 
---format1 = ( parseAttributesBS , parsePrefixesBS , Prefix , BGPUpdate )
---format2 = ( parseAttributesBS , parsePrefixes , Prefix , BGPUpdate2 )
---format3 = ( parseAttributesBS , parsePrefixes , fromPrefix . Prefix , BGPUpdate3 )
---format4 = ( parseAttributes , parsePrefixes, fromPrefix . Prefix , BGPUpdate)
-format4 = ( parseAttributes , parsePrefixes, mkpfx , BGPUpdate)
+prefixBuilder (a,b) = mkPrefix a b 
 
-mkpfx (a,b) = mkPrefix a b 
---type Prefix = (Word8,Word32)
 -- Attoparsec: Parse Update Prefixes
 -- A list of prefixes is defined by its length in bytes (so misconstructed lists are feasible).
 -- Thus a recursive parser must propagate the remaining buffer size.
@@ -158,9 +144,9 @@ parse1 byteLength = flip unsafeShiftL ( 8 * (4 - byteLength) ) <$> parse1a 0 byt
 parse2 :: Int -> Parser Word32
 parse2 k = case k of
     0 -> return 0
-    1 -> ( flip unsafeShiftL 24 . fromIntegral ) <$>  A.anyWord8
-    2 -> ( flip unsafeShiftL 16 . fromIntegral ) <$>  A.anyWord16be
-    3 -> ( flip unsafeShiftL 8 . fromIntegral ) <$>  anyWord24be
+    1 ->  flip unsafeShiftL 24 . fromIntegral <$>  A.anyWord8
+    2 ->  flip unsafeShiftL 16 . fromIntegral <$>  A.anyWord16be
+    3 ->  flip unsafeShiftL 8 . fromIntegral <$>  anyWord24be
     4 -> A.anyWord32be
     _ -> fail "impossible prefix length"
     where
