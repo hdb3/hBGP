@@ -22,6 +22,7 @@ _CapCodeMultiprotocol = 1
 _CapCodeRouteRefresh = 2
 _CapCodeGracefulRestart = 64
 _CapCodeAS4 = 65
+_CapCodeAddPath = 69
 _CapCodeEnhancedRouteRefresh = 70
 _CapCodeLLGR = 71
 _CapCodeCiscoRefresh = 128
@@ -64,6 +65,7 @@ _CapCodeCiscoRefresh = 128
 data Capability = CapMultiprotocol Word16 Word8
                 | CapGracefulRestart Bool Word16
                 | CapAS4 Word32
+                | CapAddPath Word16 Word8 Word8 -- in future the encoding of Send / Receive / Both could be made symbolic / typed
                 | CapRouteRefresh
                 | CapLLGR
                 | CapCiscoRefresh
@@ -74,6 +76,7 @@ eq_ :: Capability -> Capability -> Bool
 eq_ (CapMultiprotocol _ _) (CapMultiprotocol _ _) = True
 eq_ (CapGracefulRestart _ _) (CapGracefulRestart _ _) = True
 eq_ (CapAS4 _) (CapAS4 _) = True
+eq_ (CapAddPath _ _ _) (CapAddPath _ _ _) = True
 eq_ CapRouteRefresh CapRouteRefresh = True
 eq_ CapLLGR CapLLGR = True
 eq_ CapCiscoRefresh CapCiscoRefresh = True
@@ -112,6 +115,13 @@ instance Binary Capability where
         putWord8 4
         putWord32be as4
 
+    put (CapAddPath afi safi bits) = do
+        putWord8 _CapCodeAddPath
+        putWord8 4
+        putWord16be afi
+        putWord8 safi
+        putWord8 bits
+
     put (CapGracefulRestart rFlag restartTime) = do
         putWord8 _CapCodeGracefulRestart
         putWord8 2
@@ -141,6 +151,10 @@ instance Binary Capability where
                       return (CapGracefulRestart rFlag restartTime)
            | t == _CapCodeAS4 -> do as <- getWord32be
                                     return $ CapAS4 as -- surely not the most elegant way to say this!!!!
+           | t == _CapCodeAddPath -> do afi <- getWord16be
+                                        safi <- getWord8
+                                        bits <- getWord8
+                                        return $ CapAddPath afi safi bits
            | t == _CapCodeRouteRefresh -> return CapRouteRefresh
            | t == _CapCodeEnhancedRouteRefresh -> return CapEnhancedRouteRefresh
            | t == _CapCodeCiscoRefresh -> return CapCiscoRefresh
