@@ -51,6 +51,13 @@ getASPathOrigin = getLastASN . last . getASPathContent
 getLastASN (ASSequence ax) = last ax
 getLastASN (ASSet ax) = head ax
 
+flattenPath :: [ASSegment Word32] -> [Word32]
+flattenPath [] = []
+flattenPath (ASSequence []:segs) = flattenPath segs
+flattenPath (ASSequence asns:segs) = asns ++ flattenPath segs
+flattenPath (ASSet []:segs) = flattenPath segs
+flattenPath (ASSet asns:segs) = head asns : flattenPath segs
+
 setLocalPref :: Word32 -> [PathAttribute] -> [PathAttribute]
 setLocalPref = insertPathAttribute . PathAttributeLocalPref
 

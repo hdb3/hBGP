@@ -101,8 +101,8 @@ getLocRib rib = do
     rib' <- readMVar rib
     return (prefixTable rib')
 
-evalLocalPref :: PeerData -> [PathAttribute] -> [Prefix] -> IO Word32
-evalLocalPref peerData pathAttributes pfxs = return (peerLocalPref peerData)
+checkPoison :: PeerData -> [PathAttribute] -> [Prefix] -> IO Bool
+checkPoison peerData pathAttributes pfxs = return $ elem 666 $ flattenPath $ getASPathContent pathAttributes
 
 ribPush :: Rib -> PeerData -> ParsedUpdate -> IO()
 ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
@@ -120,8 +120,9 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
     ribUpdateMany peerData pathAttributes routeId pfxs (Rib' prefixTable adjRibOutTables )
         | null pfxs = return (Rib' prefixTable adjRibOutTables )
         | otherwise = do
-              localPref <- evalLocalPref peerData pathAttributes pfxs
-              let routeData = makeRouteData peerData pathAttributes routeId localPref
+              poisoned <- checkPoison peerData pathAttributes pfxs
+              when poisoned ( putStrLn ( "poisoned route detected " ++ show peerData ++ " " ++ show pfxs))
+              let routeData = makeRouteData peerData pathAttributes routeId poisoned
                   ( prefixTable' , updates ) = BGPRib.PrefixTable.update prefixTable pfxs routeData
               updateRibOutWithPeerData peerData routeData updates adjRibOutTables
               return $ Rib' prefixTable' adjRibOutTables
@@ -138,12 +139,13 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
             updateRibOutWithPeerData peerData nullRoute withdraws adjRibOutTables
             return $ Rib' prefixTable' adjRibOutTables
 
-    makeRouteData :: PeerData -> [PathAttribute] -> Int -> Word32 -> RouteData
-    makeRouteData peerData pathAttributes routeId localPref = RouteData {..}
+    makeRouteData :: PeerData -> [PathAttribute] -> Int -> Bool -> RouteData
+    makeRouteData peerData pathAttributes routeId poisoned = RouteData {..}
         where
         pathLength = getASPathLength pathAttributes
         fromEBGP = isExternal peerData
         med = if fromEBGP then 0 else getMED pathAttributes
+        localPref = if fromEBGP then peerLocalPref peerData else getLocalPref pathAttributes
         nextHop = getNextHop pathAttributes
         origin = getOrigin pathAttributes
 
