@@ -33,7 +33,7 @@ newPrefixTable = IntMap.empty
 slHead sl = x where
     Just (x,_) = SL.uncons sl
 
-update:: PrefixTable -> [Prefix] -> RouteData -> (PrefixTable, [(Int, [Prefix], [PeerData])])
+update:: PrefixTable -> [Prefix] -> RouteData -> (PrefixTable, [(Int, [Prefix], [PeerData],[PeerData])])
 update pt _ _ = (pt,[])
 {-
 update pt pfxs route = Data.List.foldl' f (pt,[]) pfxs where

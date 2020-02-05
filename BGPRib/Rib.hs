@@ -45,7 +45,8 @@ delPeer rib peer = modifyMVar_ rib ( delPeer' peer )
         -- schedule the withdraw dissemination
         -- NOTE - this does not change the AdjRIBMap
         unless (null iprefixes)
-             ( updateRibOutWithPeerData peer nullRoute iprefixes adjRib)
+             -- ( updateRibOutWithPeerData peer nullRoute iprefixes adjRib)
+             ( putStrLn "WARNING - delPeer' incomplete due to change in signature of updateRibOutWithPeerData" )
         -- now remove this peer completely from the AdjRIBMap
         -- it is liekly that this could be done before the previous action.....
         -- but the semantics should be identical as long as we didn't try to send withdraw messages to the peer which has gone away...
@@ -136,7 +137,8 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
             -- The withdraw entry in the adj-rib-out has a special route value
             -- in future this could be better done as just the withdrawn route with an indicator to distinguish it from a normal one
             -- probably just using Either monad?
-            updateRibOutWithPeerData peerData nullRoute withdraws adjRibOutTables
+            -- updateRibOutWithPeerData peerData nullRoute withdraws adjRibOutTables
+            putStrLn "WARNING - ribWithdrawMany incomplete due to change in signature of updateRibOutWithPeerData"
             return $ Rib' prefixTable' adjRibOutTables
 
     makeRouteData :: PeerData -> [PathAttribute] -> Int -> Bool -> RouteData
@@ -151,7 +153,7 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
 
 -- NOTE!!!! - we can be called with a null route in which case only the routeId is defined, and is equal 0!!!
 -- this is OK since we only get the routeId in this function
-updateRibOutWithPeerData :: PeerData -> [([PeerData], [PeerData], Int)] -> AdjRIB -> IO ()
+updateRibOutWithPeerData :: PeerData -> [(Int, [Prefix], [PeerData],[PeerData])] -> AdjRIB -> IO ()
 updateRibOutWithPeerData originPeer updates adjRib = do
     putStrLn $ "updateRibOutWithPeerData - " ++ show (length updates) ++ "updates in aggregate"
     print updates

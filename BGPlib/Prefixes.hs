@@ -29,27 +29,27 @@ import BGPlib.LibCommon
 -- representation of prefixes as 64 bit words: this mapping allows prefixes to be treated as Ints where useful
 
 -- todo make this Word64 not Int?
-newtype Prefix = Prefix Int deriving (Eq,Generic)
+data Prefix = Prefix Word32 Int deriving (Eq,Generic)
 
 {-# INLINE toPrefix #-}
 toPrefix :: Int -> Prefix
-toPrefix = Prefix
+toPrefix x = Prefix 0 x
 
 {-# INLINE mkPrefix #-}
 mkPrefix :: Word8 -> Word32 -> Prefix
-mkPrefix l v = Prefix $! unsafeShiftL (fromIntegral l) 32 .|. fromIntegral v
+mkPrefix l v = Prefix 0 $! unsafeShiftL (fromIntegral l) 32 .|. fromIntegral v
 
 {-# INLINE fromPrefix #-}
 fromPrefix :: Prefix -> Int
-fromPrefix (Prefix pfx) = pfx
+fromPrefix (Prefix _ pfx) = pfx
 
 {-# INLINE lengthPrefix #-}
 lengthPrefix :: Prefix -> Int
-lengthPrefix (Prefix pfx) = fromIntegral $ unsafeShiftR pfx 32
+lengthPrefix (Prefix _ pfx) = fromIntegral $ unsafeShiftR pfx 32
 
 {-# INLINE addressPrefix #-}
 addressPrefix :: Prefix -> Word32
-addressPrefix (Prefix pfx) = fromIntegral $ 0xffffffff .&. pfx
+addressPrefix (Prefix _ pfx) = fromIntegral $ 0xffffffff .&. pfx
 
 instance IsString Prefix where
     fromString = read
@@ -123,7 +123,7 @@ chunkPrefixes n pfxs = let (xl,l,_) = chunkPrefixes' pfxs in (l : xl)
                                     | otherwise = (l:xl,[pfx],size)
 
     enumeratePrefixes = map (\pfx -> (getLength pfx, pfx)) where
-        getLength pfx = fromIntegral $ 2 + (lengthPrefix pfx - 1) `div` 8
+        getLength pfx = fromIntegral $ 6 + (lengthPrefix pfx - 1) `div` 8
 
 instance Binary Prefix where
 

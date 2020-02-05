@@ -67,8 +67,8 @@ buildUpdate target iprefixes RouteData{..} = if isExternal target then egpUpdate
                            ( sortPathAttributes $
                            setOrigin origin $
                            -- this is reflector/controller default, bur for a router next-hop-self is default:
-                           -- setNextHop (nextHop route) $
-                           setNextHop (localIPv4 peerData ) $ -- next hop self!
+                           setNextHop nextHop $
+                           -- setNextHop (localIPv4 peerData ) $ -- next hop self!
                            setLocalPref localPref
                            pathAttributes 
                            )
