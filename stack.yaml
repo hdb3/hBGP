@@ -1,5 +1,6 @@
 #resolver: lts-12.26
-resolver: lts-13.25
+# resolver: lts-13.25
+resolver: lts-14.21
 packages:
 - .
 ghc-options:

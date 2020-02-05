@@ -21,21 +21,8 @@ import qualified Data.List
 import BGPRib.BGPData
 import BGPlib.BGPlib (Prefix,toPrefix,fromPrefix)
 
--- TODO
--- prefix tabel semantics require prefixes to be removed from the table when routes are lost.
--- This is suboptimal, as well as leading to more complex code.
--- The proposal is to change the logic, and retain prefeixes in the table even when there are no longer
--- any routes to them.
--- This should have low impact in worst case, and is postive in all others
--- Contrived worst cases could involve huge numbers of transient prefixes, e.g. /32s
--- This could be mitigated by grooming the table at (quiet) ointervals
-
 type PrefixTableEntry = SL.SortedList RouteData
 type PrefixTable = IntMap.IntMap PrefixTableEntry
-type PrefixTableElement = (Int,SL.SortedList RouteData)
-
-instance {-# OVERLAPPING #-} Show PrefixTableElement where
-    show (k,v) = "(" ++ show (toPrefix k) ++ "," ++ show v ++ ")"
 
 instance {-# OVERLAPPING #-} Show PrefixTable where
     show = show . IntMap.toList
@@ -65,40 +52,19 @@ updatePrefixTable pt pfx route = (newPrefixTable, isNewBestRoute) where
     newBestRoute = slHead newPrefixTableEntry
     isNewBestRoute = newBestRoute == route
 
--- this function finds the best route for a specicif prefix
--- if the requirement is bulk look up then another function might be better.....
+-- this function returns the best route for a specific prefix
 queryPrefixTable :: PrefixTable -> Prefix -> Maybe RouteData
 queryPrefixTable table pfx = fmap slHead (IntMap.lookup (fromPrefix pfx) table)
 
-{-
-  Withdraw Operations
-
-  'withdraw' is a wrapper around 'withdrawPrefixTable'.
-  'withdrawPrefixTable' updates the prefixTable Map for a specific prefix
-  Within 'withdrawPrefixTable' is an inner function which manipulates the route list for the prefix.
-  The manipulation removes the given route, identified by the peer which originated it.
-  In the case that the withdrawn route was the 'best' route then a Bool return flag is set to allow the calling context
-  to send updates replacing the route which has been withdrawn.
-
-  TODO
-
-  Withdraw semantics require the withdrawn route to be known, because 'withdraw' should only be sent to peers
-  which have received the corresponding route (e.g., dont' send a withdraw to a peer which originated a route..)
-  As of now, withdraw only supports bare prefixes.
--}
-
 withdrawPeer :: PrefixTable -> PeerData -> (PrefixTable,[Prefix])
--- core function is mapAccumWithKey :: (a -> Key -> b -> (a, c)) -> a -> IntMap b -> (a, IntMap c)
+-- core function is mapAccumWithKey
 -- which acts on the prefix table, returning a modified prefix table and also the list of prefixes which have been modifed
 -- in a way which REQUIRES an update
--- the kernel function of type (a -> Key -> b -> (a, c)) has concrete signature [Prefix] -> Prefix -> PrefixTableEntry -> ([Prefix], PrefixTableEntry)
--- (note that our input and output mapas have the same type, so type a == type b = PrefixTableEntry)
--- hence the outer function is simply:
 withdrawPeer prefixTable peerData = swapNgroom $ IntMap.mapAccumWithKey (updateFunction peerData) [] prefixTable where
     swapNgroom (pfxs,pt) = (groomPrefixTable pt,pfxs)
     updateFunction = activeUpdateFunction
--- and the inner function has the shape: PeerData -> [Prefix] -> Int -> PrefixTableEntry -> ([Prefix], PrefixTableEntry)
--- the needed function uses the 'peerData' entry of the routes in the sorted list:
+-- the inner function has the shape: PeerData -> [Prefix] -> Int -> PrefixTableEntry -> ([Prefix], PrefixTableEntry)
+-- and uses the 'peerData' entry of the routes in the sorted list:
 -- it deletes the entry corresponding to the target peer, if it exists
 -- if the deleted entry is the previous best then it adds the corresponding prefix to the accumulator
 -- the required (available) operaions in Data.SortedList are: uncons :: SortedList a -> Maybe (a, SortedList a) / filter :: (a -> Bool) -> SortedList a -> SortedList a
@@ -132,19 +98,10 @@ withdrawPrefixTable pt pfx peer = (pt', wasBestRoute) where
                          (\oldRouteList -> peerData (slHead oldRouteList) == peer )
                          maybeOldRouteList
     (maybeOldRouteList , pt') = IntMap.updateLookupWithKey tableUpdate (fromPrefix pfx) pt
-    -- 'tableUpdate' is the 'inner' fundtion which does the sortde list update and posts back the result,
-    -- including the instruction to delete the entry...
     tableUpdate :: Int -> PrefixTableEntry -> Maybe PrefixTableEntry
     tableUpdate _ routes = let notPeer pd rd = pd /= peerData rd
                                routes' = SL.filter (notPeer peer) routes
                            in if null routes' then Nothing else Just routes'
-    -- notPeer :: PeerData -> RouteData -> Bool
-    -- notPeer pd rd = pd /= peerData rd
-    --oldBestRoute = slHead oldRouteList -- 'head' operation guaranteed safe as long as the precondition that empty prefix list are removed immediately...
-    --wasBestRoute = peerData oldBestRoute == peer
-    -- oldBestRoute = slHead oldRouteList -- 'head' operation guaranteed safe as long as the precondition that empty prefix list are removed immediately...
-    -- wasBestRoute = peerData oldBestRoute == peer
-
 withdraw :: PrefixTable -> [Prefix] -> PeerData -> (PrefixTable,[Prefix])
 withdraw rib prefixes peer = Data.List.foldl' f (rib,[]) prefixes where
     f (pt,withdrawn) pfx = if p then (pt',pfx:withdrawn) else (pt',withdrawn) where
