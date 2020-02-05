@@ -75,7 +75,7 @@ instance Eq PeerData where
     p1 == p2 = peerBGPid p1 == peerBGPid p2
 
 instance Ord PeerData where
-    compare p1 p2 = compare (peerBGPid p1) (peerBGPid p2)
+    compare p1 p2 = compare (peerBGPid p1, peerIPv4 p1, peerPort p1) (peerBGPid p2, peerIPv4 p2, peerPort p2)
 
 instance Ord RouteData where
 

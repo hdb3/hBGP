@@ -124,7 +124,7 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
               when poisoned ( putStrLn ( "poisoned route detected " ++ show peerData ++ " " ++ show pfxs))
               let routeData = makeRouteData peerData pathAttributes routeId poisoned
                   ( prefixTable' , updates ) = BGPRib.PrefixTable.update prefixTable pfxs routeData
-              updateRibOutWithPeerData peerData routeData updates adjRibOutTables
+              updateRibOutWithPeerData peerData updates adjRibOutTables
               return $ Rib' prefixTable' adjRibOutTables
 
     ribWithdrawMany :: PeerData -> [Prefix] -> Rib' -> IO Rib'
@@ -151,11 +151,14 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
 
 -- NOTE!!!! - we can be called with a null route in which case only the routeId is defined, and is equal 0!!!
 -- this is OK since we only get the routeId in this function
-updateRibOutWithPeerData :: PeerData -> RouteData -> [Prefix] -> AdjRIB -> IO ()
-updateRibOutWithPeerData originPeer routeData updates adjRib = do
+updateRibOutWithPeerData :: PeerData -> [([PeerData], [PeerData], Int)] -> AdjRIB -> IO ()
+updateRibOutWithPeerData originPeer updates adjRib = do
+    putStrLn $ "updateRibOutWithPeerData - " ++ show (length updates) ++ "updates in aggregate"
+    print updates
+{-
     let updateWithKey destinationPeer table = when ( destinationPeer /= originPeer )
                                                    ( insertAdjRIBTable (updates, routeId routeData ) table )
     when ( null updates )
          ( putStrLn $ "null updates in updateRibOutWithPeerData: " ++ show originPeer ++ " / " ++ if 0 == routeId routeData then "nullRoute" else show routeData)
     void $ sequence $ Data.Map.mapWithKey updateWithKey adjRib
-    
+-}    

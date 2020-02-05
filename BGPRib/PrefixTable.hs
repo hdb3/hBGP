@@ -33,11 +33,15 @@ newPrefixTable = IntMap.empty
 slHead sl = x where
     Just (x,_) = SL.uncons sl
 
-update:: PrefixTable -> [Prefix] -> RouteData -> (PrefixTable,[Prefix])
+update:: PrefixTable -> [Prefix] -> RouteData -> (PrefixTable, [(Int, [Prefix], [PeerData])])
+update pt _ _ = (pt,[])
+{-
 update pt pfxs route = Data.List.foldl' f (pt,[]) pfxs where
     f (pt_,updated) pfx = if p then (pt__,pfx:updated) else (pt__,updated) where
         (pt__,p) = updatePrefixTable pt_ pfx route
+-}
 
+{-
 updatePrefixTable :: PrefixTable -> Prefix -> RouteData -> (PrefixTable,Bool)
 updatePrefixTable pt pfx route = (newPrefixTable, isNewBestRoute) where
     updatePrefixTableEntry :: PrefixTableEntry -> PrefixTableEntry -> PrefixTableEntry
@@ -51,6 +55,9 @@ updatePrefixTable pt pfx route = (newPrefixTable, isNewBestRoute) where
     newPrefixTableEntry = maybe newSingletonPrefixTableEntry ( updatePrefixTableEntry newSingletonPrefixTableEntry ) maybeOldPrefixTableEntry
     newBestRoute = slHead newPrefixTableEntry
     isNewBestRoute = newBestRoute == route
+-}
+updatePrefixTable :: PrefixTable -> Prefix -> RouteData -> (PrefixTable,[([PeerData], [PeerData], Int)])
+updatePrefixTable pt pfx route = (newPrefixTable, [([],[],routeId route)])
 
 -- this function returns the best route for a specific prefix
 queryPrefixTable :: PrefixTable -> Prefix -> Maybe RouteData
