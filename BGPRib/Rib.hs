@@ -131,7 +131,6 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
         | null pfxs = return (Rib' prefixTable adjRibOutTables )
         | otherwise = do
             let ( prefixTable' , withdraws ) = BGPRib.PrefixTable.withdraw prefixTable pfxs peerData
-            -- adjRibOutTables' = updateAdjRibOutTables (updates,0) adjRibOutTables
             -- ** NOTE **
             -- The withdraw entry in the adj-rib-out has a special route value
             -- in future this could be better done as just the withdrawn route with an indicator to distinguish it from a normal one
@@ -157,56 +156,4 @@ updateRibOutWithPeerData originPeer routeData updates adjRib = do
     when ( null updates )
          ( putStrLn $ "null updates in updateRibOutWithPeerData: " ++ show originPeer ++ " / " ++ if 0 == routeId routeData then "nullRoute" else show routeData)
     void $ sequence $ Data.Map.mapWithKey updateWithKey adjRib
-{- =======
-
-makeRouteData :: PeerData -> ParsedUpdate -> RouteData
-makeRouteData peerData parsedUpdate = makeRouteData' peerData ( puPathAttributes parsedUpdate) ( hash parsedUpdate)
-
-
-makeRouteData' :: PeerData -> [PathAttribute] -> Int -> RouteData
-makeRouteData' peerData pathAttributes routeId = RouteData peerData pathAttributes routeId pathLength nextHop origin med fromEBGP
-    where
-    pathLength = getASPathLength pathAttributes
-    fromEBGP = isExternal peerData
-    med = if fromEBGP then 0 else getMED pathAttributes
-    nextHop = getNextHop pathAttributes
-    origin = getOrigin pathAttributes
-
-ribPush :: Rib -> PeerData -> ParsedUpdate -> IO()
-ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
-
-ribPush' :: PeerData -> ParsedUpdate -> Rib' -> IO Rib'
--- TODO write the monadic style in a way that works????!!!
--- ribPush' peerData ParsedUpdate{..} = ribUpdateMany' peerData puPathAttributes hash nlri >>= ribWithdrawMany' peerData withdrawn
-ribPush' peerData ParsedUpdate{..} rib0 = do
-    rib1 <- ribUpdateMany' peerData puPathAttributes hash nlri rib0
-    rib2 <- ribWithdrawMany' peerData withdrawn rib1
-    return rib2
-
-ribUpdateMany :: Rib -> PeerData -> [PathAttribute] -> Int -> [IPrefix] -> IO()
-ribUpdateMany rib peerData attrs hash pfxs = modifyMVar_ rib (ribUpdateMany' peerData attrs hash pfxs)
-
-ribUpdateMany' :: PeerData -> [PathAttribute] -> Int -> [IPrefix] -> Rib' -> IO Rib'
-ribUpdateMany' peerData pathAttributes routeId pfxs (Rib' prefixTable adjRibOutTables )
-    | null pfxs = return (Rib' prefixTable adjRibOutTables )
-    | otherwise = do
-          let routeData = makeRouteData' peerData pathAttributes routeId
-              ( prefixTable' , updates ) = BGPRib.PrefixTable.update prefixTable pfxs routeData
-          updateRibOutWithPeerData peerData routeData updates adjRibOutTables
-          return $ Rib' prefixTable' adjRibOutTables
-
-ribWithdrawMany rib peer p = modifyMVar_ rib (ribWithdrawMany' peer p)
-
-ribWithdrawMany' :: PeerData -> [IPrefix] -> Rib' -> IO Rib'
-ribWithdrawMany' peerData pfxs (Rib' prefixTable adjRibOutTables)
-    | null pfxs = return (Rib' prefixTable adjRibOutTables )
-    | otherwise = do
-        let ( prefixTable' , withdraws ) = BGPRib.PrefixTable.withdraw prefixTable pfxs peerData
-        -- adjRibOutTables' = updateAdjRibOutTables (updates,0) adjRibOutTables
-        -- ** NOTE **
-        -- The withdraw entry in the adj-rib-out has a special route value
-        -- in future this could be better done as just the withdrawn route with an indicator to distinguish it from a normal one
-        -- probably just using Either monad?
-        updateRibOutWithPeerData peerData nullRoute withdraws adjRibOutTables
-        return $ Rib' prefixTable' adjRibOutTables
--}
+    
