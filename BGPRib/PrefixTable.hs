@@ -60,6 +60,7 @@ updatePrefixTable pt pfx route = (newPrefixTable, [(withdrawTargets,updateTarget
     -- note - assume that the list is sorted on entry
     oldEntry = fromMaybe [] $ IntMap.lookup (fromPrefix pfx) pt
     newEntry = Data.List.sort $ replace oldEntry route
+    pt' = IntMap.insert (fromPrefix pfx) newEntry pt
     -- replace uses the route origin as the basis for equality - in base case this is the peer, in ADDPATH it is (peer,PathID) 
     replace l x = x : ( filter (\y -> (peerData y) == peerData x)) l
     (oldPoisoned,oldUnpoisoned) = Data.List.span poisoned oldEntry
