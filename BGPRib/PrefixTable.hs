@@ -15,6 +15,7 @@ module BGPRib.PrefixTable where
 -}
 
 import qualified Data.IntMap.Strict as IntMap
+import qualified Data.Map.Strict as Map
 import Data.List ((\\))
 import qualified Data.List
 import Data.Maybe(fromMaybe) 
@@ -32,32 +33,36 @@ instance {-# OVERLAPPING #-} Show PrefixTable where
 newPrefixTable :: PrefixTable
 newPrefixTable = IntMap.empty
 
-update:: PrefixTable -> [Prefix] -> RouteData -> (PrefixTable, [(Int, [Prefix], [PeerData],[PeerData])])
-update pt _ _ = (pt,[])
+update:: PrefixTable -> [Prefix] -> RouteData -> (PrefixTable, [(PeerData, Int, [Prefix])])
+update pt _ _ = (pt',updates) where
+    map = Map.empty :: LocalMap
+    updates = extract map
+    pt' = pt
+
+type LocalMap = Map.Map (PeerData, Int) [Prefix]
+
+insert :: LocalMap -> PeerData -> Int -> Prefix -> LocalMap
+insert map peer route prefix = Map.alter f (peer,route) map where f pre = Just $ prefix : (fromMaybe [] pre)
+
+extract :: LocalMap -> [ (PeerData, Int, [Prefix]) ]
+extract m = map ( \((a,b),c) -> (a,b,c) ) $ Map.toList m
+
 {-
+    This function merges the output of multiple invocations of updatePrefixTable.
+    The output is bundled for direct consumption by updateRibOutWithPeerData in Rib.hs.
+    In many but not all cases there are 1:1 bundle:peers.
+    Each invocation of updatePrefixTable effectively returns lists of (peer, prefix, route).
+    The accumulator value is a map over (peer,route) containing a list of prefixes.
+
+
 update pt pfxs route = Data.List.foldl' f (pt,[]) pfxs where
     f (pt_,updated) pfx = if p then (pt__,pfx:updated) else (pt__,updated) where
         (pt__,p) = updatePrefixTable pt_ pfx route
 -}
 
-{-
-updatePrefixTable :: PrefixTable -> Prefix -> RouteData -> (PrefixTable,Bool)
-updatePrefixTable pt pfx route = (newPrefixTable, isNewBestRoute) where
-    updatePrefixTableEntry :: PrefixTableEntry -> PrefixTableEntry -> PrefixTableEntry
-    updatePrefixTableEntry singletonRoute routes = let newRoute = slHead singletonRoute
-                                                       pIsNotOldRoute r = peerData r /= peerData newRoute
-                                                   in SL.insert newRoute $ SL.filter pIsNotOldRoute routes
-
-    newSingletonPrefixTableEntry = SL.singleton route
-    (maybeOldPrefixTableEntry, newPrefixTable) = IntMap.insertLookupWithKey f (fromPrefix pfx) newSingletonPrefixTableEntry pt where
-        f _ = updatePrefixTableEntry
-    newPrefixTableEntry = maybe newSingletonPrefixTableEntry ( updatePrefixTableEntry newSingletonPrefixTableEntry ) maybeOldPrefixTableEntry
-    newBestRoute = slHead newPrefixTableEntry
-    isNewBestRoute = newBestRoute == route
--}
-updatePrefixTable :: PrefixTable -> Prefix -> RouteData -> (PrefixTable,[([PeerData], [PeerData], Int)])
-updatePrefixTable pt pfx route = (newPrefixTable, [(withdrawTargets,updateTargets,newBest)]) where
-    -- note - assume that the list is sorted on entry
+updatePrefixTable :: PrefixTable -> Prefix -> RouteData -> (PrefixTable, Int,[PeerData], [PeerData])
+updatePrefixTable pt pfx route = (newPrefixTable, newBest, withdrawTargets, updateTargets) where
+    -- note - assumes that the list is sorted on entry!
     oldEntry = fromMaybe [] $ IntMap.lookup (fromPrefix pfx) pt
     newEntry = Data.List.sort $ replace oldEntry route
     pt' = IntMap.insert (fromPrefix pfx) newEntry pt
