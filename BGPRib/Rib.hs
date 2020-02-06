@@ -125,6 +125,7 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
               when poisoned ( putStrLn ( "poisoned route detected " ++ show peerData ++ " " ++ show pfxs))
               let routeData = makeRouteData peerData pathAttributes routeId poisoned
                   ( prefixTable' , updates ) = BGPRib.PrefixTable.update prefixTable pfxs routeData
+              putStrLn $ "ribUpdateMany: " ++ show updates
               mapM_ (updateRibOutWithPeerData peerData adjRibOutTables) updates
               return $ Rib' prefixTable' adjRibOutTables
 

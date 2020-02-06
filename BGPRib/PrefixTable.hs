@@ -16,14 +16,13 @@ module BGPRib.PrefixTable where
 
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Map.Strict as Map
-import Data.List ((\\))
+import Data.List ((\\),foldl')
 import qualified Data.List
 import Data.Maybe(fromMaybe) 
 
 import BGPRib.BGPData
 import BGPlib.BGPlib (Prefix,toPrefix,fromPrefix)
 
--- type PrefixTableEntry = SL.SortedList RouteData
 type PrefixTableEntry = [RouteData]
 type PrefixTable = IntMap.IntMap PrefixTableEntry
 
@@ -34,15 +33,21 @@ newPrefixTable :: PrefixTable
 newPrefixTable = IntMap.empty
 
 update:: PrefixTable -> [Prefix] -> RouteData -> (PrefixTable, [(PeerData, Int, [Prefix])])
-update pt _ _ = (pt',updates) where
-    map = Map.empty :: LocalMap
+update pt pfxs route = (pt,updates) where
+
+    (pt', updateList) = foldl' kf (pt,[]) pfxs 
+    kf :: (PrefixTable, [(PeerData,Int,Prefix)]) -> Prefix -> (PrefixTable, [(PeerData,Int, Prefix)])
+    kf (pt,acc) pfx = let (pt',ax) = updatePrefixTable route pt pfx in (pt', acc ++ ax)
+
     updates = extract map
-    pt' = pt
+    map = foldl' f Map.empty updateList where f m (peer,route,pfx) = insert m peer route pfx
 
 type LocalMap = Map.Map (PeerData, Int) [Prefix]
 
 insert :: LocalMap -> PeerData -> Int -> Prefix -> LocalMap
 insert map peer route prefix = Map.alter f (peer,route) map where f pre = Just $ prefix : (fromMaybe [] pre)
+-- inserts :: LocalMap -> [(PeerData, Int)] -> Prefix -> LocalMap
+-- inserts lm ax pfx = foldl' (\m (a,b) -> insert m a b pfx) lm ax
 
 extract :: LocalMap -> [ (PeerData, Int, [Prefix]) ]
 extract m = map ( \((a,b),c) -> (a,b,c) ) $ Map.toList m
@@ -53,15 +58,10 @@ extract m = map ( \((a,b),c) -> (a,b,c) ) $ Map.toList m
     In many but not all cases there are 1:1 bundle:peers.
     Each invocation of updatePrefixTable effectively returns lists of (peer, prefix, route).
     The accumulator value is a map over (peer,route) containing a list of prefixes.
-
-
-update pt pfxs route = Data.List.foldl' f (pt,[]) pfxs where
-    f (pt_,updated) pfx = if p then (pt__,pfx:updated) else (pt__,updated) where
-        (pt__,p) = updatePrefixTable pt_ pfx route
 -}
 
-updatePrefixTable :: PrefixTable -> Prefix -> RouteData -> (PrefixTable, Int,[PeerData], [PeerData])
-updatePrefixTable pt pfx route = (newPrefixTable, newBest, withdrawTargets, updateTargets) where
+updatePrefixTable :: RouteData -> PrefixTable -> Prefix -> (PrefixTable,[(PeerData,Int,Prefix)])
+updatePrefixTable route pt pfx = (newPrefixTable, rval) where
     -- note - assumes that the list is sorted on entry!
     oldEntry = fromMaybe [] $ IntMap.lookup (fromPrefix pfx) pt
     newEntry = Data.List.sort $ replace oldEntry route
@@ -75,8 +75,9 @@ updatePrefixTable pt pfx route = (newPrefixTable, newBest, withdrawTargets, upda
     newBest = safeHeadId newUnpoisoned
     oldPoisonedPeers = map peerData oldPoisoned
     newPoisonedPeers = map peerData newPoisoned
-    (withdrawTargets,updateTargets) = if (oldBest == newBest) then (oldPoisonedPeers \\ newPoisonedPeers, newPoisonedPeers \\ oldPoisonedPeers)
+    (withdrawTargets, updateTargets) = if (oldBest == newBest) then (oldPoisonedPeers \\ newPoisonedPeers, newPoisonedPeers \\ oldPoisonedPeers)
                                                               else (oldPoisonedPeers \\ newPoisonedPeers, newPoisonedPeers)
+    rval = map (\x -> (x,0,pfx)) withdrawTargets ++ map (\x -> (x,newBest,pfx)) updateTargets 
     
 
 -- this function returns the best route for a specific prefix
@@ -129,6 +130,7 @@ withdrawPrefixTable pt pfx peer = (pt', wasBestRoute) where
     tableUpdate _ routes = let notPeer pd rd = pd /= peerData rd
                                routes' = filter (notPeer peer) routes
                            in if null routes' then Nothing else Just routes'
+
 withdraw :: PrefixTable -> [Prefix] -> PeerData -> (PrefixTable,[Prefix])
 withdraw rib prefixes peer = Data.List.foldl' f (rib,[]) prefixes where
     f (pt,withdrawn) pfx = if p then (pt',pfx:withdrawn) else (pt',withdrawn) where
