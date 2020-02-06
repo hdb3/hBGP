@@ -14,14 +14,13 @@ module BGPRib.PrefixTableUtils where
 -}
 
 import Data.IntMap.Strict(toList)
-import qualified Data.SortedList as SL -- package sorted-list
 import qualified Data.List
 import Data.IP
 
 import BGPlib.BGPlib (Prefix,toPrefix)
 import BGPRib.Common
 import BGPRib.BGPData
-import BGPRib.PrefixTable(PrefixTable,slHead)
+import BGPRib.PrefixTable(PrefixTable)
 
 -- ===================================================
 --
@@ -31,14 +30,14 @@ import BGPRib.PrefixTable(PrefixTable,slHead)
 
 getDB :: PrefixTable -> [(Prefix,[RouteData])]
 getDB pt = map f (toList pt) where
-    f (pfx,routes) = (toPrefix pfx,SL.fromSortedList routes)
+    f (pfx,routes) = (toPrefix pfx,routes)
 
 lengthRIB :: PrefixTable -> Int
 lengthRIB pt = length (toList pt)
 
 getRIB :: PrefixTable -> [(RouteData,Prefix)]
 getRIB pt = map f (toList pt) where
-    f (pfx,routes) = (slHead routes , toPrefix pfx)
+    f (pfx,routes) = (head routes , toPrefix pfx)
 
 getFIB :: PrefixTable -> [(Prefix,IPv4)]
 getFIB pt = map f (getRIB pt) where

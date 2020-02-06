@@ -15,13 +15,14 @@ module BGPRib.PrefixTable where
 -}
 
 import qualified Data.IntMap.Strict as IntMap
-import qualified Data.SortedList as SL -- package sorted-list
 import qualified Data.List
+import Data.Maybe(fromMaybe) 
 
 import BGPRib.BGPData
 import BGPlib.BGPlib (Prefix,toPrefix,fromPrefix)
 
-type PrefixTableEntry = SL.SortedList RouteData
+-- type PrefixTableEntry = SL.SortedList RouteData
+type PrefixTableEntry = [RouteData]
 type PrefixTable = IntMap.IntMap PrefixTableEntry
 
 instance {-# OVERLAPPING #-} Show PrefixTable where
@@ -29,9 +30,6 @@ instance {-# OVERLAPPING #-} Show PrefixTable where
 
 newPrefixTable :: PrefixTable
 newPrefixTable = IntMap.empty
-
-slHead sl = x where
-    Just (x,_) = SL.uncons sl
 
 update:: PrefixTable -> [Prefix] -> RouteData -> (PrefixTable, [(Int, [Prefix], [PeerData],[PeerData])])
 update pt _ _ = (pt,[])
@@ -57,11 +55,12 @@ updatePrefixTable pt pfx route = (newPrefixTable, isNewBestRoute) where
     isNewBestRoute = newBestRoute == route
 -}
 updatePrefixTable :: PrefixTable -> Prefix -> RouteData -> (PrefixTable,[([PeerData], [PeerData], Int)])
-updatePrefixTable pt pfx route = (newPrefixTable, [([],[],routeId route)])
+updatePrefixTable pt pfx route = (newPrefixTable, [([],[],routeId route)]) where
+    oldEntry = fromMaybe [] $ IntMap.lookup (fromPrefix pfx) pt
 
 -- this function returns the best route for a specific prefix
 queryPrefixTable :: PrefixTable -> Prefix -> Maybe RouteData
-queryPrefixTable table pfx = fmap slHead (IntMap.lookup (fromPrefix pfx) table)
+queryPrefixTable table pfx = fmap head (IntMap.lookup (fromPrefix pfx) table)
 
 withdrawPeer :: PrefixTable -> PeerData -> (PrefixTable,[Prefix])
 -- core function is mapAccumWithKey
@@ -82,9 +81,9 @@ withdrawPeer prefixTable peerData = swapNgroom $ IntMap.mapAccumWithKey (updateF
     activeUpdateFunction peer prefixList prefix prefixTableEntry =
         if p top
         then (prefixList',tail)
-        else (prefixList, SL.filter ( not . p ) prefixTableEntry)
+        else (prefixList, filter ( not . p ) prefixTableEntry)
         where
-            Just (top,tail) = SL.uncons prefixTableEntry -- safe because the list cannot be null
+            Just (top,tail) = Data.List.uncons prefixTableEntry -- safe because the list cannot be null
                                                          -- however!!!! this can MAKE an empty list which we cannot delet in this operation
                                                          -- so we need a final preen before returning the Map to the RIB!!!!
             p route = peer == BGPRib.BGPData.peerData route
@@ -102,12 +101,12 @@ withdrawPrefixTable pt pfx peer = (pt', wasBestRoute) where
                                -- b) route was found and removed, and WAS the 'best' route
                                -- c) the route was not found, which could be a programming error
                                --    or an external issue
-                         (\oldRouteList -> peerData (slHead oldRouteList) == peer )
+                         (\oldRouteList -> peerData (head oldRouteList) == peer )
                          maybeOldRouteList
     (maybeOldRouteList , pt') = IntMap.updateLookupWithKey tableUpdate (fromPrefix pfx) pt
     tableUpdate :: Int -> PrefixTableEntry -> Maybe PrefixTableEntry
     tableUpdate _ routes = let notPeer pd rd = pd /= peerData rd
-                               routes' = SL.filter (notPeer peer) routes
+                               routes' = filter (notPeer peer) routes
                            in if null routes' then Nothing else Just routes'
 withdraw :: PrefixTable -> [Prefix] -> PeerData -> (PrefixTable,[Prefix])
 withdraw rib prefixes peer = Data.List.foldl' f (rib,[]) prefixes where
