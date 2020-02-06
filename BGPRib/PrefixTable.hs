@@ -15,6 +15,7 @@ module BGPRib.PrefixTable where
 -}
 
 import qualified Data.IntMap.Strict as IntMap
+import Data.List ((\\))
 import qualified Data.List
 import Data.Maybe(fromMaybe) 
 
@@ -55,8 +56,22 @@ updatePrefixTable pt pfx route = (newPrefixTable, isNewBestRoute) where
     isNewBestRoute = newBestRoute == route
 -}
 updatePrefixTable :: PrefixTable -> Prefix -> RouteData -> (PrefixTable,[([PeerData], [PeerData], Int)])
-updatePrefixTable pt pfx route = (newPrefixTable, [([],[],routeId route)]) where
+updatePrefixTable pt pfx route = (newPrefixTable, [(withdrawTargets,updateTargets,newBest)]) where
+    -- note - assume that the list is sorted on entry
     oldEntry = fromMaybe [] $ IntMap.lookup (fromPrefix pfx) pt
+    newEntry = Data.List.sort $ replace oldEntry route
+    -- replace uses the route origin as the basis for equality - in base case this is the peer, in ADDPATH it is (peer,PathID) 
+    replace l x = x : ( filter (\y -> (peerData y) == peerData x)) l
+    (oldPoisoned,oldUnpoisoned) = Data.List.span poisoned oldEntry
+    (newPoisoned,newUnpoisoned) = Data.List.span poisoned newEntry
+    safeHeadId ax = if null ax then 0 else routeId (head ax)
+    oldBest = safeHeadId oldUnpoisoned
+    newBest = safeHeadId newUnpoisoned
+    oldPoisonedPeers = map peerData oldPoisoned
+    newPoisonedPeers = map peerData newPoisoned
+    (withdrawTargets,updateTargets) = if (oldBest == newBest) then (oldPoisonedPeers \\ newPoisonedPeers, newPoisonedPeers \\ oldPoisonedPeers)
+                                                              else (oldPoisonedPeers \\ newPoisonedPeers, newPoisonedPeers)
+    
 
 -- this function returns the best route for a specific prefix
 queryPrefixTable :: PrefixTable -> Prefix -> Maybe RouteData
