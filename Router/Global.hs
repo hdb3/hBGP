@@ -18,8 +18,11 @@ data Global = Global { rib :: BGPRib.BGPRib.Rib
                      , initialHoldTimer :: Int
                      , config :: Config
                      , logger :: String -> IO ()
+                     , exitFlag :: MVar ()
                      }
 
 
 
 type FSMExit = ( ThreadId, SockAddr, Either String String )
+
+-- globalExit global = putMVar (exitFlag global) ()
