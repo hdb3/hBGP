@@ -1,6 +1,6 @@
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 module BGPlib.BGPparse where
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString as B

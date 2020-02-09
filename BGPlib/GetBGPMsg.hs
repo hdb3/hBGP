@@ -28,7 +28,7 @@ hGetRawMsg :: SIHandle -> Int -> IO BGPByteString
 hGetRawMsg = getRawMsg
 
 instance Handle NSSocket where
-    hPut h s = NSB.send h s >> return ()
+    hPut h s = void (NSB.send h s)
     hGet h n = NSB.recv h (fromIntegral n) -- Network.Socket uses Int64 not Int !
 
 lBGPMarker = L.replicate 16 0xff

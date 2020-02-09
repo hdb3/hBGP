@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards, TupleSections #-}
+{-# LANGUAGE RecordWildCards #-}
 module Router.StdRib (ribPull,msgTimeout,addRouteRib,delRouteRib,updateFromAdjRibEntrys,delPeerByAddress,Router.StdRib.addPeer,Router.StdRib.ribPush,RibHandle) where
 import Control.Monad.Extra(when,concatMapM)
 import System.Timeout(timeout)
@@ -20,9 +20,7 @@ addPeer rib peer = do
 
 ribPush :: RibHandle -> ParsedUpdate -> IO()
 ribPush _ NullUpdate = return ()
-ribPush (rib,peer) update@ParsedUpdate{} = do
-    --trace $ "ribPush " ++ show peer ++ ":" ++ show update
-    BGPRib.ribPush rib peer update
+ribPush (rib,peer) update@ParsedUpdate{} = BGPRib.ribPush rib peer update
 
 delPeerByAddress :: Rib -> Word16 -> IPv4 -> IO ()
 delPeerByAddress rib port ip = do
@@ -59,10 +57,10 @@ buildUpdate :: PeerData -> [Prefix] -> Maybe RouteData -> [ParsedUpdate]
 --
 -- Note: the Route source peer can be reached from the RouteData record via peerData
 --
-buildUpdate target iprefixes Nothing = makeUpdate [] iprefixes []
-buildUpdate target iprefixes (Just RouteData{..}) = if isExternal target then egpUpdate else igpUpdate
+buildUpdate target prefixes Nothing = makeUpdate [] prefixes []
+buildUpdate target prefixes (Just RouteData{..}) = if isExternal target then egpUpdate else igpUpdate
     where
-    igpUpdate = makeUpdate iprefixes
+    igpUpdate = makeUpdate prefixes
                            []
                            ( sortPathAttributes $
                            setOrigin origin $
@@ -72,7 +70,7 @@ buildUpdate target iprefixes (Just RouteData{..}) = if isExternal target then eg
                            setLocalPref localPref
                            pathAttributes 
                            )
-    egpUpdate = makeUpdate iprefixes
+    egpUpdate = makeUpdate prefixes
                            []
                            ( sortPathAttributes $
                            setOrigin origin $
@@ -82,9 +80,9 @@ buildUpdate target iprefixes (Just RouteData{..}) = if isExternal target then eg
                            )
 
 updateFromAdjRibEntrys :: Rib -> PeerData -> [AdjRIBEntry] -> IO [ParsedUpdate]
-updateFromAdjRibEntrys rib target ares = concatMapM (updateFromAdjRibEntry rib target) ares
+updateFromAdjRibEntrys rib target = concatMapM (updateFromAdjRibEntry rib target)
     where
 
     updateFromAdjRibEntry :: Rib -> PeerData -> AdjRIBEntry -> IO [ParsedUpdate]
-    updateFromAdjRibEntry rib target (iprefixes,routeHash) =
-        concatMap (\(route,iprefixes) -> buildUpdate target iprefixes route) <$> lookupRoutes rib (iprefixes,routeHash)
+    updateFromAdjRibEntry rib target (prefixes,routeHash) =
+        concatMap (\(route,prefixes) -> buildUpdate target prefixes route) <$> lookupRoutes rib (prefixes,routeHash)

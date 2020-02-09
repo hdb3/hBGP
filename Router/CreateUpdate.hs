@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 module Router.CreateUpdate(iBGPUpdate,eBGPUpdate,bgpWithdraw,eor) where
 import System.IO(stdout,stderr)
 import Data.ByteString.Lazy.Char8 (pack)

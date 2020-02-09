@@ -35,12 +35,11 @@ main = do
 
     info $ "connecting to " ++ show (activePeers config)
     info $ "activeOnly = " ++ show (activeOnly config)
-    --print config
     forkIO $ Session.session 179 app (configListenAddress config) (activePeers config) (not $ activeOnly config)
     info "Router ready"
     takeMVar (exitFlag global)
-    --idle where idle = do threadDelay 10000000
-    --                     idle
+    -- gracefull cleanup would have to be called here
+    -- currently, sessions just fall of a cliff edge (TCP reset)
 
 getConfig :: IO Config
 getConfig = do
@@ -53,7 +52,6 @@ getConfig = do
     configString <- readFile configPath
     let rawConfig = read configString :: Config
         rawConfig' = if 0 == n then rawConfig else rawConfig { configTestRouteCount = n }
-    --print rawConfig
     return $ buildPeerConfigs rawConfig'
 
 buildGlobal :: Config -> IO Global

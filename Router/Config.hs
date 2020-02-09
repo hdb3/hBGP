@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards,OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Router.Config where
 
 -- ## TODO rework the whole Config concept of 'enabled' peers

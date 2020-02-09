@@ -15,7 +15,7 @@ console path pfxs nh = do
     prompt
     input <- getLine
     let (command:px) = words input ++ repeat ""
-    case (map toLower command) of
+    case map toLower command of
 
         "s" -> do putStrLn $ "Route: " ++ show path ++ " : " ++ show pfxs ++ " : " ++ show nh
                   console path pfxs nh

@@ -42,12 +42,11 @@ delPeer rib peer = modifyMVar_ rib ( delPeer' peer )
     delPeer' :: PeerData -> Rib' -> IO Rib'
     delPeer' peer Rib' {..} = do
         -- drain the prefix table and save the resulting withdraws
-        let (prefixTable',iprefixes) = withdrawPeer prefixTable peer
+        let (prefixTable',prefixes) = withdrawPeer prefixTable peer
         -- schedule the withdraw dissemination
         -- NOTE - this does not change the AdjRIBMap
-        unless (null iprefixes)
-             -- ( updateRibOutWithPeerData peer nullRoute iprefixes adjRib)
-             ( putStrLn "WARNING - delPeer' incomplete due to change in signature of updateRibOutWithPeerData" )
+        unless (null prefixes)
+             ( updateRibOutWithPeerData peer nullRoute prefixes adjRib)
         -- now remove this peer completely from the AdjRIBMap
         -- it is liekly that this could be done before the previous action.....
         -- but the semantics should be identical as long as we didn't try to send withdraw messages to the peer which has gone away...
@@ -84,7 +83,7 @@ addPeer rib peer = modifyMVar_ rib ( addPeer' peer )
 
     New design
 
-    lookupRoutes should return [(Maybe RouteData,[IPrefix])] rather than [(RouteData,[IPrefix])],
+    lookupRoutes should return [(Maybe RouteData,[Prefix])] rather than [(RouteData,[Prefix])],
     where Maybe RouteData allows a withdraw to be represented.  The prescribed filter logic is implemented after initial lookup and before function return.
     The initial lookup function returns an ARE record (tuple) augmented with the lookup outcome.
     Before grouping on the lookup outcome the list is filtered according to the description above. 
@@ -95,14 +94,14 @@ lookupRoutes rib (prefixes,routeHash) = if 0 == routeHash
     then return [(Nothing,prefixes)] 
     else do
         rib' <- readMVar rib
-        let pxrs = map (\(prefix) -> (queryPrefixTable (prefixTable rib') prefix, prefix)) prefixes
+        let pxrs = map (\prefix -> (queryPrefixTable (prefixTable rib') prefix, prefix)) prefixes
             discardChanged (mrd,_) = maybe True (\rd -> routeHash == routeId rd) mrd
         return $ group $ filter discardChanged pxrs
 
 getNextHops :: Rib -> [Prefix] -> IO [(Prefix,Maybe IPv4)]
 getNextHops rib prefixes = do
     rib' <- readMVar rib
-    let getNextHop prefix = (prefix,) $ fmap nextHop $ queryPrefixTable (prefixTable rib') prefix
+    let getNextHop prefix = (prefix,) $ nextHop <$> queryPrefixTable (prefixTable rib') prefix
     return $ map getNextHop prefixes
 
 pullAllUpdates :: PeerData -> Rib -> IO [AdjRIBEntry]
@@ -179,5 +178,4 @@ updateRibOutWithPeerData originPeer adjRib (targetPeer, route, prefixes) = do
                                                    ( insertAdjRIBTable (updates, routeId routeData ) table )
     when ( null updates )
          ( putStrLn $ "null updates in updateRibOutWithPeerData: " ++ show originPeer ++ " / " ++ if 0 == routeId routeData then "nullRoute" else show routeData)
-    void $ sequence $ Data.Map.mapWithKey updateWithKey adjRib
--}    
+    sequence_ $ Data.Map.mapWithKey updateWithKey adjRib

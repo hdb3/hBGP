@@ -10,12 +10,10 @@ import Control.Monad(unless)
 import BGPlib.Capabilities(parseOptionalParameters)
 import BGPlib.LibCommon(decode8,fromHostAddress)
 import BGPlib.Prefixes
---import BGPlib.PathAttributes
 import BGPlib.BGPparse(BGPMessage(..))
 import Data.Word
 import Data.Bits
 import Control.Applicative((<|>))
---import FarmHash(hash64)
 
 terminatingWireParser = wireParser1 <|> return B.empty
 eosWireParser = B.null
