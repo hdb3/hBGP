@@ -42,11 +42,11 @@ delPeer rib peer = modifyMVar_ rib ( delPeer' peer )
     delPeer' :: PeerData -> Rib' -> IO Rib'
     delPeer' peer Rib' {..} = do
         -- drain the prefix table and save the resulting withdraws
-        let (prefixTable',iprefixes) = withdrawPeer prefixTable peer
+        let (prefixTable',prefixes) = withdrawPeer prefixTable peer
         -- schedule the withdraw dissemination
         -- NOTE - this does not change the AdjRIBMap
-        unless (null iprefixes)
-             ( updateRibOutWithPeerData peer nullRoute iprefixes adjRib)
+        unless (null prefixes)
+             ( updateRibOutWithPeerData peer nullRoute prefixes adjRib)
         -- now remove this peer completely from the AdjRIBMap
         -- it is liekly that this could be done before the previous action.....
         -- but the semantics should be identical as long as we didn't try to send withdraw messages to the peer which has gone away...
@@ -83,7 +83,7 @@ addPeer rib peer = modifyMVar_ rib ( addPeer' peer )
 
     New design
 
-    lookupRoutes should return [(Maybe RouteData,[IPrefix])] rather than [(RouteData,[IPrefix])],
+    lookupRoutes should return [(Maybe RouteData,[Prefix])] rather than [(RouteData,[Prefix])],
     where Maybe RouteData allows a withdraw to be represented.  The prescribed filter logic is implemented after initial lookup and before function return.
     The initial lookup function returns an ARE record (tuple) augmented with the lookup outcome.
     Before grouping on the lookup outcome the list is filtered according to the description above. 
@@ -94,14 +94,14 @@ lookupRoutes rib (prefixes,routeHash) = if 0 == routeHash
     then return [(Nothing,prefixes)] 
     else do
         rib' <- readMVar rib
-        let pxrs = map (\(prefix) -> (queryPrefixTable (prefixTable rib') prefix, prefix)) prefixes
+        let pxrs = map (\prefix -> (queryPrefixTable (prefixTable rib') prefix, prefix)) prefixes
             discardChanged (mrd,_) = maybe True (\rd -> routeHash == routeId rd) mrd
         return $ group $ filter discardChanged pxrs
 
 getNextHops :: Rib -> [Prefix] -> IO [(Prefix,Maybe IPv4)]
 getNextHops rib prefixes = do
     rib' <- readMVar rib
-    let getNextHop prefix = (prefix,) $ fmap nextHop $ queryPrefixTable (prefixTable rib') prefix
+    let getNextHop prefix = (prefix,) $ nextHop <$> queryPrefixTable (prefixTable rib') prefix
     return $ map getNextHop prefixes
 
 pullAllUpdates :: PeerData -> Rib -> IO [AdjRIBEntry]
@@ -174,57 +174,4 @@ updateRibOutWithPeerData originPeer routeData updates adjRib = do
                                                    ( insertAdjRIBTable (updates, routeId routeData ) table )
     when ( null updates )
          ( putStrLn $ "null updates in updateRibOutWithPeerData: " ++ show originPeer ++ " / " ++ if 0 == routeId routeData then "nullRoute" else show routeData)
-    void $ sequence $ Data.Map.mapWithKey updateWithKey adjRib
-{- =======
-
-makeRouteData :: PeerData -> ParsedUpdate -> RouteData
-makeRouteData peerData parsedUpdate = makeRouteData' peerData ( puPathAttributes parsedUpdate) ( hash parsedUpdate)
-
-
-makeRouteData' :: PeerData -> [PathAttribute] -> Int -> RouteData
-makeRouteData' peerData pathAttributes routeId = RouteData peerData pathAttributes routeId pathLength nextHop origin med fromEBGP
-    where
-    pathLength = getASPathLength pathAttributes
-    fromEBGP = isExternal peerData
-    med = if fromEBGP then 0 else getMED pathAttributes
-    nextHop = getNextHop pathAttributes
-    origin = getOrigin pathAttributes
-
-ribPush :: Rib -> PeerData -> ParsedUpdate -> IO()
-ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
-
-ribPush' :: PeerData -> ParsedUpdate -> Rib' -> IO Rib'
--- TODO write the monadic style in a way that works????!!!
--- ribPush' peerData ParsedUpdate{..} = ribUpdateMany' peerData puPathAttributes hash nlri >>= ribWithdrawMany' peerData withdrawn
-ribPush' peerData ParsedUpdate{..} rib0 = do
-    rib1 <- ribUpdateMany' peerData puPathAttributes hash nlri rib0
-    rib2 <- ribWithdrawMany' peerData withdrawn rib1
-    return rib2
-
-ribUpdateMany :: Rib -> PeerData -> [PathAttribute] -> Int -> [IPrefix] -> IO()
-ribUpdateMany rib peerData attrs hash pfxs = modifyMVar_ rib (ribUpdateMany' peerData attrs hash pfxs)
-
-ribUpdateMany' :: PeerData -> [PathAttribute] -> Int -> [IPrefix] -> Rib' -> IO Rib'
-ribUpdateMany' peerData pathAttributes routeId pfxs (Rib' prefixTable adjRibOutTables )
-    | null pfxs = return (Rib' prefixTable adjRibOutTables )
-    | otherwise = do
-          let routeData = makeRouteData' peerData pathAttributes routeId
-              ( prefixTable' , updates ) = BGPRib.PrefixTable.update prefixTable pfxs routeData
-          updateRibOutWithPeerData peerData routeData updates adjRibOutTables
-          return $ Rib' prefixTable' adjRibOutTables
-
-ribWithdrawMany rib peer p = modifyMVar_ rib (ribWithdrawMany' peer p)
-
-ribWithdrawMany' :: PeerData -> [IPrefix] -> Rib' -> IO Rib'
-ribWithdrawMany' peerData pfxs (Rib' prefixTable adjRibOutTables)
-    | null pfxs = return (Rib' prefixTable adjRibOutTables )
-    | otherwise = do
-        let ( prefixTable' , withdraws ) = BGPRib.PrefixTable.withdraw prefixTable pfxs peerData
-        -- adjRibOutTables' = updateAdjRibOutTables (updates,0) adjRibOutTables
-        -- ** NOTE **
-        -- The withdraw entry in the adj-rib-out has a special route value
-        -- in future this could be better done as just the withdrawn route with an indicator to distinguish it from a normal one
-        -- probably just using Either monad?
-        updateRibOutWithPeerData peerData nullRoute withdraws adjRibOutTables
-        return $ Rib' prefixTable' adjRibOutTables
--}
+    sequence_ $ Data.Map.mapWithKey updateWithKey adjRib

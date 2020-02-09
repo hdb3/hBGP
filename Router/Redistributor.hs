@@ -104,7 +104,7 @@ insertTestRoutes Global{..} path count = do
 
 startConsole global = do
    let push = ribPush (rib global) (localPeer $ gd global)
-       consoleThread = do (console push [] [] "0.0.0.0")
+       consoleThread = do console push [] [] "0.0.0.0"
                           putMVar (exitFlag global) () 
    void $ forkIO consoleThread
       -- void $ (global exitGlobal) global 
@@ -114,7 +114,7 @@ console push path pfxs nh = do
     prompt
     input <- getLine
     let (command:px) = words input ++ repeat ""
-    case (map toLower command) of
+    case map toLower command of
 
         "" -> console push path pfxs nh
 

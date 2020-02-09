@@ -2,7 +2,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DeriveAnyClass #-}
 module BGPlib.PathAttributes ( module BGPlib.Codes
                              , module BGPlib.PathAttributes
                              , module BGPlib.ASPath) where
@@ -174,24 +173,22 @@ instance Binary PathAttribute where
                     bs <- getLazyByteString (fromIntegral len)
                     return $ PathAttributeASPath (decode bs)
 
-                | TypeCodePathAttributeNextHop == code -> do
-                  v <- getWord32le
-                  return $ PathAttributeNextHop (fromHostAddress v)
+                | TypeCodePathAttributeNextHop == code ->
+                    PathAttributeNextHop . fromHostAddress <$> getWord32le
+                  -- v <- getWord32le
+                  -- return $ PathAttributeNextHop (fromHostAddress v)
 
-                | TypeCodePathAttributeMultiExitDisc == code -> do
-                  v <- getWord32be
-                  return $ PathAttributeMultiExitDisc v
+                | TypeCodePathAttributeMultiExitDisc == code ->
+                      PathAttributeMultiExitDisc <$> getWord32be
 
-                | TypeCodePathAttributeLocalPref == code -> do
-                  v <- getWord32be
-                  return $ PathAttributeLocalPref v
+                | TypeCodePathAttributeLocalPref == code ->
+                      PathAttributeLocalPref <$> getWord32be
 
                 | TypeCodePathAttributeAtomicAggregate == code -> return PathAttributeAtomicAggregate
 
                 | TypeCodePathAttributeAggregator == code -> do
-                    as <- if len == 6 then do
-                        as2 <- getWord16be
-                        return $ fromIntegral as2
+                    as <- if len == 6 then
+                        fromIntegral <$> getWord32be
                     else if len == 8 then
                         getWord32be
                     else fail $ "Bad length in PathAttributeAggregator: " ++ show len

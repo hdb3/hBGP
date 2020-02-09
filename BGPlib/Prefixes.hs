@@ -1,8 +1,8 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveGeneric #-}
-module BGPlib.Prefixes(Prefix,chunkPrefixes,toAddrRange,mkPrefix,toPrefix,fromPrefix,fromAddrRange,lengthPrefix) where
 {-# LANGUAGE Strict #-}
+module BGPlib.Prefixes(Prefix,chunkPrefixes,toAddrRange,mkPrefix,toPrefix,fromPrefix,fromAddrRange,lengthPrefix) where
 import Data.Binary
 import Data.Hashable
 import Data.Binary.Get

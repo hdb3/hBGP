@@ -3,7 +3,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ConstrainedClassMethods #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DeriveAnyClass #-}
 module BGPlib.ASPath where
 import Data.Binary
 import Data.Binary.Get

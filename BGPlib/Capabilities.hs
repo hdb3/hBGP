@@ -76,7 +76,7 @@ eq_ :: Capability -> Capability -> Bool
 eq_ (CapMultiprotocol _ _) (CapMultiprotocol _ _) = True
 eq_ (CapGracefulRestart _ _) (CapGracefulRestart _ _) = True
 eq_ (CapAS4 _) (CapAS4 _) = True
-eq_ (CapAddPath _ _ _) (CapAddPath _ _ _) = True
+eq_ CapAddPath {} CapAddPath {} = True
 eq_ CapRouteRefresh CapRouteRefresh = True
 eq_ CapLLGR CapLLGR = True
 eq_ CapCiscoRefresh CapCiscoRefresh = True
@@ -149,8 +149,7 @@ instance Binary Capability where
                       let rFlag = testBit word0 15
                           restartTime = word0 .&. 0x0fff
                       return (CapGracefulRestart rFlag restartTime)
-           | t == _CapCodeAS4 -> do as <- getWord32be
-                                    return $ CapAS4 as -- surely not the most elegant way to say this!!!!
+           | t == _CapCodeAS4 -> CapAS4 <$> getWord32be
            | t == _CapCodeAddPath -> do afi <- getWord16be
                                         safi <- getWord8
                                         bits <- getWord8

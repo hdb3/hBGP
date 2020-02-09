@@ -32,7 +32,7 @@ getPathAttribute :: PathAttributeTypeCode -> [PathAttribute] -> Maybe PathAttrib
 getPathAttribute code pas = find ((code ==) . identify) pas
 
 deletePathAttributeType :: PathAttributeTypeCode -> [PathAttribute] -> [PathAttribute]
-deletePathAttributeType t = filter ( not . (t ==) . identify )
+deletePathAttributeType t = filter ( (t /=) . identify )
 
 insertPathAttribute :: PathAttribute -> [PathAttribute] -> [PathAttribute]
 -- replaces an existing attribute of the same type
@@ -173,25 +173,21 @@ instance Binary PathAttribute where
                     bs <- getLazyByteString (fromIntegral len)
                     return $ PathAttributeASPath (decode bs)
 
-                | TypeCodePathAttributeNextHop == code -> do
-                  v <- getWord32le
-                  return $ PathAttributeNextHop (fromHostAddress v)
+                | TypeCodePathAttributeNextHop == code ->
+                      return $ PathAttributeNextHop .fromHostAddress <$> getWord32le
 
-                | TypeCodePathAttributeMultiExitDisc == code -> do
-                  v <- getWord32be
-                  return $ PathAttributeMultiExitDisc v
+                | TypeCodePathAttributeMultiExitDisc == code ->
+                      PathAttributeMultiExitDisc <$> getWord32be
 
-                | TypeCodePathAttributeLocalPref == code -> do
-                  v <- getWord32be
-                  return $ PathAttributeLocalPref v
+                | TypeCodePathAttributeLocalPref == code ->
+                      PathAttributeLocalPref <$> getWord32be
 
                 | TypeCodePathAttributeAtomicAggregate == code -> return PathAttributeAtomicAggregate
 
                 | TypeCodePathAttributeAggregator == code -> do
-                    as <- if (len == 6) then do
-                        as2 <- getWord16be
-                        return $ fromIntegral as2
-                    else if (len == 8) then
+                    as <- if len == 6 then
+                        fromIntegral <$> getWord16be
+                    else if len == 8 then
                         getWord32be
                     else fail $ "Bad length in PathAttributeAggregator: " ++ show len
                     bgpid <- getWord32le
