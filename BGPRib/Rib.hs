@@ -1,10 +1,11 @@
 {-# LANGUAGE RecordWildCards, TupleSections #-}
-module BGPRib.Rib(Rib,ribPush,newRib,getLocRib,addPeer,delPeer,getPeersInRib,lookupRoutes,pullAllUpdates) where
+module BGPRib.Rib(Rib,ribPush,newRib,getLocRib,addPeer,delPeer,getPeersInRib,lookupRoutes,pullAllUpdates,getNextHops) where
 import Control.Concurrent
 import qualified Data.Map.Strict as Data.Map
 import Control.Monad(unless,when,void)
 import Data.List(intercalate)
 import Data.Word(Word32)
+import Data.IP
 
 import BGPlib.BGPlib
 
@@ -13,7 +14,7 @@ import BGPRib.PrefixTable
 import qualified BGPRib.PrefixTableUtils as PrefixTableUtils
 import BGPRib.Update
 import BGPRib.AdjRIBOut
-import BGPRib.Common(group_)
+import BGPRib.Common(group)
 
 type Rib = MVar Rib'
 -- TODO rename AdjRIB -> AdjRIBMap
@@ -67,25 +68,42 @@ addPeer rib peer = modifyMVar_ rib ( addPeer' peer )
             -- TODO - this would be the place to insert an end-of-rib marker
         let adjRib' = Data.Map.insert peer aro adjRib
         return $ Rib' prefixTable adjRib'
+{-
+    delayed route look-up logic
+    After an update/withdraw is scheduled the best route may change, or be removed, leaving no route at all.
+    This raises two issues: firstly, the original route may no longer be available, so the immediate update cannot be sent.
+    Secondly, even if the route is still valid, or a withdraw was requested, the optimal behaviour may not be to send the originally selected route.
+    The simple course of action is to discard tbe immediate update, safe in the knowledge that another update for the specific peer is in the pipeline.
+    However, the logic fails when the request is withdraw, since it is possible that the replacement route would be filtered for the specific target peer.
+    Therefore scheduled withdraw should not be discarded.  A similar problem arises when the current route is null, in which case a withdraw is in the pipeline,
+    but if we discard the earlier route and it was also the first route selected for this prefix/peer then a withdraw will be generated without a matching update.
+    This outcome is likely to be rare, and does not compromise route integrity, although a peer may detect the anomaly.
+    A full resoultion is not possible in this design - it motivates a change from use of route hashes to actual route referneces in ARO entries.
 
-lookupRoutes :: Rib -> AdjRIBEntry -> IO [(RouteData,[Prefix])]
-lookupRoutes rib (iprefixes,routeHash) = group_ <$> mapM (\pfx -> (,pfx) <$> adjRibQueryRib rib pfx routeHash) iprefixes
+    Summary: withdrawals are never discarded, changed non-null routes are...
 
-    where
-    -- adjRibQueryRib extends queryRib by checking that the current route hash matches the one saved when the AdjRIbOut entry was created
-    --    this is useful because if it has changed then probably the correct action is to discard the result
-    --    the special case of routeId == 0 is not hadnled differently - this would correspond to a withdraw - it should never occur in a RouteData record
-    --    but it could on lookup, in which case the correct behaviour would be to discard the withdraw if the prefix is found
-    --    however the caller should not use this function since there is no valid Just value which can represent the withdraw
-    --    instead the caller should merely use queryRib and discard the withdraw if the return value is not Nothing
-    adjRibQueryRib :: Rib -> Prefix -> Int -> IO (Maybe RouteData)
-    adjRibQueryRib rib iprefix routeHash =
-        maybe Nothing (\route -> if routeHash == routeId route then Just route else Nothing) <$> queryRib rib iprefix
+    New design
 
-    queryRib :: Rib -> Prefix -> IO (Maybe RouteData)
-    queryRib rib prefix = do
+    lookupRoutes should return [(Maybe RouteData,[IPrefix])] rather than [(RouteData,[IPrefix])],
+    where Maybe RouteData allows a withdraw to be represented.  The prescribed filter logic is implemented after initial lookup and before function return.
+    The initial lookup function returns an ARE record (tuple) augmented with the lookup outcome.
+    Before grouping on the lookup outcome the list is filtered according to the description above. 
+-}
+
+lookupRoutes :: Rib -> AdjRIBEntry -> IO [(Maybe RouteData,[Prefix])]
+lookupRoutes rib (prefixes,routeHash) = if 0 == routeHash
+    then return [(Nothing,prefixes)] 
+    else do
         rib' <- readMVar rib
-        return $ queryPrefixTable (prefixTable rib') prefix
+        let pxrs = map (\(prefix) -> (queryPrefixTable (prefixTable rib') prefix, prefix)) prefixes
+            discardChanged (mrd,_) = maybe True (\rd -> routeHash == routeId rd) mrd
+        return $ group $ filter discardChanged pxrs
+
+getNextHops :: Rib -> [Prefix] -> IO [(Prefix,Maybe IPv4)]
+getNextHops rib prefixes = do
+    rib' <- readMVar rib
+    let getNextHop prefix = (prefix,) $ fmap nextHop $ queryPrefixTable (prefixTable rib') prefix
+    return $ map getNextHop prefixes
 
 pullAllUpdates :: PeerData -> Rib -> IO [AdjRIBEntry]
 pullAllUpdates peer rib = do

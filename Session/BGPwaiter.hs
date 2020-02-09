@@ -13,7 +13,7 @@ main :: IO ()
 main = do
     listeningSocket <- socket AF_INET Stream defaultProtocol
     setSocketOption listeningSocket ReuseAddr 1
-    bind listeningSocket ( SockAddrInet 8179 ( toHostAddress "127.0.0.1") )
+    bind listeningSocket ( SockAddrInet 179 ( toHostAddress "192.168.122.1") )
     --bind listeningSocket ( SockAddrInet 8179 ( toHostAddress "0.0.0.0") )
     listen listeningSocket 1
     (sock, SockAddrInet remotePort remoteIPv4) <- accept listeningSocket

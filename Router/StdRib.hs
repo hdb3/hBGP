@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards, TupleSections #-}
-module Router.StdRib (ribPull,msgTimeout,addRouteRib,delRouteRib,updateFromAdjRibEntrys,routesFromAdjRibEntrys,delPeerByAddress,Router.StdRib.addPeer,Router.StdRib.ribPush,RibHandle) where
+module Router.StdRib (ribPull,msgTimeout,addRouteRib,delRouteRib,updateFromAdjRibEntrys,delPeerByAddress,Router.StdRib.addPeer,Router.StdRib.ribPush,RibHandle) where
 import Control.Monad.Extra(when,concatMapM)
 import System.Timeout(timeout)
 import Data.Maybe(fromMaybe)
@@ -45,7 +45,7 @@ addRouteRib rib peer prefix nextHop = BGPRib.ribPush rib peer (igpUpdate nextHop
 delRouteRib :: Rib -> PeerData -> AddrRange IPv4 -> IO()
 delRouteRib rib peer prefix = BGPRib.ribPush rib peer (originateWithdraw [fromAddrRange prefix])
 
-buildUpdate :: PeerData -> [Prefix] -> RouteData -> [ParsedUpdate]
+buildUpdate :: PeerData -> [Prefix] -> Maybe RouteData -> [ParsedUpdate]
 -- there are three distinct 'peers' and associated PeerData potentially in scope here
 --     the peer which originated the route
 --     the peer which will receive this update ('target')
@@ -59,8 +59,8 @@ buildUpdate :: PeerData -> [Prefix] -> RouteData -> [ParsedUpdate]
 --
 -- Note: the Route source peer can be reached from the RouteData record via peerData
 --
-
-buildUpdate target iprefixes RouteData{..} = if isExternal target then egpUpdate else igpUpdate
+buildUpdate target iprefixes Nothing = makeUpdate [] iprefixes []
+buildUpdate target iprefixes (Just RouteData{..}) = if isExternal target then egpUpdate else igpUpdate
     where
     igpUpdate = makeUpdate iprefixes
                            []
@@ -68,7 +68,7 @@ buildUpdate target iprefixes RouteData{..} = if isExternal target then egpUpdate
                            setOrigin origin $
                            -- this is reflector/controller default, bur for a router next-hop-self is default:
                            setNextHop nextHop $
-                           -- setNextHop (localIPv4 peerData ) $ -- next hop self!
+                           -- setNextHop (localIPv4 peerData ) $ -- next hop self! - but not very good if the route is actually local, unless we set the local peer ip4...
                            setLocalPref localPref
                            pathAttributes 
                            )
@@ -76,25 +76,15 @@ buildUpdate target iprefixes RouteData{..} = if isExternal target then egpUpdate
                            []
                            ( sortPathAttributes $
                            setOrigin origin $
-                           -- setNextHop (nextHop route) $ -- reflector default
                            setNextHop (localIPv4 peerData ) $ -- next hop self!
                            prePendAS ( myAS $ globalData peerData )
                            pathAttributes
                            )
 
 updateFromAdjRibEntrys :: Rib -> PeerData -> [AdjRIBEntry] -> IO [ParsedUpdate]
-updateFromAdjRibEntrys rib target = concatMapM (updateFromAdjRibEntry rib target)
-    -- ToDO - Restore the capability to generate WITHDRAWs!!!!
+updateFromAdjRibEntrys rib target ares = concatMapM (updateFromAdjRibEntry rib target) ares
     where
 
     updateFromAdjRibEntry :: Rib -> PeerData -> AdjRIBEntry -> IO [ParsedUpdate]
     updateFromAdjRibEntry rib target (iprefixes,routeHash) =
         concatMap (\(route,iprefixes) -> buildUpdate target iprefixes route) <$> lookupRoutes rib (iprefixes,routeHash)
-
-routesFromAdjRibEntrys :: Rib -> [AdjRIBEntry] -> IO [(Prefix,IPv4)]
-routesFromAdjRibEntrys rib = concatMapM (routesFromAdjRibEntry rib)
-    where
-
-    routesFromAdjRibEntry :: Rib -> AdjRIBEntry -> IO [(Prefix,IPv4)]
-    routesFromAdjRibEntry rib (iprefixes,routeHash) =
-        concatMap (\(route,iprefixes) -> map (,nextHop route) iprefixes ) <$> lookupRoutes rib (iprefixes,routeHash)

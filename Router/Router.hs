@@ -36,10 +36,11 @@ main = do
     info $ "connecting to " ++ show (activePeers config)
     info $ "activeOnly = " ++ show (activeOnly config)
     --print config
-    Session.session 179 app (configListenAddress config) (activePeers config) (not $ activeOnly config)
+    forkIO $ Session.session 179 app (configListenAddress config) (activePeers config) (not $ activeOnly config)
     info "Router ready"
-    idle where idle = do threadDelay 10000000
-                         idle
+    takeMVar (exitFlag global)
+    --idle where idle = do threadDelay 10000000
+    --                     idle
 
 getConfig :: IO Config
 getConfig = do
@@ -71,6 +72,8 @@ buildGlobal c@Config{..} = do
         peerMap = Data.Map.fromList $ map (\pc -> (peerConfigIPv4 pc,pc)) configConfiguredPeers
 
         logger = hPutStrLn stdout
+
+    exitFlag <- newEmptyMVar
 
     collisionDetector <- mkCollisionDetector
     sessions <- newMVar Data.Map.empty
