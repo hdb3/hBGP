@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
-module BGPRib.PrefixTable where
+module BGPRib.PrefixTable(PrefixTable,update,newPrefixTable,queryPrefixTable,getPeerPrefixes) where
 
 {- A single prefix table holds everything about a prefix we could care about
  - but, this is merely the prefix itself, and the associated path
@@ -32,12 +32,12 @@ instance {-# OVERLAPPING #-} Show PrefixTable where
 newPrefixTable :: PrefixTable
 newPrefixTable = IntMap.empty
 
-update:: PrefixTable -> [Prefix] -> RouteData -> (PrefixTable, [(PeerData, Int, [Prefix])])
-update pt pfxs route = (pt,updates) where
+update:: PrefixTable -> [Prefix] -> PeerData -> Maybe RouteData -> (PrefixTable, [(PeerData, Int, [Prefix])])
+update pt pfxs sourcePeer routeM = (pt,updates) where
 
     (pt', updateList) = foldl' kf (pt,[]) pfxs 
     kf :: (PrefixTable, [(PeerData,Int,Prefix)]) -> Prefix -> (PrefixTable, [(PeerData,Int, Prefix)])
-    kf (pt,acc) pfx = let (pt',ax) = updatePrefixTable route pt pfx in (pt', acc ++ ax)
+    kf (pt,acc) pfx = let (pt',ax) = updatePrefixTable sourcePeer routeM pt pfx in (pt', acc ++ ax)
 
     updates = extract map
     map = foldl' f Map.empty updateList where f m (peer,route,pfx) = insert m peer route pfx
@@ -60,23 +60,35 @@ extract m = map ( \((a,b),c) -> (a,b,c) ) $ Map.toList m
     The accumulator value is a map over (peer,route) containing a list of prefixes.
 -}
 
-updatePrefixTable :: RouteData -> PrefixTable -> Prefix -> (PrefixTable,[(PeerData,Int,Prefix)])
-updatePrefixTable route pt pfx = (newPrefixTable, rval) where
-    -- note - assumes that the list is sorted on entry!
-    oldEntry = fromMaybe [] $ IntMap.lookup (fromPrefix pfx) pt
-    newEntry = Data.List.sort $ replace oldEntry route
-    pt' = IntMap.insert (fromPrefix pfx) newEntry pt
-    -- replace uses the route origin as the basis for equality - in base case this is the peer, in ADDPATH it is (peer,PathID) 
-    replace l x = x : ( filter (\y -> (peerData y) == peerData x)) l
-    (oldPoisoned,oldUnpoisoned) = Data.List.span poisoned oldEntry
-    (newPoisoned,newUnpoisoned) = Data.List.span poisoned newEntry
+updatePrefixTable :: PeerData -> Maybe RouteData -> PrefixTable -> Prefix -> (PrefixTable,[(PeerData,Int,Prefix)])
+updatePrefixTable sourcePeer routeM pt pfx = (pt', rval) where
+    -- NB - this function assumes that the list is sorted on entry!
+    oldList = fromMaybe [] $ IntMap.lookup (fromPrefix pfx) pt
+    
+    -- delete strategy uses the route origin as the basis for equality - in base case this is the peer, in ADDPATH it is (peer,PathID) 
+    tmpList = filter p oldList where p r = peerData r == sourcePeer
+
+    newList = maybe tmpList (\route -> Data.List.sort $ route : tmpList) routeM
+        
+    pt' = IntMap.insert (fromPrefix pfx) newList pt
+
+    -- LOCRIB update complete, now calculate the impact....
+    -- this section is BGPPROTECTION specific
+    -- however the mechanism is backportable to the general case, by changing the target peer and best route selection strategy
+    -- note that the context here includes both old and new locrib state, which is required in all cases for calculating the target peer set
+    -- unless/until the old per peer adjRIBout status is persistsed elsewhere
+
+    -- TODO  - make this an IO function and perform adjRIBout push directly rather than using the return values for this purpose
+
+    (oldPoisoned,oldUnpoisoned) = Data.List.span poisoned oldList
+    (newPoisoned,newUnpoisoned) = Data.List.span poisoned newList
     safeHeadId ax = if null ax then 0 else routeId (head ax)
     oldBest = safeHeadId oldUnpoisoned
     newBest = safeHeadId newUnpoisoned
     oldPoisonedPeers = map peerData oldPoisoned
     newPoisonedPeers = map peerData newPoisoned
     (withdrawTargets, updateTargets) = if (oldBest == newBest) then (oldPoisonedPeers \\ newPoisonedPeers, newPoisonedPeers \\ oldPoisonedPeers)
-                                                              else (oldPoisonedPeers \\ newPoisonedPeers, newPoisonedPeers)
+                                                               else (oldPoisonedPeers \\ newPoisonedPeers, newPoisonedPeers)
     rval = map (\x -> (x,0,pfx)) withdrawTargets ++ map (\x -> (x,newBest,pfx)) updateTargets 
     
 
@@ -113,6 +125,21 @@ withdrawPeer prefixTable peerData = swapNgroom $ IntMap.mapAccumWithKey (updateF
 
 groomPrefixTable :: PrefixTable -> PrefixTable
 groomPrefixTable = IntMap.filter ( not . null )
+
+getPeerPrefixes :: PrefixTable -> PeerData -> [Prefix]
+getPeerPrefixes pt peer = IntMap.foldlWithKey' f [] pt where 
+    f acc key val = if p val then (toPrefix key:acc) else acc
+    p = Data.List.any p'
+    p' = ( peer == ) . peerData
+
+{-
+  the function requires collection of just those keys for which the associated value matches the function subject
+  this is a fold using the predicate p over the value field:
+  IntMap.foldlWithKey' f [] map
+
+  where f acc key val = if p val then (k:acc) else acc
+  and in this case p val is actually Data.List.any p', where p' v' = peer == peerData v'   
+-}
 
 withdrawPrefixTable :: PrefixTable -> Prefix -> PeerData -> (PrefixTable,Bool)
 withdrawPrefixTable pt pfx peer = (pt', wasBestRoute) where
