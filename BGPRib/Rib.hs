@@ -146,7 +146,7 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
         | otherwise = do
               poisoned <- checkPoison peerData pathAttributes pfxs
               when poisoned ( putStrLn ( "poisoned route detected " ++ show peerData ++ " " ++ show pfxs))
-              let routeData = makeRouteData peerData pathAttributes routeId poisoned
+              let routeData = makeRouteData peerData pathAttributes routeId 100 poisoned
                   ( prefixTable' , updates ) = BGPRib.PrefixTable.update prefixTable pfxs peerData (Just routeData)
               putStrLn $ "ribUpdateMany: " ++ show updates
               mapM_ (updatePeer adjRibOutTables) updates
@@ -172,13 +172,13 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
             -- putStrLn "WARNING - ribWithdrawMany incomplete due to change in signature of updateRibOutWithPeerData"
             return $ Rib' prefixTable' adjRibOutTables
 
-    makeRouteData :: PeerData -> [PathAttribute] -> Int -> Bool -> RouteData
-    makeRouteData peerData pathAttributes routeId poisoned = RouteData {..}
+    makeRouteData :: PeerData -> [PathAttribute] -> Int -> Word32 -> Bool -> RouteData
+    makeRouteData peerData pathAttributes routeId overrideLocalPref poisoned = RouteData {..}
         where
         pathLength = getASPathLength pathAttributes
         fromEBGP = isExternal peerData
         med = if fromEBGP then 0 else getMED pathAttributes
-        localPref = if fromEBGP then peerLocalPref peerData else getLocalPref pathAttributes
+        localPref = if fromEBGP then overrideLocalPref else getLocalPref pathAttributes
         nextHop = getNextHop pathAttributes
         origin = getOrigin pathAttributes
 

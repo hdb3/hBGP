@@ -10,6 +10,7 @@ import Data.Maybe(fromJust,isJust,fromMaybe)
 import Data.Either(either)
 import qualified Data.Map.Strict as Data.Map
 import Control.Applicative ((<|>))
+import Control.Monad(void)
 
 import BGPlib.BGPlib
 
@@ -237,8 +238,7 @@ runFSM g@Global{..} socketName peerName handle =
         msg <- bgpRcv handle (getNegotiatedHoldTime osm)
         case msg of
 
-            BGPKeepalive -> do trace "established: BGPKeepalive"
-                               _ <- Rib.ribPush (fromJust ribHandle) NullUpdate
+            BGPKeepalive -> do void $ Rib.ribPush (fromJust ribHandle) NullUpdate
                                return (Established,st)
 
             update@BGPUpdate{} -> do

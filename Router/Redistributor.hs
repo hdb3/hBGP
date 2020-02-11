@@ -102,55 +102,72 @@ insertTestRoutes Global{..} path count = do
     mapM_ (ribPush rib ( localPeer gd )) updates''
     info "done"
 
+data CState = CState { push :: (ParsedUpdate -> IO ())
+                     , exit :: IO ()
+                     , csPath :: [Word32]
+                     , csNlri :: [AddrRange IPv4]
+                     , csNextHop :: IPv4
+                     , csLocalPref :: Word32 }
+
 startConsole global = do
    let push = ribPush (rib global) (localPeer $ gd global)
-       consoleThread = do console push [] [] "0.0.0.0"
-                          putMVar (exitFlag global) () 
+       exit = putMVar (exitFlag global) ()
+       consoleThread = console $ CState push exit [] [] "0.0.0.0" 100
+                       --   putMVar (exitFlag global) () 
    void $ forkIO consoleThread
-      -- void $ (global exitGlobal) global 
 
-console :: (ParsedUpdate -> IO ()) -> [Word32] -> [AddrRange IPv4] ->  IPv4 -> IO ()
-console push path pfxs nh = do
+updateFrom CState{..} = mapM_ push $ iBGPUpdate csPath csNlri csNextHop csLocalPref
+withdrawFrom CState{..} = mapM_ push ( bgpWithdraw csNlri )
+
+console :: CState -> IO ()
+console cstate@CState{..} = do
     prompt
     input <- getLine
     let (command:px) = words input ++ repeat ""
     case map toLower command of
 
-        "" -> console push path pfxs nh
+        "" -> console cstate
 
-        "s" -> do putStrLn $ "Route: " ++ show path ++ " : " ++ show pfxs ++ " : " ++ show nh
-                  console push path pfxs nh
+        "s" -> do putStrLn $ "Route: " ++ show csPath ++ " : " ++ show csNlri ++ " nh=" ++ show csNextHop ++ " lp=" ++ show csLocalPref
+                  console cstate
 
-        "u" -> do putStrLn $ "Sending update: " ++ show path ++ " : " ++ show pfxs ++ " : " ++ show nh
-                  mapM_ push ( iBGPUpdate path pfxs nh )
-                  console push path pfxs nh
+        "u" -> do putStrLn $ "Sending update: " ++ show csPath ++ " : " ++ show csNlri ++ " : " ++ show csNextHop
+                  updateFrom cstate
+                  console cstate
 
-        "w" -> do putStrLn $ "Sending withdraw: " ++ show pfxs
-                  mapM_ push ( bgpWithdraw pfxs )
-                  console push path pfxs nh
+        "w" -> do putStrLn $ "Sending withdraw: " ++ show csNlri
+                  withdrawFrom cstate
+                  console cstate
 
         "h" -> maybe (putStrLn "couldn't parse nexthop")
                      (\p -> do putStrLn $ "Nexthop: " ++ show p
-                               console push path pfxs p
+                               console cstate {csNextHop = p}
                      )
                      (parseAddress $ px !! 0)
 
         "p" -> maybe (putStrLn "couldn't parse a path")
                      (\p -> do putStrLn $ "Path: " ++ show p
-                               console push p pfxs nh
+                               console cstate {csPath = p}
                      )
                      (parsePath $ px !! 0)
         
         "n" -> maybe (putStrLn "couldn't parse prefixes")
-                     (\p -> do putStrLn $ "NLRI: " ++ show p
-                               console push path p nh
+                     (\p -> do putStrLn $ "nlri: " ++ show p
+                               console cstate {csNlri = p}
                      )
                      (parsePrefixes $ px !! 0)
 
-        "q" -> putStrLn "goodbye"                  
+        "l" -> maybe (putStrLn "couldn't parse local preference")
+                     (\p -> do putStrLn $ "LocPref: " ++ show p
+                               console cstate {csLocalPref = p}
+                     )
+                     (parseWord32 $ px !! 0)
 
-        _   -> do putStrLn "couldn't parse a command - try Show / Path / nH / Nlri / Update / Withdraw / Quit"
-                  console push path pfxs nh
+        "q" -> putStrLn "goodbye" >> exit                  
+
+        _   -> putStrLn "couldn't parse a command - try Show / Path / nH / Nlri / Local preference / Update / Withdraw / Quit"
+
+    console cstate
 
 prompt = putStr ">>> " >> hFlush stdout
 
@@ -159,3 +176,4 @@ parsePrefixes s = readMaybe s :: Maybe [AddrRange IPv4]
 
 parseAddress s  = readMaybe s :: Maybe IPv4
 parsePath s  = readMaybe s :: Maybe [Word32]
+parseWord32 s  = readMaybe s :: Maybe Word32
