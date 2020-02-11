@@ -4,6 +4,8 @@ import BGPlib.BGPparse(BGPMessage(..),encodeBGPMessage)
 import Network.Socket(Socket,close)
 import Network.Socket.ByteString(recv)
 import System.IO.Error(catchIOError)
+import qualified System.Timeout
+import Data.Maybe(fromMaybe)
 import qualified Data.ByteString.Lazy as L
 import Data.Binary(encode)
 import Control.Exception(handle,evaluate,throw,Exception,SomeException)
@@ -29,7 +31,10 @@ getBGPHandle s = do
         return $ BGPHandle s ior
 
 bgpRcv :: BGPHandle -> Int -> IO BGPMessage
-bgpRcv (BGPHandle stream ioref) _ = do
+bgpRcv bgpHandle t = fromMaybe BGPTimeout <$> System.Timeout.timeout (1000000 * t) (bgpRcv' bgpHandle)
+
+bgpRcv' :: BGPHandle -> IO BGPMessage
+bgpRcv' (BGPHandle stream ioref) = do
 
     oldBuf <- readIORef ioref
     newBuf <- if B.null oldBuf then getBuf else return oldBuf
