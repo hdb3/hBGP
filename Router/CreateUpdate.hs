@@ -15,19 +15,19 @@ bgpWithdraw  prefixes  = makeUpdate [] ( map fromAddrRange prefixes ) []
 eor :: [ParsedUpdate]
 eor = eorBGPUpdate
 
-iBGPUpdate :: [Word32] -> [ AddrRange IPv4] -> IPv4 -> [ParsedUpdate]
+iBGPUpdate :: [Word32] -> [ AddrRange IPv4] -> IPv4 -> Word32 -> [ParsedUpdate]
 iBGPUpdate = xBGPUpdate False
 
-eBGPUpdate :: [Word32] -> [ AddrRange IPv4] -> IPv4 -> [ParsedUpdate]
+eBGPUpdate :: [Word32] -> [ AddrRange IPv4] -> IPv4 -> Word32 -> [ParsedUpdate]
 eBGPUpdate = xBGPUpdate True
 
-xBGPUpdate isExternal aspath prefixes nextHop = makeUpdate
+xBGPUpdate isExternal aspath prefixes nextHop varpar = makeUpdate
                     ( map fromAddrRange prefixes )
                     []
                     [ PathAttributeOrigin _BGP_ORIGIN_IGP
                     , PathAttributeASPath $ ASPath4 [ASSequence aspath]
                     , PathAttributeNextHop nextHop
-                    , if isExternal then PathAttributeMultiExitDisc 0 else PathAttributeLocalPref 100
+                    , if isExternal then PathAttributeMultiExitDisc varpar else PathAttributeLocalPref varpar
                     ]
 
 eorBGPUpdate = makeUpdate [] [] []
