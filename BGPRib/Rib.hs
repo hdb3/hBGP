@@ -158,11 +158,12 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
             return $ Rib' prefixTable' adjRibOutTables
 
     makeRouteData :: PeerData -> [PathAttribute] -> Int -> Word32 -> RouteData
-    makeRouteData peerData pathAttributes routeId localPref = RouteData {..}
+    makeRouteData peerData pathAttributes routeId overrideLocalPref = RouteData {..}
         where
         pathLength = getASPathLength pathAttributes
         fromEBGP = isExternal peerData
         med = if fromEBGP then 0 else getMED pathAttributes
+        localPref = if fromEBGP then overrideLocalPref else getLocalPref pathAttributes
         nextHop = getNextHop pathAttributes
         origin = getOrigin pathAttributes
 
