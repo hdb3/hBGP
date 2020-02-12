@@ -27,13 +27,13 @@ type PrefixTableEntry = [RouteData]
 type PrefixTable = IntMap.IntMap PrefixTableEntry
 
 instance {-# OVERLAPPING #-} Show PrefixTable where
-    show = show . IntMap.toList
+    show = show . (map (\(k,v) -> (toPrefix k,v))) . IntMap.toList
 
 newPrefixTable :: PrefixTable
 newPrefixTable = IntMap.empty
 
 update:: PrefixTable -> [Prefix] -> PeerData -> Maybe RouteData -> (PrefixTable, [(PeerData, Int, [Prefix])])
-update pt pfxs sourcePeer routeM = (pt,updates) where
+update pt pfxs sourcePeer routeM = (pt',updates) where
 
     (pt', updateList) = foldl' kf (pt,[]) pfxs 
     kf :: (PrefixTable, [(PeerData,Int,Prefix)]) -> Prefix -> (PrefixTable, [(PeerData,Int, Prefix)])
