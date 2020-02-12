@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
-module BGPRib.PrefixTable(PrefixTable,update,newPrefixTable,queryPrefixTable,getPeerPrefixes) where
+module BGPRib.PrefixTable(PrefixTable,update,newPrefixTable,queryPrefixTable,getPeerPrefixes,showRibAt) where
 
 {- A single prefix table holds everything about a prefix we could care about
  - but, this is merely the prefix itself, and the associated path
@@ -95,6 +95,9 @@ updatePrefixTable sourcePeer routeM pt pfx = (pt', rval) where
 -- this function returns the best route for a specific prefix
 queryPrefixTable :: PrefixTable -> Prefix -> Maybe RouteData
 queryPrefixTable table pfx = fmap head (IntMap.lookup (fromPrefix pfx) table)
+
+showRibAt :: PrefixTable -> Prefix -> String
+showRibAt table pfx = show (IntMap.lookup (fromPrefix pfx) table)
 
 withdrawPeer :: PrefixTable -> PeerData -> (PrefixTable,[Prefix])
 -- core function is mapAccumWithKey

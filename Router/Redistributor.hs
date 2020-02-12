@@ -104,16 +104,27 @@ insertTestRoutes Global{..} path count = do
 
 data CState = CState { push :: (ParsedUpdate -> IO ())
                      , exit :: IO ()
+                     , csGlobal :: Global
                      , csPath :: [Word32]
                      , csNlri :: [AddrRange IPv4]
                      , csNextHop :: IPv4
                      , csLocalPref :: Word32 }
 
+query :: CState -> [String] -> IO ()
+query cs s = do
+    prefixTable <- getLocRib (rib $ csGlobal cs)
+    if null $ head s then
+        print prefixTable
+    else
+        maybe (putStrLn "couldn't parse prefix")
+              (\prefix -> putStrLn $ "[" ++ show prefix ++ "] " ++ showRibAt prefixTable (fromAddrRange prefix))
+              (parsePrefix $ head s)
+    console cs
+
 startConsole global = do
    let push = ribPush (rib global) (localPeer $ gd global)
        exit = putMVar (exitFlag global) ()
-       consoleThread = console $ CState push exit [] [] "0.0.0.0" 100
-                       --   putMVar (exitFlag global) () 
+       consoleThread = console $ CState push exit global [] [] "0.0.0.0" 100
    void $ forkIO consoleThread
 
 updateFrom CState{..} = mapM_ push $ iBGPUpdate csPath csNlri csNextHop csLocalPref
@@ -127,6 +138,8 @@ console cstate@CState{..} = do
     case map toLower command of
 
         "" -> console cstate
+
+        "q" -> query cstate px
 
         "s" -> do putStrLn $ "Route: " ++ show csPath ++ " : " ++ show csNlri ++ " nh=" ++ show csNextHop ++ " lp=" ++ show csLocalPref
                   console cstate
@@ -163,7 +176,7 @@ console cstate@CState{..} = do
                      )
                      (parseWord32 $ px !! 0)
 
-        "q" -> putStrLn "goodbye" >> exit                  
+        "x" -> putStrLn "goodbye" >> exit                  
 
         _   -> putStrLn "couldn't parse a command - try Show / Path / nH / Nlri / Local preference / Update / Withdraw / Quit"
 
