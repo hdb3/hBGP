@@ -62,10 +62,10 @@ dummyGlobalData :: GlobalData
 dummyGlobalData = GlobalData 64512 "127.0.0.1"
 
 instance Show PeerData where
-    show pd = " peer-AS=" ++ show (peerAS pd) ++ " peer-IP=" ++ show (peerBGPid pd)
+    show pd = " peer AS: " ++ show (peerAS pd) ++ ",  peer addr: " ++ show (peerIPv4 pd)
 
 instance Show RouteData where
-    show rd = "pathlength=" ++ show (pathLength rd) ++ "localPref=" ++ show (localPref rd) ++ show (peerData rd)
+    show rd = "nexthop: " ++ show (nextHop rd) ++ ",  peer ID: " ++ show (peerBGPid $ peerData rd) ++ ",  pref " ++ show (localPref rd)
 
 instance Eq RouteData where
     a == b = routeId a == routeId b
