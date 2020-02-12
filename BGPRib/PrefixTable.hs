@@ -70,6 +70,9 @@ updatePrefixTable pt pfx route = (newPrefixTable, isNewBestRoute) where
 queryPrefixTable :: PrefixTable -> Prefix -> Maybe RouteData
 queryPrefixTable table pfx = fmap slHead (IntMap.lookup (fromPrefix pfx) table)
 
+showRibAt :: PrefixTable -> Prefix -> String
+showRibAt table pfx = show (IntMap.lookup (fromPrefix pfx) table)
+
 {-
   Withdraw Operations
 
