@@ -296,9 +296,8 @@ runFSM g@Global{..} socketName peerName handle =
 
     keepaliveLoop handle timer | timer == 0 = return ()
                                | otherwise  = catch
-        ( do
+        ( do threadDelay ( 1000000 * timer)
              bgpSnd handle BGPKeepalive
-             threadDelay ( 1000000 * timer)
              keepaliveLoop handle timer
         )
         (\(BGPIOException _) -> return ()
