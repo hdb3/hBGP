@@ -5,12 +5,15 @@ module Router.Redistributor where
 import Control.Concurrent
 import qualified System.IO.Streams as Streams
 import Control.Monad(void,unless)
+import Data.Maybe(fromMaybe)
 import Data.IP
-import Text.Read
+import Text.Read hiding (lift)
 import System.IO(hFlush,stdout)
 import Data.Char(toLower)
 import Data.Word(Word32)
 import System.Exit(exitSuccess)
+import System.Console.Haskeline
+import Control.Monad.Trans.Class
 
 import BGPlib.BGPlib
 import BGPRib.BGPRib
@@ -102,83 +105,84 @@ insertTestRoutes Global{..} path count = do
     mapM_ (ribPush rib ( localPeer gd )) updates''
     info "done"
 
-data CState = CState { push :: (ParsedUpdate -> IO ())
-                     , exit :: IO ()
+data CState = CState { push :: (ParsedUpdate -> InputT IO ())
+                     , exit :: InputT IO ()
                      , csGlobal :: Global
                      , csPath :: [Word32]
                      , csNlri :: [AddrRange IPv4]
                      , csNextHop :: IPv4
                      , csLocalPref :: Word32 }
 
-query :: CState -> [String] -> IO ()
+query :: CState -> [String] -> InputT IO ()
 query cs s = do
-    prefixTable <- getLocRib (rib $ csGlobal cs)
+    prefixTable <- lift $ getLocRib (rib $ csGlobal cs)
     if null $ head s then
-        print prefixTable
+        lift $ print prefixTable
     else
-        maybe (putStrLn "couldn't parse prefix")
-              (\prefix -> putStrLn $ "[" ++ show prefix ++ "] " ++ showRibAt prefixTable (fromAddrRange prefix))
+        maybe (outputStrLn "couldn't parse prefix")
+              (\prefix -> outputStrLn $ "[" ++ show prefix ++ "] " ++ showRibAt prefixTable (fromAddrRange prefix))
               (parsePrefix $ head s)
     console cs
 
 startConsole global = do
-   let push = ribPush (rib global) (localPeer $ gd global)
-       exit = putMVar (exitFlag global) ()
-       consoleThread = console $ CState push exit global [] [] "0.0.0.0" 100
+   let push v = lift $ ribPush (rib global) (localPeer $ gd global) v
+       exit = lift $ putMVar (exitFlag global) ()
+       consoleThread = runInputT defaultSettings $ console $ CState push exit global [] [] "0.0.0.0" 100
    void $ forkIO consoleThread
 
 updateFrom CState{..} = mapM_ push $ iBGPUpdate csPath csNlri csNextHop csLocalPref
 withdrawFrom CState{..} = mapM_ push ( bgpWithdraw csNlri )
 
-console :: CState -> IO ()
+console :: CState -> InputT IO ()
 console cstate@CState{..} = do
-    prompt
-    input <- getLine
-    let (command:px) = words input ++ repeat ""
+    
+    inputM <- getInputLine ">>> "
+    let input = fromMaybe "" inputM
+        (command:px) = words input ++ repeat ""
     case map toLower command of
 
         "" -> console cstate
 
         "q" -> query cstate px
 
-        "s" -> do putStrLn $ "Route: " ++ show csPath ++ " : " ++ show csNlri ++ " nh=" ++ show csNextHop ++ " lp=" ++ show csLocalPref
+        "s" -> do outputStrLn $ "Route: " ++ show csPath ++ " : " ++ show csNlri ++ " nh=" ++ show csNextHop ++ " lp=" ++ show csLocalPref
                   console cstate
 
-        "u" -> do putStrLn $ "Sending update: " ++ show csPath ++ " : " ++ show csNlri ++ " : " ++ show csNextHop
+        "u" -> do outputStrLn $ "Sending update: " ++ show csPath ++ " : " ++ show csNlri ++ " : " ++ show csNextHop
                   updateFrom cstate
                   console cstate
 
-        "w" -> do putStrLn $ "Sending withdraw: " ++ show csNlri
+        "w" -> do outputStrLn $ "Sending withdraw: " ++ show csNlri
                   withdrawFrom cstate
                   console cstate
 
-        "h" -> maybe (putStrLn "couldn't parse nexthop")
-                     (\p -> do putStrLn $ "Nexthop: " ++ show p
+        "h" -> maybe (outputStrLn "couldn't parse nexthop")
+                     (\p -> do outputStrLn $ "Nexthop: " ++ show p
                                console cstate {csNextHop = p}
                      )
                      (parseAddress $ px !! 0)
 
-        "p" -> maybe (putStrLn "couldn't parse a path")
-                     (\p -> do putStrLn $ "Path: " ++ show p
+        "p" -> maybe (outputStrLn "couldn't parse a path")
+                     (\p -> do outputStrLn $ "Path: " ++ show p
                                console cstate {csPath = p}
                      )
                      (parsePath $ px !! 0)
         
-        "n" -> maybe (putStrLn "couldn't parse prefixes")
-                     (\p -> do putStrLn $ "nlri: " ++ show p
+        "n" -> maybe (outputStrLn "couldn't parse prefixes")
+                     (\p -> do outputStrLn $ "nlri: " ++ show p
                                console cstate {csNlri = p}
                      )
                      (parsePrefixes $ px !! 0)
 
-        "l" -> maybe (putStrLn "couldn't parse local preference")
-                     (\p -> do putStrLn $ "LocPref: " ++ show p
+        "l" -> maybe (outputStrLn "couldn't parse local preference")
+                     (\p -> do outputStrLn $ "LocPref: " ++ show p
                                console cstate {csLocalPref = p}
                      )
                      (parseWord32 $ px !! 0)
 
-        "x" -> putStrLn "goodbye" >> exit                  
+        "x" -> outputStrLn "goodbye" >> exit                  
 
-        _   -> putStrLn "couldn't parse a command - try Show / Path / nH / Nlri / Local preference / Update / Withdraw / Quit"
+        _   -> outputStrLn "couldn't parse a command - try Show / Path / nH / Nlri / Local preference / Update / Withdraw / Quit"
 
     console cstate
 
