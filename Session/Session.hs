@@ -109,7 +109,7 @@ listener state@State{..} = do
     eSock <- tryIOError ( bindSock' port (toHostAddress listenAddress) )
     either
         ( \e -> do Errno errno <- getErrno
-                   if | errno == 13 -> die "permission error binding port (are you su?)"
+                   if | errno == 13 -> die "permission error binding port (are you su?) (or try: sysctl net.ipv4.ip_unprivileged_port_start=179?)"
                       | errno == 99 -> die "address error binding port - host configuration mismatch?"
                       | errno `elem` [98] -> do hPutStrLn stderr "waiting to bind port"
                                                 threadDelay (10 * seconds)
