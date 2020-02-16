@@ -110,6 +110,7 @@ listener state@State{..} = do
     either
         ( \e -> do Errno errno <- getErrno
                    if | errno == 13 -> die "permission error binding port (are you su?)"
+                      | errno == 99 -> die "address error binding port - host configuration mismatch?"
                       | errno `elem` [98] -> do hPutStrLn stderr "waiting to bind port"
                                                 threadDelay (10 * seconds)
                                                 listener state
@@ -186,7 +187,7 @@ run state@State{..} (src,dst) = do
             logger $ "Exception connecting to " ++ show dst ++ " - " ++ errReport errno e
             return Nothing )
 
-errReport errno e | errno `elem` [2,32,104,107,115] = ioe_description e ++ " (" ++ show errno ++ ")"
+errReport errno e | errno `elem` [2,32,99,104,107,115] = ioe_description e ++ " (" ++ show errno ++ ")"
                   | otherwise = errReport' errno e
 
 errReport' errno e = unlines
