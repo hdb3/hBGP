@@ -115,8 +115,8 @@ listener state@State{..} = do
                                                 threadDelay (10 * seconds)
                                                 listener state
                       | otherwise -> error $ errReport' errno e )
-        ( \(listeningSocket,_) -> forever ( do s <- NS.accept listeningSocket
-                                               forkIO $ listenClient s ))
+        ( \(listeningSocket,_) -> putStrLn "listening server started" >> forever ( do s <- NS.accept listeningSocket
+                                                                                      forkIO $ listenClient s ))
         eSock
     where
 
