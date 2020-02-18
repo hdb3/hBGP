@@ -54,16 +54,26 @@ log_user 1
 send "\renable\r\rconfig terminal\r"
 
 send "$data"
-send "\r\rwrite terminal\r\r"
+send "\r\rwrite memory\r\r"
 
 ts
 
 send_user "config complete\n"
 
+expect {
+         -re "# *\n" { ts ; send_user "Done\n" }
+         -re "#\n" { ts ; send_user "Done\n" }
+         -re "\n" { send_user + ; exp_continue }
+         timeout { ts ; send_user "==$exp_output(buffer)==\n" ; send "\r\n" ; exp_continue }
+       }
+
 # interact 
 
-sleep 1
+sleep 2
 
+ts
+send_user "reload request\n"
+sleep 2
 send "\rreload\r"
 
 expect { "[confirm]" { send "\r" } }
