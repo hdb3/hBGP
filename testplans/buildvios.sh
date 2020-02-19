@@ -1,4 +1,4 @@
-vmdk=/home/nic/VIRL/vios-adventerprisek9-m.vmdk.SPA.157-3.M3
+vmdk=/home/nic/virl/vios-adventerprisek9-m.vmdk.SPA.157-3.M3
 virsh destroy vios1 || echo "nowt to do"
 virsh undefine vios1 || echo "nowt to do again"
 sudo rm -f vios1.qcow2
