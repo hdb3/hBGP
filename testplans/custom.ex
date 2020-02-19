@@ -1,5 +1,8 @@
 #!/usr/bin/expect
 set vm [lindex $argv 0]
+set config [lindex $argv 1]
+set f [open $config]
+set data [read $f]
 log_user 0
 
 proc ts {s} {
@@ -10,7 +13,7 @@ proc ts {s} {
 spawn /usr/bin/virsh start $vm
 expect "Domain $vm started"
 
-ts "VM $vm started"
+ts "domain started"
 
 spawn /usr/bin/virsh console $vm
 
@@ -45,13 +48,15 @@ expect {
        }
 
 expect *
-ts "initialisation complete , sending base config"
+
+ts "initialisation complete , sending config $config"
+
 send "\rterminal no monitor\rconfig terminal\r"
 
-send "enable password cisco"
+send "$data"
 expect *
 send "\r\rwrite memory\r\r"
-ts "base configuration complete , waiting for confirmation"
+ts "configuration complete , waiting for confirmation"
 
 set timeout 20
 expect {
@@ -63,14 +68,13 @@ expect {
 
 ts "startup configuration saved, waiting for console prompt"
 
-set timeout 5
+expect *
+send "\r"
+set timeout 1
 expect {
-         -re "\nRouter#$" { ts "default console active after configuration" }
-         -re "\n\([\[:alnum:\]\]+)#$" { ts "custom console active after configuration: $expect_out(1,string)" }
-         -re ".*\n" { exp_continue }
-         -re "\r" { exp_continue }
-         timeout { send_user "!" ; send "\r" ; exp_continue }
-#         timeout { ts "!" ; send_user "==$expect_out(buffer)==\n" ; send "\r" ; exp_continue }
+         -re "\n(.*)#" { set rname $expect_out(1,string) ; ts "matched device name is $rname" }
+         -re ".*\n" { send "\r" ; exp_continue }
+         timeout { send_user "." ; send "\r" ; exp_continue }
        }
 
 ts "reload request"
@@ -91,4 +95,4 @@ spawn /usr/bin/virsh destroy $vm
 
 expect -re "Domain $vm destroyed"
 expect eof
-ts "bootstrap complete for $vm using $config"
+ts "bootstrap complete for $vm using $config\n"
