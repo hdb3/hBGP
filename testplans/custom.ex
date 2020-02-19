@@ -1,8 +1,13 @@
 #!/usr/bin/expect
 set vm [lindex $argv 0]
+set sshconfig "sshbase.cfg"
 set config [lindex $argv 1]
-set f [open $config]
-set data [read $f]
+# set f [open $config]
+# set data [read $f]
+set data [read [open $config]]
+# set sshf [open $sshconfig]
+# set sshdata [read $sshf]
+set sshdata [read [open $sshconfig]]
 log_user 0
 
 proc ts {s} {
@@ -53,7 +58,9 @@ ts "initialisation complete , sending config $config"
 
 send "\rterminal no monitor\rconfig terminal\r"
 
+send "$sshdata"
 send "$data"
+send "end"
 expect *
 send "\r\rwrite memory\r\r"
 ts "configuration complete , waiting for confirmation"

@@ -5,6 +5,10 @@ for net in default1 default2
   done
 virsh net-list
 
+sudo ip addr add 100.64.0.2/30 dev virbr1
+sudo ip addr add 100.64.0.6/30 dev virbr1
+sudo ip addr add 100.64.0.10/30 dev virbr1
+
 exit 0
 
 for net in default1 default2
