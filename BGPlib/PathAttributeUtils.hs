@@ -61,6 +61,9 @@ flattenPath (ASSet asns:segs) = head asns : flattenPath segs
 setLocalPref :: Word32 -> [PathAttribute] -> [PathAttribute]
 setLocalPref = insertPathAttribute . PathAttributeLocalPref
 
+delLocalPref :: [PathAttribute] -> [PathAttribute]
+delLocalPref = deletePathAttributeType TypeCodePathAttributeLocalPref
+
 getLocalPref :: [PathAttribute] -> Word32
 getLocalPref pas = maybe 0 (\(PathAttributeLocalPref x) -> x) (getPathAttribute TypeCodePathAttributeLocalPref pas)
 
