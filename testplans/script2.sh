@@ -2,10 +2,10 @@
 # tmux new-session -d -s test
 tmux set mouse on
 # tmux set -t test:0 remain-on-exit on
-tmux splitw -P -d -t test:0 -c /home/nic/src/hBGP.master/ stack run testplans/agent1.conf > agent1.pane
-tmux splitw -P -d -t test:0 -c /home/nic/src/hBGP.master/ stack run testplans/agent2.conf > agent2.pane
-tmux splitw -P -d -t test:0 -c /home/nic/src/hBGP.master/ stack run testplans/agent3.conf > agent3.pane
-tmux splitw -P -d -t test:0 -c /home/nic/src/hBGP.master/testplans bash test2.sh > script.pane
+tmux splitw -P -F "#{pane_id}" -d -t test:0 -c /home/nic/src/hBGP.master/ stack run testplans/agent1.conf > agent1.pane
+tmux splitw -P -F "#{pane_id}" -d -t test:0 -c /home/nic/src/hBGP.master/ stack run testplans/agent2.conf > agent2.pane
+tmux splitw -P -F "#{pane_id}" -d -t test:0 -c /home/nic/src/hBGP.master/ stack run testplans/agent3.conf > agent3.pane
+tmux splitw -P -F "#{pane_id}" -d -t test:0 -c /home/nic/src/hBGP.master/testplans bash test2.sh > script.pane
 # tmux attach -t test:0
 
 # read -p "load initial?"
