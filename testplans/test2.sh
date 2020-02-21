@@ -1,11 +1,15 @@
-agent1=$(<agent1.pane)
-agent2=$(<agent2.pane)
-agent3=$(<agent3.pane)
-read -p "load initial?"
-tmux send-keys -t $agent2 "h 100.64.0.2" Enter "p [100]" Enter "n [172.16.0.99/32]" Enter u Enter
-tmux send-keys -t $agent3 "h 100.64.0.3" Enter "p [666]" Enter "n [172.16.0.99/32]" Enter u Enter
+agent1=$(</tmp/agent1.pane)
+agent2=$(</tmp/agent2.pane)
+agent3=$(</tmp/agent3.pane)
+read -p "load good route"
 
-read -p "remove 666"
+tmux send-keys -t $agent2 "h 7.0.0.6" Enter "p [100,101]" Enter "n [172.16.0.99/32]" Enter "l 50" Enter u Enter
+
+read -p "advertise 666"
+
+tmux send-keys -t $agent3 "h 7.0.0.10" Enter "p [666]" Enter "n [172.16.0.99/32]" Enter "l 50" Enter u Enter
+
+read -p "modify 666 -> 999"
 
 tmux send-keys -t $agent3 "p [999]" Enter u Enter
 
@@ -13,9 +17,10 @@ read -p "reinstate 666"
 
 tmux send-keys -t $agent3 "p [666]" Enter u Enter
 
-read -p "send withdraw?"
+read -p "withdraw"
 
 tmux send-keys -t $agent3 w Enter
 
 read -p "all done"
-#tmux kill-session -t test
+
+tmux kill-session -t test
