@@ -4,7 +4,7 @@
 module Router.Redistributor where
 import Control.Concurrent
 import qualified System.IO.Streams as Streams
-import Control.Monad(void,unless)
+import Control.Monad(void,unless,when)
 import Data.Maybe(fromMaybe)
 import Data.IP
 import Text.Read hiding (lift)
@@ -32,26 +32,26 @@ redistribute :: Global -> IO ()
 redistribute global@Global{..} = do
     insertTestRoutes global (configTestRoutePath config) (configTestRouteCount config)
     startConsole global
-    if not (configEnableDataPlane config )
-    then info "configEnableDataPlane not set, not starting zserv API"
-    else do threadId <- myThreadId
-            trace $ "Thread " ++ show threadId ++ " starting redistributor"
-            ( zStreamIn, zStreamOut ) <- getZServerStreamUnix "/var/run/quagga/zserv.api"
-            zservRegister zStreamOut _ZEBRA_ROUTE_BGP
-            if configEnableRedistribution config
-            then void $ forkIO (zservReader global (localPeer gd) ( zStreamIn, zStreamOut ))
-            else info "configEnableRedistribution not enabled - not staring Zserv listener"
+    when (configEnableDataPlane config )
+         ( do   threadId <- myThreadId
+                trace $ "Thread " ++ show threadId ++ " starting redistributor"
+                ( zStreamIn, zStreamOut ) <- getZServerStreamUnix "/var/run/quagga/zserv.api"
+                zservRegister zStreamOut _ZEBRA_ROUTE_BGP
+                if configEnableRedistribution config
+                then void $ forkIO (zservReader global (localPeer gd) ( zStreamIn, zStreamOut ))
+                else info "configEnableRedistribution not enabled - not staring Zserv listener"
 
-            let routeInstall (route, Just nextHop) = do
-                    trace $ "install " ++ show route ++ " via " ++ show nextHop
-                    addRoute zStreamOut (toAddrRange route) nextHop
-                    -- addRoute zStreamOut (toAddrRange $ toPrefix route) nextHop
-                routeInstall (route, Nothing) = do
-                    trace $ "delete " ++ show route
-                    delRoute zStreamOut (toAddrRange route)
-                    -- delRoute zStreamOut (toAddrRange $ toPrefix route)
+                let routeInstall (route, Just nextHop) = do
+                        trace $ "install " ++ show route ++ " via " ++ show nextHop
+                        addRoute zStreamOut (toAddrRange route) nextHop
+                        -- addRoute zStreamOut (toAddrRange $ toPrefix route) nextHop
+                    routeInstall (route, Nothing) = do
+                        trace $ "delete " ++ show route
+                        delRoute zStreamOut (toAddrRange route)
+                        -- delRoute zStreamOut (toAddrRange $ toPrefix route)
 
-            ribUpdateListener routeInstall global ( localPeer gd ) 1
+                ribUpdateListener routeInstall global ( localPeer gd ) 1
+         )
 
 
 ribUpdateListener routeInstall global@Global{..} peer timeout = do
@@ -94,7 +94,7 @@ zservReader Global{..} peer ( zStreamIn, zStreamOut ) = do
               msg
 
 
-insertTestRoutes _ "" _ = info "no test route data specified"
+insertTestRoutes _ "" _ = debug "no test route data specified"
 insertTestRoutes Global{..} path count = do
     info $ "test route set requested: " ++ path
     updates <- pathReadRib path

@@ -33,8 +33,8 @@ main = do
     let
         app = bgpFSM global
 
-    info $ "connecting to " ++ show (activePeers config)
-    info $ "activeOnly = " ++ show (activeOnly config)
+    debug $ "connecting to " ++ show (activePeers config)
+    debug $ "activeOnly = " ++ show (activeOnly config)
     forkIO $ Session.session 179 app (configListenAddress config) (activePeers config) (not $ activeOnly config)
     info "Router ready"
     takeMVar (exitFlag global)

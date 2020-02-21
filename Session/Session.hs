@@ -53,7 +53,7 @@ session port defaultApp localIPv4 peers enableInbound = do
     if enableInbound then
         listener state
     else do
-        putStrLn "session: inbound connections not enabled"
+        -- putStrLn "session: inbound connections not enabled"
         forever (threadDelay $ 10^12)
     where
 
@@ -115,8 +115,8 @@ listener state@State{..} = do
                                                 threadDelay (10 * seconds)
                                                 listener state
                       | otherwise -> error $ errReport' errno e )
-        ( \(listeningSocket,_) -> putStrLn "listening server started" >> forever ( do s <- NS.accept listeningSocket
-                                                                                      forkIO $ listenClient s ))
+        ( \(listeningSocket,_) -> forever ( do s <- NS.accept listeningSocket
+                                               forkIO $ listenClient s ))
         eSock
     where
 
@@ -132,7 +132,7 @@ listener state@State{..} = do
     listenClient (sock, NS.SockAddrInet _ remoteHostAddress) = do
             ( NS.SockAddrInet _ localHostAddress ) <- NS.getSocketName sock
             let addressPair = ( fromHostAddress localHostAddress ,fromHostAddress remoteHostAddress)
-            logger $ "listener - connect request (src/dst): " ++ show addressPair
+            -- logger $ "listener - connect request (src/dst): " ++ show addressPair
             unblocked <- raceCheckNonBlock addressPair
             if unblocked then do
                 wrap state defaultApp sock
