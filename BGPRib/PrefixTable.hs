@@ -14,6 +14,7 @@ module BGPRib.PrefixTable(PrefixTable,update,newPrefixTable,queryPrefixTable,get
  - hence a fast implementation is essential
 -}
 
+import qualified Debug.Trace
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Map.Strict as Map
 import Data.List ((\\),foldl')
@@ -66,7 +67,7 @@ updatePrefixTable sourcePeer routeM pt pfx = (pt', rval) where
     oldList = fromMaybe [] $ IntMap.lookup (fromPrefix pfx) pt
     
     -- delete strategy uses the route origin as the basis for equality - in base case this is the peer, in ADDPATH it is (peer,PathID) 
-    tmpList = filter p oldList where p r = peerData r == sourcePeer
+    tmpList = filter p oldList where p r = peerData r /= sourcePeer
 
     newList = maybe tmpList (\route -> Data.List.sort $ route : tmpList) routeM
         
@@ -89,7 +90,10 @@ updatePrefixTable sourcePeer routeM pt pfx = (pt', rval) where
     newPoisonedPeers = map peerData newPoisoned
     (withdrawTargets, updateTargets) = if (oldBest == newBest) then (oldPoisonedPeers \\ newPoisonedPeers, newPoisonedPeers \\ oldPoisonedPeers)
                                                                else (oldPoisonedPeers \\ newPoisonedPeers, newPoisonedPeers)
-    rval = map (\x -> (x,0,pfx)) withdrawTargets ++ map (\x -> (x,newBest,pfx)) updateTargets 
+
+    traceData = "\noldPoisoned / oldUnpoisoned " ++ show (oldPoisoned,oldUnpoisoned) 
+                ++ "\nnewPoisoned / newUnpoisoned " ++ show (newPoisoned,newUnpoisoned)                                                    
+    rval = Debug.Trace.trace traceData ( map (\x -> (x,0,pfx)) withdrawTargets ++ map (\x -> (x,newBest,pfx)) updateTargets)
     
 
 -- this function returns the best route for a specific prefix
