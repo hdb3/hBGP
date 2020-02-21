@@ -1,16 +1,24 @@
 vmdk=/home/nic/virl/vios-adventerprisek9-m.vmdk.SPA.157-3.M3
-virsh -q destroy br1 || :
-virsh -q undefine br1 || :
-sudo rm -f br1.qcow2
-qemu-img convert -f vmdk -O qcow2 $vmdk br1.qcow2
-virt-install --os-variant freebsd12.0 --graphics none --noreboot --noautoconsole --import --disk br1.qcow2 --name br1 --memory 2048 --network network=default2,model=e1000 --network network=default1,model=e1000 --network network=default1,model=e1000 --network network=default1,model=e1000
-./custom.ex br1 br1.startup.cfg
-exit 0
-for vm in br3a br3b br3c
-  do virsh -q destroy $vm || :
-     virsh -q undefine $vm || :
+
+function build {
+     vm=$1
+     intnet="--network network=default2,model=e1000"
+     extnet="--network network=default1,model=e1000"
+     vmspec="--os-variant freebsd12.0 --graphics none --memory 2048"
+     networks="$intnet"
+     if (( $# < 2 )) ; then netn=1 ; else netn=$2 ; fi
+     for i in $( seq 1 $netn ) 
+         do networks="$networks $extnet"
+         done
+     virsh -q destroy $vm > /dev/null  || :
+     virsh -q undefine $vm > /dev/null || :
      sudo rm -f $vm.qcow2
      qemu-img convert -f vmdk -O qcow2 $vmdk $vm.qcow2
-     virt-install --os-variant freebsd12.0 --noautoconsole --import --disk $vm.qcow2 --name $vm --memory 2048 --network network=default2,model=e1000 --network network=default1,model=e1000
+     virt-install --quiet --noreboot --noautoconsole $vmspec --name $vm --import --disk $vm.qcow2 $networks
      ./custom.ex $vm $vm.startup.cfg
+}
+
+build br1 3
+for vm in br3a br3b br3c
+  do build $vm 1
   done

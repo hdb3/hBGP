@@ -15,7 +15,7 @@ proc ts {s} {
 spawn /usr/bin/virsh start $vm
 expect "Domain $vm started"
 
-ts "vm started"
+ts "vm $vm started"
 
 spawn /usr/bin/virsh console $vm
 ts "console started"
@@ -30,33 +30,45 @@ ts "waiting for config dialog"
 set timeout 120
 
 expect {
-        -re "Would you like to enter the initial configuration dialog" { ts "console active, waiting for command prompt"; send "no\r\n" }
+        -re "Would you like to enter the initial configuration dialog" { ts "console active, waiting for command prompt"; sleep 1 ; send "no\r" }
          timeout { ts " timed out (120 seconds)\n" ; exit 1 }
        }
 
-set timeout 60
+set timeout 5
 send "\r"
 expect {
-         -re "Press RETURN to get started" { send "\r"; exp_continue -continue_timer }
-         -re "Router>" {  send "enable\r" ; ts "command prompt active, requesting privileged mode" } 
-         -re "\nCompiled" { send "\r" ; exp_continue -continue_timer}
-         timeout {  ts "phase 2 timeout" ; exit 1 }
+         -re "Press RETURN to get started" { send "\r"; exp_continue }
+         -re "Router>" {  ts "command prompt active" } 
+         timeout {  send "\r" ; exp_continue }
        }
 
+send "show privilege\r"
 expect {
-         -re "Router#" {  ts "got privileged mode prompt"} 
-         timeout {  ts "phase 3 timeout" ; exit 1 }
+         -re ".*\r\nCurrent privilege level is 1\r\nRouter>" {  ts "priv level 1"} 
+         timeout {  send "show privilege\r" ; exp_continue }
        }
 
-expect *
+send "enable\r"
+
+send "show privilege\r"
+expect {
+         -re ".*\r\nCurrent privilege level is 15\r\n(\[\[:alnum:]\]*)#" {
+              set rname $expect_out(1,string)
+              if { $rname != "Router" } { send_user "fatal error - device name not Router" ; exit 1 }
+              ; ts "enable OK"
+             } 
+         timeout {  send "show privilege\r" ; exp_continue }
+       }
 
 ts "initialisation complete , sending config $config"
 
-send "\rterminal no monitor\rconfig terminal\r"
+send "\rconfig terminal\r"
+send "\rterminal no monitor\r"
 
 send "$data"
 send "$sshdata"
-send "end"
+send "\rend\r"
+sleep 5
 expect *
 send "\r\rwrite memory\r\r"
 ts "configuration complete , waiting for confirmation"
@@ -71,12 +83,14 @@ expect {
 ts "startup configuration saved, waiting for console prompt"
 
 expect *
-send "\r"
-set timeout 1
+
+send "show privilege\r"
 expect {
-         -re "\n(.*)#" { set rname $expect_out(1,string) ; ts "matched device name is $rname" }
-         timeout { send_user "." ; send "\r" ; exp_continue }
+         -re ".*\r\nCurrent privilege level is 15\r\n(\[\[:alnum:]\]*)#" { set rname $expect_out(1,string) ; ts "hostname $rname"} 
+         timeout {  send "show privilege\r" ; exp_continue }
        }
+
+if { $rname == "Router" } { send_user "fatal error - device name not changed from Router" ; exit 1 }
 
 ts "reload request"
 send "\rreload\r"
@@ -99,4 +113,4 @@ spawn /usr/bin/virsh destroy $vm
 
 expect -re "Domain $vm destroyed"
 expect eof
-ts "bootstrap complete for $vm using $config\n"
+ts "bootstrap complete for $vm using $config (config hostname was $rname)\n"
