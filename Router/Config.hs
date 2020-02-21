@@ -51,6 +51,7 @@ data PeerConfig = PeerConfig { peerConfigIPv4 :: (IPv4,IPv4)
                              , peerConfigEnableInbound :: Bool
                              , peerConfigOfferedCapabilities :: [ Capability ]
                              , peerConfigRequiredCapabilities :: [ Capability ]
+                             , peerConfigLocalPref :: Word32
                              }
                              deriving (Eq,Show,Read)
 
@@ -63,6 +64,7 @@ defaultPeerConfig = PeerConfig { peerConfigIPv4 = undefined
                                , peerConfigEnableInbound = True
                                , peerConfigOfferedCapabilities = [CapAS4 0]
                                , peerConfigRequiredCapabilities = [CapAS4 0]
+                               , peerConfigLocalPref = 100
                                }
 
 dummyPeerConfig = defaultPeerConfig {peerConfigIPv4=("0.0.0.0","127.0.0.1") }
