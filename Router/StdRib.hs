@@ -75,8 +75,8 @@ buildUpdate target prefixes (Just RouteData{..}) = if isExternal target then egp
                            ( sortPathAttributes $
                            setOrigin origin $
                            setNextHop (localIPv4 target ) $ -- next hop self!
-                           prePendAS ( myAS $ globalData peerData )
-                           pathAttributes
+                           prePendAS ( myAS $ globalData peerData ) $
+                           delLocalPref pathAttributes
                            )
 
 updateFromAdjRibEntrys :: Rib -> PeerData -> [AdjRIBEntry] -> IO [ParsedUpdate]
