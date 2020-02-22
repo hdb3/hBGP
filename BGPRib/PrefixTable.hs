@@ -96,9 +96,13 @@ updatePrefixTable sourcePeer routeM pt pfx = (pt', rval) where
     rval = Debug.Trace.trace traceData ( map (\x -> (x,0,pfx)) withdrawTargets ++ map (\x -> (x,newBest,pfx)) updateTargets)
     
 
+
 -- this function returns the best route for a specific prefix
 queryPrefixTable :: PrefixTable -> Prefix -> Maybe RouteData
-queryPrefixTable table pfx = fmap head (IntMap.lookup (fromPrefix pfx) table)
+queryPrefixTable table pfx = let
+    rawRouteList = fromMaybe [] $ IntMap.lookup (fromPrefix pfx) table
+    safeHead ax = if null ax then Nothing else Just $ head ax
+    in (safeHead . Data.List.dropWhile poisoned) rawRouteList
 
 showRibAt :: PrefixTable -> Prefix -> String
 showRibAt table pfx = show (IntMap.lookup (fromPrefix pfx) table)
