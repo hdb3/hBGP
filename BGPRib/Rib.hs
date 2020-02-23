@@ -45,8 +45,7 @@ delPeer rib peer = modifyMVar_ rib ( delPeer' peer )
         let (prefixTable',prefixes) = withdrawPeer prefixTable peer
         -- schedule the withdraw dissemination
         -- NOTE - this does not change the AdjRIBMap
-        unless (null prefixes)
-             ( updateRibOutWithPeerData peer nullRoute prefixes adjRib)
+        updateRibOutWithPeerData peer nullRoute prefixes adjRib
         -- now remove this peer completely from the AdjRIBMap
         -- it is liekly that this could be done before the previous action.....
         -- but the semantics should be identical as long as we didn't try to send withdraw messages to the peer which has gone away...
@@ -107,11 +106,8 @@ getNextHops rib prefixes = do
 pullAllUpdates :: PeerData -> Rib -> IO [AdjRIBEntry]
 pullAllUpdates peer rib = do
     (Rib' _ arot) <- readMVar rib
-    --dequeueAll (arot Data.Map.! peer)
-    rval <- dequeueAll (arot Data.Map.! peer)
-    -- diagnostic for sent updates - TODO convert to trace
-    --print $ length rval
-    return rval
+    dequeueAll (arot Data.Map.! peer)
+
 -- TODO write and use the function 'getAdjRibForPeer'
 
 getLocRib :: Rib -> IO PrefixTable
@@ -128,11 +124,8 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
     where
 
     ribPush' :: PeerData -> ParsedUpdate -> Rib' -> IO Rib'
-    ribPush' peerData ParsedUpdate{..} rib0 = do
-        rib1 <- ribUpdateMany peerData puPathAttributes hash nlri rib0
-        -- diagnostic for received updates - TODO convert to trace
-        --print (PrefixTableUtils.lengthRIB $ prefixTable rib0 , PrefixTableUtils.lengthRIB $ prefixTable rib1)
-        ribWithdrawMany peerData withdrawn rib1
+    ribPush' peerData ParsedUpdate{..} rib = 
+        ribUpdateMany peerData puPathAttributes hash nlri rib >>= ribWithdrawMany peerData withdrawn
 
     ribUpdateMany :: PeerData -> [PathAttribute] -> Int -> [Prefix] -> Rib' -> IO Rib'
     ribUpdateMany peerData pathAttributes routeId pfxs (Rib' prefixTable adjRibOutTables )
@@ -149,11 +142,6 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
         | null pfxs = return (Rib' prefixTable adjRibOutTables )
         | otherwise = do
             let ( prefixTable' , withdraws ) = BGPRib.PrefixTable.withdraw prefixTable pfxs peerData
-            -- adjRibOutTables' = updateAdjRibOutTables (updates,0) adjRibOutTables
-            -- ** NOTE **
-            -- The withdraw entry in the adj-rib-out has a special route value
-            -- in future this could be better done as just the withdrawn route with an indicator to distinguish it from a normal one
-            -- probably just using Either monad?
             updateRibOutWithPeerData peerData nullRoute withdraws adjRibOutTables
             return $ Rib' prefixTable' adjRibOutTables
 
@@ -167,12 +155,14 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
         nextHop = getNextHop pathAttributes
         origin = getOrigin pathAttributes
 
--- NOTE!!!! - we can be called with a null route in which case only the routeId is defined, and is equal 0!!!
--- this is OK since we only get the routeId in this function
 updateRibOutWithPeerData :: PeerData -> RouteData -> [Prefix] -> AdjRIB -> IO ()
-updateRibOutWithPeerData originPeer routeData updates adjRib = do
-    let updateWithKey destinationPeer table = when ( destinationPeer /= originPeer )
-                                                   ( insertAdjRIBTable (updates, routeId routeData ) table )
-    when ( null updates )
-         ( putStrLn $ "null updates in updateRibOutWithPeerData: " ++ show originPeer ++ " / " ++ if 0 == routeId routeData then "nullRoute" else show routeData)
-    sequence_ $ Data.Map.mapWithKey updateWithKey adjRib
+updateRibOutWithPeerData originPeer routeData updates adjRib = sequence_ $ Data.Map.mapWithKey updateWithKey adjRib
+    where updateWithKey destinationPeer table = when ( destinationPeer /= originPeer )
+                                                     ( insertAdjRIBTable (updates, routeId routeData ) table )
+    -- returning routes to the originator seems unprofitable
+    -- however real routers do exactly this (e.g. Cisco IOS) and it may simplify matters to follow suit...
+    -- hence this version of updateWithKey can be replaced with a simpler one....
+          updateWithKey' _ = insertAdjRIBTable (updates, routeId routeData)
+    -- in future this could be a run-time configuration option.....
+
+    
