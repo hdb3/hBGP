@@ -59,15 +59,27 @@ buildUpdate :: PeerData -> [Prefix] -> Maybe RouteData -> [ParsedUpdate]
 --
 buildUpdate target prefixes Nothing = makeUpdate [] prefixes []
 buildUpdate target prefixes (Just RouteData{..}) = if isExternal target then egpUpdate else igpUpdate
+-- TODO - combine the i/e gpUpdates and use the isExternal switch to drive variant behaviour
     where
     igpUpdate = makeUpdate prefixes
                            []
                            ( sortPathAttributes $
                            setOrigin origin $
-                           -- this is reflector/controller default, bur for a router next-hop-self is default:
+
+                           -- for iBGP we want to route directly to the egress AS interface
+                           -- as a router the internal interface is probably equivalent and next-hop-self would work
+                           -- but RR or controller cannot use its own address - the coice is between using the next hop as received in EBGP,
+                           -- or allowing route selection to specify an alternative - this coding follows the latter path
+                           -- however it is likely that the existing next-hop is the same as the override
+                           -- (it is questionalble whether it is useful to explicitly hold an alternate next-hop in RouteData,
+                           --  since any manipulation may be target sensitive)
                            setNextHop nextHop $
-                           -- setNextHop (localIPv4 peerData ) $ -- next hop self! - but not very good if the route is actually local, unless we set the local peer ip4...
-                           setLocalPref localPref
+                           -- setNextHop (localIPv4 peerData ) $ -- next hop self alternate
+                           setLocalPref 1000000
+                                          -- unlike nextHop there is no obvious argument for per-peer variable local preference behaviour,
+                                          -- other than the removal of the attribute for EBGP 
+                                          --  1000000 -> BGPPROTECTION always wants to win -- this could be configurable
+                                          -- or the route selection process could set it in the RouteData
                            pathAttributes 
                            )
     egpUpdate = makeUpdate prefixes
