@@ -1,5 +1,6 @@
 #!/bin/bash -e
 
+# ./restart3.sh
 if [[ -z $1 ]] ; then script=active-script ; else script="$1" ; fi
 if [[ -f "$script" ]] ; then echo "using $script"; else echo "$script is not a regular file"; exit 1 ; fi
 
