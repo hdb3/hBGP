@@ -45,7 +45,8 @@ delPeer rib peer = modifyMVar_ rib ( delPeer' peer )
         let (prefixTable',prefixes) = withdrawPeer prefixTable peer
         -- schedule the withdraw dissemination
         -- NOTE - this does not change the AdjRIBMap
-        updateRibOutWithPeerData nullRoute prefixes adjRib
+        unless (null prefixes)
+             ( updateRibOutWithPeerData peer nullRoute prefixes adjRib)
         -- now remove this peer completely from the AdjRIBMap
         -- it is liekly that this could be done before the previous action.....
         -- but the semantics should be identical as long as we didn't try to send withdraw messages to the peer which has gone away...
@@ -140,7 +141,7 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
               localPref <- evalLocalPref peerData pathAttributes pfxs
               let routeData = makeRouteData peerData pathAttributes routeId localPref
                   ( prefixTable' , updates ) = BGPRib.PrefixTable.update prefixTable pfxs routeData
-              updateRibOutWithPeerData routeData updates adjRibOutTables
+              updateRibOutWithPeerData peerData routeData updates adjRibOutTables
               return $ Rib' prefixTable' adjRibOutTables
 
     ribWithdrawMany :: PeerData -> [Prefix] -> Rib' -> IO Rib'
@@ -153,7 +154,7 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
             -- The withdraw entry in the adj-rib-out has a special route value
             -- in future this could be better done as just the withdrawn route with an indicator to distinguish it from a normal one
             -- probably just using Either monad?
-            updateRibOutWithPeerData nullRoute withdraws adjRibOutTables
+            updateRibOutWithPeerData peerData nullRoute withdraws adjRibOutTables
             return $ Rib' prefixTable' adjRibOutTables
 
     makeRouteData :: PeerData -> [PathAttribute] -> Int -> Word32 -> RouteData
@@ -166,8 +167,8 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
         nextHop = getNextHop pathAttributes
         origin = getOrigin pathAttributes
 
-updateRibOutWithPeerData :: RouteData -> [Prefix] -> AdjRIB -> IO ()
-updateRibOutWithPeerData routeData updates adjRib = sequence_ $ Data.Map.mapWithKey updateWithKey adjRib
+updateRibOutWithPeerData :: PeerData -> RouteData -> [Prefix] -> AdjRIB -> IO ()
+updateRibOutWithPeerData originPeer routeData updates adjRib = sequence_ $ Data.Map.mapWithKey updateWithKey adjRib
     where updateWithKey destinationPeer = insertAdjRIBTable (updates, routeId routeData )
 {-    
 updateRibOutWithPeerData originPeer routeData updates adjRib = do
