@@ -167,22 +167,12 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
         nextHop = getNextHop pathAttributes
         origin = getOrigin pathAttributes
 
+-- NOTE!!!! - we can be called with a null route in which case only the routeId is defined, and is equal 0!!!
+-- this is OK since we only get the routeId in this function
 updateRibOutWithPeerData :: PeerData -> RouteData -> [Prefix] -> AdjRIB -> IO ()
-updateRibOutWithPeerData originPeer routeData updates adjRib = sequence_ $ Data.Map.mapWithKey updateWithKey adjRib
-    where updateWithKey destinationPeer = insertAdjRIBTable (updates, routeId routeData )
-{-    
 updateRibOutWithPeerData originPeer routeData updates adjRib = do
-    -- returning routes to the originator seems unprofitable
-    -- however real routers do exactly this (e.g. Cisco IOS) and it simplifies matters to follwo suit...
-    -- hence this version of updateWithKey is replaced with a simpler one....
     let updateWithKey destinationPeer table = when ( destinationPeer /= originPeer )
                                                    ( insertAdjRIBTable (updates, routeId routeData ) table )
-
-    let updateWithKey destinationPeer table = ( insertAdjRIBTable (updates, routeId routeData ) table )
-
-    -- being called with an empty work list of prefixes is not an exception, hence removing the log message when it happens....
     when ( null updates )
          ( putStrLn $ "null updates in updateRibOutWithPeerData: " ++ show originPeer ++ " / " ++ if 0 == routeId routeData then "nullRoute" else show routeData)
     sequence_ $ Data.Map.mapWithKey updateWithKey adjRib
-
--}
