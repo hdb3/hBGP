@@ -83,7 +83,7 @@ bgpParser1 = do
 parseX = parse2 -- this is the case statement parser
 --parseX = inline parse3 -- this is the simplified version of parse2
 
-prefixBuilder (a,b) = mkPrefix a b 
+prefixBuilder (a,b) = _mkPrefix a b -- does not have awareness of ADDPATH! 
 
 -- Attoparsec: Parse Update Prefixes
 -- A list of prefixes is defined by its length in bytes (so misconstructed lists are feasible).

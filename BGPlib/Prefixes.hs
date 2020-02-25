@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE Strict #-}
-module BGPlib.Prefixes(Prefix,chunkPrefixes,toAddrRange,mkPrefix,toPrefix,fromPrefix,fromAddrRange,lengthPrefix) where
+module BGPlib.Prefixes(Prefix,chunkPrefixes,toAddrRange,_mkPrefix,toPrefix,fromPrefix,fromAddrRange,lengthPrefix) where
 import Data.Binary
 import Data.Hashable
 import Data.Binary.Get
@@ -35,9 +35,13 @@ data Prefix = Prefix Word32 Int deriving (Eq,Generic)
 toPrefix :: Int -> Prefix
 toPrefix x = Prefix 0 x
 
+{-# INLINE _mkPrefix #-}
+_mkPrefix :: Word8 -> Word32 -> Prefix
+_mkPrefix l v = Prefix 0 $! unsafeShiftL (fromIntegral l) 32 .|. fromIntegral v
+
 {-# INLINE mkPrefix #-}
-mkPrefix :: Word8 -> Word32 -> Prefix
-mkPrefix l v = Prefix 0 $! unsafeShiftL (fromIntegral l) 32 .|. fromIntegral v
+mkPrefix :: Word32 -> Word8 -> Word32 -> Prefix
+mkPrefix pathID l v = Prefix pathID  $! unsafeShiftL (fromIntegral l) 32 .|. fromIntegral v
 
 {-# INLINE fromPrefix #-}
 fromPrefix :: Prefix -> Int
@@ -50,6 +54,10 @@ lengthPrefix (Prefix _ pfx) = fromIntegral $ unsafeShiftR pfx 32
 {-# INLINE addressPrefix #-}
 addressPrefix :: Prefix -> Word32
 addressPrefix (Prefix _ pfx) = fromIntegral $ 0xffffffff .&. pfx
+
+{-# INLINE pathID #-}
+pathID :: Prefix -> Word32
+pathID (Prefix pid _) = pid
 
 instance IsString Prefix where
     fromString = read
@@ -79,7 +87,7 @@ toAddrRange pfx = makeAddrRange (fromHostAddress $ byteSwap32 $ addressPrefix pf
 
 {-# INLINE fromAddrRange #-}
 fromAddrRange :: AddrRange IPv4 -> Prefix
-fromAddrRange ar = mkPrefix (fromIntegral subnet) (byteSwap32 $ toHostAddress ip) where
+fromAddrRange ar = mkPrefix 0 (fromIntegral subnet) (byteSwap32 $ toHostAddress ip) where
                    (ip,subnet) = addrRangePair ar
 
 -- binary format for attributes is 1 byte flags, 1 byte type code, 1 or 2 byte length value depending on a flag bit, then payload
@@ -109,6 +117,25 @@ fromAddrRange ar = mkPrefix (fromIntegral subnet) (byteSwap32 $ toHostAddress ip
             enough trailing bits to make the end of the field fall on an
             octet boundary.  Note that the value of the trailing bits is
             irrelevant.
+
+    RFC 7911 - Advertisement of Multiple Paths in BGP
+
+    3.  Extended NLRI Encodings
+
+   In order to carry the Path Identifier in an UPDATE message, the NLRI
+   encoding MUST be extended by prepending the Path Identifier field,
+   which is of four octets.
+
+   For example, the NLRI encoding specified in [RFC4271] is extended as
+   the following:
+
+                  +--------------------------------+
+                  | Path Identifier (4 octets)     |
+                  +--------------------------------+
+                  | Length (1 octet)               |
+                  +--------------------------------+
+                  | Prefix (variable)              |
+                  +--------------------------------+
 -}
 
 
@@ -127,41 +154,47 @@ chunkPrefixes n pfxs = let (xl,l,_) = chunkPrefixes' pfxs in (l : xl)
 
 instance Binary Prefix where
 
-    put pfx | subnet == 0 = putWord8 0
-            | subnet < 9  = do putWord8 subnet
+    put pfx | subnet == 0 = do putWord32be (pathID pfx)
+                               putWord8 0
+            | subnet < 9  = do putWord32be (pathID pfx)
+                               putWord8 subnet
                                putWord8 (fromIntegral $ unsafeShiftR ip 24)
-            | subnet < 17 = do putWord8 subnet
+            | subnet < 17 = do putWord32be (pathID pfx)
+                               putWord8 subnet
                                putWord16be  (fromIntegral $ unsafeShiftR ip 16)
-            | subnet < 25 = do putWord8 subnet
+            | subnet < 25 = do putWord32be (pathID pfx)
+                               putWord8 subnet
                                putWord16be  (fromIntegral $ unsafeShiftR ip 16)
                                putWord8 (fromIntegral $ unsafeShiftR ip 8)
-            | otherwise   = do putWord8 subnet
+            | otherwise   = do putWord32be (pathID pfx)
+                               putWord8 subnet
                                putWord32be  ip
         where subnet = fromIntegral $ lengthPrefix pfx
               ip = addressPrefix pfx
 
     get = label "Prefix" $ do
+        pathID <- getWord32be
         subnet <- getWord8
         if subnet == 0
-        then return $ mkPrefix 0 0
+        then return $ mkPrefix pathID 0 0
         else if subnet < 9
         then do
             w8 <- getWord8
             let ip = unsafeShiftL (fromIntegral w8 :: Word32) 24
-            return $ mkPrefix subnet ip
+            return $ mkPrefix pathID subnet ip
         else if subnet < 17
         then do
             w16  <- getWord16be
             let ip = unsafeShiftL (fromIntegral w16  :: Word32) 16
-            return $ mkPrefix subnet ip
+            return $ mkPrefix pathID subnet ip
         else if subnet < 25
         then do
             w16 <- getWord16be
             w8  <- getWord8
             let ip = unsafeShiftL (fromIntegral w16 :: Word32) 16 .|.
                      unsafeShiftL (fromIntegral w8 :: Word32) 8
-            return $ mkPrefix subnet ip
-        else mkPrefix subnet <$> getWord32be
+            return $ mkPrefix pathID subnet ip
+        else mkPrefix pathID subnet <$> getWord32be
 
 instance {-# OVERLAPPING #-} Binary [Prefix] where
     put = putn
