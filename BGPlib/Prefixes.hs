@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE Strict #-}
-module BGPlib.Prefixes(Prefix,chunkPrefixes,toAddrRange,_mkPrefix,toPrefix,fromPrefix,fromAddrRange,lengthPrefix) where
+module BGPlib.Prefixes(Prefix(..),chunkPrefixes,toAddrRange,pathID,mkPrefix,toPrefix,fromPrefix,fromAddrRange,lengthPrefix) where
 import Data.Binary
 import Data.Hashable
 import Data.Binary.Get

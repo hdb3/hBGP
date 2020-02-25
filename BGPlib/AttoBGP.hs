@@ -83,7 +83,7 @@ bgpParser1 = do
 parseX = parse2 -- this is the case statement parser
 --parseX = inline parse3 -- this is the simplified version of parse2
 
-prefixBuilder (a,b) = _mkPrefix a b -- does not have awareness of ADDPATH! 
+prefixBuilder (a,b,c) = mkPrefix a b c
 
 -- Attoparsec: Parse Update Prefixes
 -- A list of prefixes is defined by its length in bytes (so misconstructed lists are feasible).
@@ -102,10 +102,11 @@ parsePrefixes' 0 prefixes = return $ reverse prefixes
 
 -- The normal path is:
 parsePrefixes' n prefixes = do
+    pathID <- A.anyWord32be
     prefixBitLen <- A.anyWord8
     let prefixByteLen = fromIntegral $ (prefixBitLen+7) `div` 8
     prefix <- parseX prefixByteLen
-    parsePrefixes' (n-prefixByteLen-1) (prefixBuilder (prefixBitLen,prefix) : prefixes)
+    parsePrefixes' (n-prefixByteLen-5) (prefixBuilder (pathID,prefixBitLen,prefix) : prefixes)
 
 -- This leaves it to define parse1:
 --     parse1 :: Int -> Parser Word32
