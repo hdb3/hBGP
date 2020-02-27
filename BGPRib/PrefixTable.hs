@@ -25,6 +25,9 @@ import Data.Word(Word32)
 import BGPRib.BGPData
 import BGPlib.BGPlib (Prefix(..),toPrefix,fromPrefix,pathID)
 
+trace _ = id
+-- trace = Debug.Trace.trace
+
 type PrefixTableEntry = [(Word32,RouteData)]
 type PrefixTable = IntMap.IntMap PrefixTableEntry
 
@@ -36,7 +39,7 @@ newPrefixTable :: PrefixTable
 newPrefixTable = IntMap.empty
 
 update:: PrefixTable -> [Prefix] -> PeerData -> Maybe RouteData -> (PrefixTable, [(PeerData, Int, [Prefix])])
-update pt pfxs sourcePeer routeM = (pt',updates) where
+update pt pfxs sourcePeer routeM = (pt', trace (show updates) updates) where
 
     (pt', updateList) = foldl' kf (pt,[]) pfxs 
     kf :: (PrefixTable, [(PeerData,Int,Prefix)]) -> Prefix -> (PrefixTable, [(PeerData,Int, Prefix)])
@@ -69,7 +72,7 @@ updatePrefixTable sourcePeer routeM pt pfx = (pt', rval) where
     oldList = fromMaybe [] $ IntMap.lookup (fromPrefix pfx) pt
     
     -- delete strategy uses the route origin as the basis for equality - in base case this is the peer, in ADDPATH it is (peer,PathID) 
-    tmpList = filter p oldList where p (id,r) = peerData r /= sourcePeer && id == pathID pfx
+    tmpList = filter p oldList where p (id,r) = not (peerData r == sourcePeer && id == pathID pfx)
 
     newList = maybe tmpList (\route -> Data.List.sortOn snd $ (pathID pfx,route) : tmpList) routeM
         
@@ -94,8 +97,10 @@ updatePrefixTable sourcePeer routeM pt pfx = (pt', rval) where
                                                                else (oldPoisonedPeers \\ newPoisonedPeers, newPoisonedPeers)
 
     traceData = "\noldPoisoned / oldUnpoisoned " ++ show (oldPoisoned,oldUnpoisoned) 
-                ++ "\nnewPoisoned / newUnpoisoned " ++ show (newPoisoned,newUnpoisoned)                                                    
-    rval = Debug.Trace.trace traceData ( map (\x -> (x,0,pfx)) withdrawTargets ++ map (\x -> (x,newBest,pfx)) updateTargets)
+                ++ "\nnewPoisoned / newUnpoisoned " ++ show (newPoisoned,newUnpoisoned)
+                ++ "\n(withdrawTargets, updateTargets) " ++ show (withdrawTargets, updateTargets)                                                    
+                                                 
+    rval = trace traceData ( map (\x -> (x,0,pfx)) withdrawTargets ++ map (\x -> (x,newBest,pfx)) updateTargets)
     
 
 
