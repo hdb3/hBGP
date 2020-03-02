@@ -144,7 +144,9 @@ fromAddrRange ar = mkPrefix (fromIntegral subnet) (byteSwap32 $ toHostAddress ip
 -- It is expected that ADDPATH aware code would operate correctly over a non-addpath session
 -- by using zero pathID - diveregnt behaviour is signalled by use of 
 
-data XPrefix = XPrefix Word32 Prefix deriving (Eq,Show)
+data XPrefix = XPrefix Word32 Prefix deriving Eq
+instance Show XPrefix where
+    show (XPrefix a b) = show (a,b)
 
 {-# INLINE mkXPrefix #-}
 mkXPrefix :: Word32 -> Prefix -> XPrefix
