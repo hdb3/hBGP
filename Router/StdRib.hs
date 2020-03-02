@@ -5,7 +5,7 @@ import System.Timeout(timeout)
 import Data.Maybe(fromMaybe)
 import Data.Word
 
-import BGPlib.BGPlib
+import BGPlib.BGPlib hiding (nlri,withdrawn)
 import BGPRib.BGPRib
 import qualified BGPRib.BGPRib as BGPRib
 import Router.Log
@@ -14,13 +14,17 @@ type RibHandle = (Rib,PeerData)
 
 addPeer :: Rib -> PeerData -> IO RibHandle
 addPeer rib peer = do
-    trace $ "addPeer " ++ show peer
+    event $ "Peer Up: " ++ show (peerIPv4 peer)
     BGPRib.addPeer rib peer
     return (rib,peer)
 
 ribPush :: RibHandle -> ParsedUpdate -> IO()
-ribPush _ NullUpdate = return ()
-ribPush (rib,peer) update@ParsedUpdate{} = BGPRib.ribPush rib peer update
+ribPush (_,peer) NullUpdate = return ()
+ribPush (rib,peer) update@ParsedUpdate{} =do
+    if null (nlri update) && null (withdrawn update)
+        then event $ "EOR: " ++ show (peerIPv4 peer)
+        else event $ "Update: " ++ show (peerIPv4 peer) ++ show update
+    BGPRib.ribPush rib peer update
 
 delPeerByAddress :: Rib -> Word16 -> IPv4 -> IO ()
 delPeerByAddress rib port ip = do
@@ -68,7 +72,7 @@ buildUpdate target prefixes (Just RouteData{..}) = if isExternal target then egp
                            setNextHop nextHop $
                            -- setNextHop (localIPv4 peerData ) $ -- next hop self! - but not very good if the route is actually local, unless we set the local peer ip4...
                            setLocalPref localPref
-                           pathAttributes 
+                           pathAttributes
                            )
     egpUpdate = makeUpdate prefixes
                            []
