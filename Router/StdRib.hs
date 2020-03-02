@@ -21,8 +21,10 @@ addPeer rib peer = do
 ribPush :: RibHandle -> ParsedUpdate -> IO()
 ribPush (_,peer) NullUpdate = return ()
 ribPush (rib,peer) update@ParsedUpdate{} =do
-    if null (nlri update) && null (withdrawn update)
-        then event $ "EOR: " ++ show (peerIPv4 peer)
+    if null (nlri update)
+        then if null (withdrawn update)
+            then event $ "EOR: " ++ show (peerIPv4 peer)
+            else event $ "Withdraw: " ++ show (peerIPv4 peer) ++ show (withdrawn update)
         else event $ "Update: " ++ show (peerIPv4 peer) ++ show update
     BGPRib.ribPush rib peer update
 
