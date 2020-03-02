@@ -4,7 +4,9 @@ import Control.Concurrent
 import qualified Data.Map.Strict as Data.Map
 import Control.Monad(unless,when,void)
 import Data.List(intercalate,nub)
+-- TODO replace Data.List with Data.List.EXtra and use nubOrd not nub
 import Data.Maybe(fromJust)
+
 import Data.Word(Word32)
 import Data.IP
 
