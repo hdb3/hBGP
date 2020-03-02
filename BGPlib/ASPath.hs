@@ -43,8 +43,8 @@ instance ASNumber Word16 where
 instance ASNumber Word32 where
 data ASPath = ASPath2 [ASSegment Word16] | ASPath4 [ASSegment Word32] deriving (Eq,Generic)
 instance Show ASPath where
-    show (ASPath2 x) = concatMap show x
-    show (ASPath4 x) = concatMap show x
+    show (ASPath2 x) = if null x then "_" else concatMap show x
+    show (ASPath4 x) = if null x then "_" else concatMap show x
 
 instance Hashable ASPath
 data ASSegment asn = ASSet [asn] | ASSequence [asn] deriving (Eq,Generic)
