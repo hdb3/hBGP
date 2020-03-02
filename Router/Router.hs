@@ -1,6 +1,7 @@
-{-# LANGUAGE DuplicateRecordFields,RecordWildCards #-}
+{-# LANGUAGE DuplicateRecordFields,RecordWildCards,TemplateHaskell #-}
 module Main where
 
+import Development.GitRev
 import Paths_hbgp(version)
 import Data.Version(showVersion)
 import System.Environment(getArgs)
@@ -8,6 +9,7 @@ import System.IO
 import System.Exit
 import Data.List(intersect)
 import Network.Socket
+import Control.Monad(unless)
 import Control.Concurrent
 import qualified Data.Map.Strict as Data.Map
 
@@ -22,7 +24,7 @@ import Router.Log
 
 main :: IO ()
 main = do
-    info $ "hbgp " ++ showVersion version
+    info banner
 
     config <- getConfig
 
@@ -41,10 +43,14 @@ main = do
     -- gracefull cleanup would have to be called here
     -- currently, sessions just fall of a cliff edge (TCP reset)
 
+banner = "hbgp " ++ showVersion version
+         ++ if "master" == $(gitBranch) then "" else " (" ++ $(gitBranch)++ ")"
+         
 getConfig :: IO Config
 getConfig = do
     args <- getArgs
-    if not $ null $ intersect args ["--version","-V","-v"] then exitSuccess else return ()
+    unless (null $ intersect args ["--version","-V","-v"]) exitSuccess
+
     --let n = if 1 < length args then read (args !! 1) :: Int else 0
     let n = 0 -- kludge until this is patched to support ArgConfig style parameters.....
     let configPath = if null args then "bgp.conf" else head args
