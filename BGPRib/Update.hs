@@ -13,7 +13,7 @@ import BGPRib.Common
 myHash :: L.ByteString -> Int
 myHash = fromIntegral . hash64 . L.toStrict
 
-data ParsedUpdate = ParsedUpdate { puPathAttributes :: [PathAttribute], nlri :: [Prefix], withdrawn :: [Prefix], hash :: Int } | NullUpdate -- deriving Show
+data ParsedUpdate = ParsedUpdate { puPathAttributes :: [PathAttribute], nlri :: [XPrefix], withdrawn :: [XPrefix], hash :: Int } | NullUpdate
 instance Show ParsedUpdate where
       show ParsedUpdate{..} = "<" ++ show (getASPath puPathAttributes) ++ " " ++ show nlri ++ "|" ++ show withdrawn ++ ">" 
 
@@ -47,7 +47,7 @@ originateUpdate origin path nextHop prefixes =
 ibgpUpdate = originateUpdate _BGP_ORIGIN_IGP []
 
 {-
--- this is so dangerous that the apps which use it should instead define it locally to make clear
+-- makeUpdateSimple is so dangerous that the apps which use it should instead define it locally to make clear
 -- that they discard silenetly potentially significant data...
 makeUpdateSimple :: [PathAttribute] -> [Prefix] -> [Prefix] -> ParsedUpdate
 makeUpdateSimple p n w = head $ makeUpdate n w p
@@ -80,6 +80,3 @@ makeUpdate nlri' withdrawn' attributes = result where
                   then [makeUpdate' (head chunkedNlri) (head chunkedWithdrawn) attributes] ++ withdraws ++ updates
                   else [makeUpdate' [] (head chunkedWithdrawn) attributes,
                         makeUpdate' (head chunkedNlri) [] attributes] ++ withdraws ++ updates
-
-
--- igpUpdate = originateUpdate _BGP_ORIGIN_IGP []
