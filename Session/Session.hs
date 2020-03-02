@@ -4,7 +4,7 @@ module Session.Session where
 
 import Data.Maybe
 import Control.Concurrent
-import Control.Monad (forever)
+import Control.Monad (forever,void)
 import qualified Network.Socket as NS
 import System.IO
 import System.Exit(die)
@@ -52,8 +52,7 @@ session port defaultApp localIPv4 peers enableInbound = do
     mapM_ ( forkIO . run state ) peers
     if enableInbound then
         listener state
-    else do
-        -- putStrLn "session: inbound connections not enabled"
+    else 
         forever (threadDelay $ 10^12)
     where
 
@@ -147,8 +146,7 @@ wrap State{..} app sock = do
     let ip = fromPeerAddress peerAddress
         fromPeerAddress (NS.SockAddrInet _ ip) = fromHostAddress ip
     catchIOError
-        ( do logger $ "connected to : " ++ show ip
-             _ <- app ( sock , peerAddress )
+        ( do void $ app ( sock , peerAddress )
              NS.close sock
              logger $ "app terminated for : " ++ show ip )
         (\e -> do Errno errno <- getErrno
