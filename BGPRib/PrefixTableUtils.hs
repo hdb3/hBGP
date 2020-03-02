@@ -17,7 +17,7 @@ import Data.IntMap.Strict(toList)
 import qualified Data.List
 import Data.IP
 
-import BGPlib.BGPlib (Prefix(..),toPrefix)
+import BGPlib.BGPlib (XPrefix(..),Prefix(..),toPrefix)
 import BGPRib.Common
 import BGPRib.BGPData
 import BGPRib.PrefixTable(PrefixTable)
@@ -30,20 +30,29 @@ import BGPRib.PrefixTable(PrefixTable)
 
 -- TODO for ADDPATH - fix these Show instances to be more usefull
 
-getDB :: PrefixTable -> [(Prefix,[RouteData])]
+getDB :: PrefixTable -> [(XPrefix,[RouteData])]
 getDB pt = map f (toList pt) where
-    f (pfx,routes) = (Prefix 0 pfx,map snd routes)
+    f (pfx,routes) = (XPrefix 0 (toPrefix pfx), map snd routes)
 
 lengthRIB :: PrefixTable -> Int
 lengthRIB pt = length (toList pt)
 
 -- TODO - should use 'bestPath' not head......
+-- ADDPATH - NOTE - this logic and the consumer (addPeer) in Rib.hs need revisiting
+-- under ADDPATH the correct behaviour is to send nothing since a new peer cannot have raised poisoned routes.....
+
 getRIB :: PrefixTable -> [(RouteData,Prefix)]
-getRIB pt = map f (toList pt) where
-    f (pfx,ptes) = (snd $ head ptes, Prefix (fst $ head ptes) pfx)
+getRIB _ = []
 
 getFIB :: PrefixTable -> [(Prefix,IPv4)]
-getFIB pt = map f (getRIB pt) where
+getFIB _ = []
+
+getXRIB :: PrefixTable -> [(RouteData,XPrefix)]
+getXRIB pt = map f (toList pt) where
+    f (pfx,ptes) = (snd $ head ptes, XPrefix (fst $ head ptes) (toPrefix pfx))
+
+getXFIB :: PrefixTable -> [(XPrefix,IPv4)]
+getXFIB pt = map f (getXRIB pt) where
     f (route,pfx) = (pfx , nextHop route)
 
 getAdjRIBOut :: PrefixTable -> [(RouteData,[Prefix])]

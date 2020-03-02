@@ -38,7 +38,7 @@ msgTimeout :: Int -> IO [a] -> IO [a]
 msgTimeout t f = fromMaybe [] <$> timeout (1000000 * t) f
 
 addRouteRib :: Rib -> PeerData -> AddrRange IPv4 -> IPv4 -> IO()
-addRouteRib rib peer prefix nextHop = BGPRib.ribPush rib peer (igpUpdate nextHop [fromAddrRange prefix])
+addRouteRib rib peer prefix nextHop = BGPRib.ribPush rib peer (ibgpUpdate nextHop [fromAddrRange prefix])
 
 delRouteRib :: Rib -> PeerData -> AddrRange IPv4 -> IO()
 delRouteRib rib peer prefix = BGPRib.ribPush rib peer (originateWithdraw [fromAddrRange prefix])

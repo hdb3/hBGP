@@ -83,7 +83,7 @@ bgpParser1 = do
 parseX = parse2 -- this is the case statement parser
 --parseX = inline parse3 -- this is the simplified version of parse2
 
-prefixBuilder (a,b,c) = mkPrefix a b c
+prefixBuilder (a,b,c) = mkXPrefix a (mkPrefix b c)
 
 -- Attoparsec: Parse Update Prefixes
 -- A list of prefixes is defined by its length in bytes (so misconstructed lists are feasible).
@@ -91,10 +91,10 @@ prefixBuilder (a,b,c) = mkPrefix a b c
 -- Implementation
 -- The signature of a recursive parser is thus: -}
 
---parsePrefixes :: Int -> Parser [Prefix]
+--parsePrefixes :: Int -> Parser [XPrefix]
 {-# INLINE parsePrefixes' #-}
 parsePrefixes n = parsePrefixes' n []
---parsePrefixes' :: Int -> [Prefix] -> Parser [Prefix]
+--parsePrefixes' :: Int -> [XPrefix] -> Parser [XPrefix]
 -- The parser is initialized with an empty list and the buffer size.
 -- The recursion terminates when the available buffer is ==0
 

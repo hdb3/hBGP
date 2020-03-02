@@ -33,7 +33,7 @@ data BGPMessage = BGPOpen { myAutonomousSystem :: Word16, holdTime :: Word16, bg
                   | BGPKeepalive
                   | BGPNotify { code :: EnumNotificationCode, subCode :: NotificationSubcode, errorData :: L.ByteString }
                   -- | BGPUpdate { withdrawn :: [Prefix], attributes :: [PathAttribute], nlri :: [Prefix], pathHash :: Int }
-                  | BGPUpdate { withdrawn :: [Prefix], attributes :: L.ByteString, nlri :: [Prefix] }
+                  | BGPUpdate { withdrawn :: [XPrefix], attributes :: L.ByteString, nlri :: [XPrefix] }
                   | BGPTimeout
                   | BGPError String
                   | BGPEndOfStream
@@ -120,15 +120,10 @@ instance Binary BGPMessage where
                                            withdrawnRoutes <- getLazyByteString $ fromIntegral withdrawnRoutesLength
                                            pathAttributesLength <- getWord16be
                                            pathAttributes <- getLazyByteString $ fromIntegral pathAttributesLength
-                                           nlri <- getRemainingLazyByteString
-                                           return $ BGPUpdate (decode withdrawnRoutes) pathAttributes (decode nlri)
+                                           BGPUpdate (decode withdrawnRoutes) pathAttributes . decode <$> getRemainingLazyByteString
                 | _BGPNotify == msgType -> do
                                            errorCode <- getWord8
                                            errorSubcode <- getWord8
-                                           errorData <- getRemainingLazyByteString
-                                           -- return $ BGPNotify (decode8 errorCode) errorSubcode (decode errorData)
-                                           -- decoding the error data depends on the type of notification!
-                                           -- e.g. Bad Peer AS contains just the unwanted (?) peer AS number
-                                           return $ BGPNotify (decode8 errorCode) errorSubcode errorData
+                                           BGPNotify (decode8 errorCode) errorSubcode <$> getRemainingLazyByteString
                 | _BGPKeepalive == msgType -> return BGPKeepalive
                 | otherwise -> fail "Bad type code"

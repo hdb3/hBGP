@@ -121,8 +121,8 @@ getLocRib rib = do
     rib' <- readMVar rib
     return (prefixTable rib')
 
-checkPoison :: PeerData -> [PathAttribute] -> [Prefix] -> IO Bool
-checkPoison peerData pathAttributes pfxs = return $ elem 666 $ flattenPath $ getASPathContent pathAttributes
+checkPoison :: PeerData -> [PathAttribute] -> [XPrefix] -> IO Bool
+checkPoison peerData pathAttributes _ = return $ elem 666 $ flattenPath $ getASPathContent pathAttributes
 
 ribPush :: Rib -> PeerData -> ParsedUpdate -> IO()
 ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
@@ -143,7 +143,7 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
 
 -- TODO - merge ribUpdateMany and ribWithdrawMany?
 
-    ribUpdateMany :: PeerData -> [PathAttribute] -> Int -> [Prefix] -> Rib' -> IO Rib'
+    ribUpdateMany :: PeerData -> [PathAttribute] -> Int -> [XPrefix] -> Rib' -> IO Rib'
     ribUpdateMany peerData pathAttributes routeId pfxs (Rib' prefixTable adjRibOutTables )
         | null pfxs = return (Rib' prefixTable adjRibOutTables )
         | otherwise = do
@@ -165,7 +165,7 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
 
               return $ Rib' prefixTable' adjRibOutTables
 
-    ribWithdrawMany :: PeerData -> [Prefix] -> Rib' -> IO Rib'
+    ribWithdrawMany :: PeerData -> [XPrefix] -> Rib' -> IO Rib'
     ribWithdrawMany peerData pfxs (Rib' prefixTable adjRibOutTables)
         | null pfxs = return (Rib' prefixTable adjRibOutTables )
         | otherwise = do
