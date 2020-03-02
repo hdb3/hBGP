@@ -139,7 +139,8 @@ instance Binary Prefix where
                                putWord32be  ip
         where subnet = fromIntegral $ lengthPrefix pfx
               ip = addressPrefix pfx
-
+    get = error "Binary Prefix is deprecated"
+{-
     get = label "Prefix" $ do
         subnet <- getWord8
         if subnet == 0
@@ -162,7 +163,7 @@ instance Binary Prefix where
                      unsafeShiftL (fromIntegral w8 :: Word32) 8
             return $ mkPrefix subnet ip
         else mkPrefix subnet <$> getWord32be
-
+-}
 instance {-# OVERLAPPING #-} Binary [Prefix] where
     put = putn
     get = getn

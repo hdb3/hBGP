@@ -3,6 +3,7 @@ module BGPRib.Rib(Rib,ribPush,newRib,getLocRib,addPeer,delPeer,getPeersInRib,loo
 import Control.Concurrent
 import qualified Data.Map.Strict as Data.Map
 import Control.Monad(unless,when,void)
+-- TODO replace Data.List with Data.List.EXtra and use nubOrd not nub
 import Data.List(intercalate)
 import Data.Word(Word32)
 import Data.IP
