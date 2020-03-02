@@ -140,7 +140,6 @@ instance Binary Prefix where
         where subnet = fromIntegral $ lengthPrefix pfx
               ip = addressPrefix pfx
     get = error "Binary Prefix is deprecated"
-
 instance {-# OVERLAPPING #-} Binary [Prefix] where
     put = putn
     get = getn
