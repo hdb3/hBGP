@@ -154,19 +154,19 @@ chunkPrefixes n pfxs = let (xl,l,_) = chunkPrefixes' pfxs in (l : xl)
 
 instance Binary Prefix where
 
-    put pfx | subnet == 0 = do putWord32be (pathID pfx)
+    put pfx | subnet == 0 = do putWord32be 0 -- (pathID pfx)
                                putWord8 0
-            | subnet < 9  = do putWord32be (pathID pfx)
+            | subnet < 9  = do putWord32be 0 -- (pathID pfx)
                                putWord8 subnet
                                putWord8 (fromIntegral $ unsafeShiftR ip 24)
-            | subnet < 17 = do putWord32be (pathID pfx)
+            | subnet < 17 = do putWord32be 0 -- (pathID pfx)
                                putWord8 subnet
                                putWord16be  (fromIntegral $ unsafeShiftR ip 16)
-            | subnet < 25 = do putWord32be (pathID pfx)
+            | subnet < 25 = do putWord32be 0 -- (pathID pfx)
                                putWord8 subnet
                                putWord16be  (fromIntegral $ unsafeShiftR ip 16)
                                putWord8 (fromIntegral $ unsafeShiftR ip 8)
-            | otherwise   = do putWord32be (pathID pfx)
+            | otherwise   = do putWord32be 0 -- (pathID pfx)
                                putWord8 subnet
                                putWord32be  ip
         where subnet = fromIntegral $ lengthPrefix pfx
