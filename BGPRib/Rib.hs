@@ -155,14 +155,15 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
                   ( prefixTable' , updates ) = BGPRib.PrefixTable.update prefixTable pfxs peerData (Just routeData)
                   reducedUpdates = reduce updates
 
-              {-
+              {--}
               -- this version is the minimal update applicable in the ADDPATH case
               mapM_ (updatePeer adjRibOutTables) updates
-              -}
+              
               {-
               -- this version is the promicuous update applicable in the best-external case
-              -}
               mapM_ (updateAllPeers adjRibOutTables) reducedUpdates 
+              -}
+
 
               return $ Rib' prefixTable' adjRibOutTables
 

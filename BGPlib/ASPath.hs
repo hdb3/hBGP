@@ -6,7 +6,7 @@
 module BGPlib.ASPath where
 import Data.Binary
 import Data.Binary.Get
-import Data.List(foldl')
+import Data.List(foldl',intercalate)
 import qualified Data.ByteString.Lazy as L
 import Control.Applicative
 import Data.Attoparsec.ByteString -- from package attoparsec
@@ -41,10 +41,20 @@ class (Eq a, Num a, Integral a, Show a, Read a, Binary a) => ASNumber a where
 
 instance ASNumber Word16 where
 instance ASNumber Word32 where
-data ASPath = ASPath2 [ASSegment Word16] | ASPath4 [ASSegment Word32] deriving (Show,Eq,Generic)
+data ASPath = ASPath2 [ASSegment Word16] | ASPath4 [ASSegment Word32] deriving (Eq,Generic)
+instance Show ASPath where
+    show (ASPath2 x) = if null x then "_" else concatMap show x
+    show (ASPath4 x) = if null x then "_" else concatMap show x
 
 instance Hashable ASPath
-data ASSegment asn = ASSet [asn] | ASSequence [asn] deriving (Show,Eq,Generic)
+data ASSegment asn = ASSet [asn] | ASSequence [asn] deriving (Eq,Generic)
+
+instance Show (ASSegment Word32) where
+    show (ASSequence asn) = show asn -- the list braces are ‘free’.
+    show (ASSet asn) = "{" ++ intercalate "," (map show asn) ++ "}"
+
+instance Show (ASSegment Word16) where
+    show _ = undefined
 
 instance Hashable ( ASSegment Word16 )
 instance Hashable ( ASSegment Word32 )
@@ -103,9 +113,7 @@ as4list :: Integral a => [a] -> [Word32]
 as4list = map fromIntegral
 
 instance Binary ASPath where
-    get = do
-        bytes <- getRemainingLazyByteString
-        return $ decodeAS4 bytes
+    get = decodeAS4 <$> getRemainingLazyByteString
 
     put (ASPath2 asp) = put asp
     put (ASPath4 asp) = put asp

@@ -17,7 +17,7 @@ import Data.IntMap.Strict(toList)
 import qualified Data.List
 import Data.IP
 
-import BGPlib.BGPlib (Prefix,toPrefix)
+import BGPlib.BGPlib (Prefix(..),toPrefix)
 import BGPRib.Common
 import BGPRib.BGPData
 import BGPRib.PrefixTable(PrefixTable)
@@ -28,16 +28,19 @@ import BGPRib.PrefixTable(PrefixTable)
 --
 -- ===================================================
 
+-- TODO for ADDPATH - fix these Show instances to be more usefull
+
 getDB :: PrefixTable -> [(Prefix,[RouteData])]
 getDB pt = map f (toList pt) where
-    f (pfx,routes) = (toPrefix pfx,routes)
+    f (pfx,routes) = (Prefix 0 pfx,map snd routes)
 
 lengthRIB :: PrefixTable -> Int
 lengthRIB pt = length (toList pt)
 
+-- TODO - should use 'bestPath' not head......
 getRIB :: PrefixTable -> [(RouteData,Prefix)]
 getRIB pt = map f (toList pt) where
-    f (pfx,routes) = (head routes , toPrefix pfx)
+    f (pfx,ptes) = (snd $ head ptes, Prefix (fst $ head ptes) pfx)
 
 getFIB :: PrefixTable -> [(Prefix,IPv4)]
 getFIB pt = map f (getRIB pt) where

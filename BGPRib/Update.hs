@@ -13,7 +13,13 @@ import BGPRib.Common
 myHash :: L.ByteString -> Int
 myHash = fromIntegral . hash64 . L.toStrict
 
-data ParsedUpdate = ParsedUpdate { puPathAttributes :: [PathAttribute], nlri :: [Prefix], withdrawn :: [Prefix], hash :: Int } | NullUpdate deriving Show
+data ParsedUpdate = ParsedUpdate { puPathAttributes :: [PathAttribute], nlri :: [Prefix], withdrawn :: [Prefix], hash :: Int } | NullUpdate -- deriving Show
+instance Show ParsedUpdate where
+      show ParsedUpdate{..} = "<" 
+                              ++ if null puPathAttributes then "*" else show (getASPath puPathAttributes)
+                              ++ " " ++ show nlri
+                              ++ "|" ++ show withdrawn
+                              ++ ">" 
 
 modifyPathAttributes :: ([PathAttribute] -> [PathAttribute]) -> ParsedUpdate -> ParsedUpdate
 modifyPathAttributes f pu = pu { puPathAttributes = f $ puPathAttributes pu }
