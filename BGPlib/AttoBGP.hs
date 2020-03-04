@@ -105,7 +105,7 @@ parsePrefixes' n prefixes = do
     prefixBitLen <- A.anyWord8
     let prefixByteLen = fromIntegral $ (prefixBitLen+7) `div` 8
     prefix <- parseX prefixByteLen
-    parsePrefixes' (n-prefixByteLen-5) (prefixBuilder (prefixBitLen,prefix) : prefixes)
+    parsePrefixes' (n-prefixByteLen-1) (prefixBuilder (prefixBitLen,prefix) : prefixes)
 
 -- This leaves it to define parse1:
 --     parse1 :: Int -> Parser Word32
