@@ -141,12 +141,6 @@ withdrawPrefixTable pt pfx peer = (pt', wasBestRoute) where
     tableUpdate _ routes = let notPeer pd rd = pd /= peerData rd
                                routes' = SL.filter (notPeer peer) routes
                            in if null routes' then Nothing else Just routes'
-    -- notPeer :: PeerData -> RouteData -> Bool
-    -- notPeer pd rd = pd /= peerData rd
-    --oldBestRoute = slHead oldRouteList -- 'head' operation guaranteed safe as long as the precondition that empty prefix list are removed immediately...
-    --wasBestRoute = peerData oldBestRoute == peer
-    -- oldBestRoute = slHead oldRouteList -- 'head' operation guaranteed safe as long as the precondition that empty prefix list are removed immediately...
-    -- wasBestRoute = peerData oldBestRoute == peer
 
 withdraw :: PrefixTable -> [Prefix] -> PeerData -> (PrefixTable,[Prefix])
 withdraw rib prefixes peer = Data.List.foldl' f (rib,[]) prefixes where
