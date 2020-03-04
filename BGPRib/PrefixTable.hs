@@ -25,14 +25,13 @@ import Data.Word(Word32)
 import BGPRib.BGPData
 import BGPlib.BGPlib (Prefix(..),toPrefix,fromPrefix)
 
--- trace _ = id
-trace = Debug.Trace.trace
+trace _ = id
+-- trace = Debug.Trace.trace
 
 type PrefixTableEntry = [RouteData]
 type PrefixTable = IntMap.IntMap PrefixTableEntry
 
 instance {-# OVERLAPPING #-} Show PrefixTable where
-    --show = show . map (\((k,[(v1,v2)])) -> (toPrefix k,v1,v2)) . IntMap.toList
     show = show . map (\(k,v) -> (toPrefix k,v)) . IntMap.toList
 
 newPrefixTable :: PrefixTable
@@ -87,9 +86,7 @@ updatePrefixTable sourcePeer routeM pt pfx = (pt', rval) where
     (initialRemediated, initialOther) = Data.List.span poisoned oldList
     (finalRemediable, finalOther) = Data.List.span poisoned newList
     newBestRoute = (routeId . head) finalOther  -- partial result guarded by use only when update list is not empty
-    -- safeHeadId ax = if null ax then 0 else (routeId . snd) (head ax)
-    -- oldBest = safeHeadId oldUnpoisoned
-    -- newBest = safeHeadId newUnpoisoned
+
     (withdraw,update) = case (null initialRemediated || null initialOther, null finalRemediable || null finalOther) of
         (True,True) -> ([],[])
         (True,False) -> ([],finalRemediable)
@@ -148,7 +145,6 @@ withdrawPeer prefixTable peerData = swapNgroom $ IntMap.mapAccumWithKey (updateF
             Just (top,tail) = Data.List.uncons prefixTableEntry -- safe because the list cannot be null
                                                          -- however!!!! this can MAKE an empty list which we cannot delet in this operation
                                                          -- so we need a final preen before returning the Map to the RIB!!!!
-            -- p route = peer == BGPRib.BGPData.peerData route
             p = (peer /=) .  BGPRib.BGPData.peerData
             prefixList' = toPrefix prefix : prefixList
 
@@ -163,49 +159,7 @@ groomPrefixTable = IntMap.filter ( not . null )
 getPeerPrefixes :: PrefixTable -> PeerData -> [Prefix]
 getPeerPrefixes pt peer = IntMap.foldlWithKey' f [] pt where 
     
-
-{-
-    f acc key val = prefixes ++ acc where
-    -- 'val' is [PrefixTableEntry], which is [(PathID,RouteData)], key is proxy Prefix
-    -- we need the list [Prefix] where Prefix is composed as Prefix pathID key
-        prefixes = map (\(x,_) -> Prefix x key ) ( filter p val) 
-        p = ( peer == ) . peerData . snd
--}
-
     -- base code - assumes that only one prefix can be returned per prefix table entry....
     f acc key val = if p val then (toPrefix key:acc) else acc
     p = Data.List.any p'
     p' = ( peer == ) . peerData
-
-
-{-
-  the function requires collection of just those keys for which the associated value matches the function subject
-  this is a fold using the predicate p over the value field:
-  IntMap.foldlWithKey' f [] map
-
-  where f acc key val = if p val then (k:acc) else acc
-  and in this case p val is actually Data.List.any p', where p' v' = peer == peerData v'   
--}
-{-
-withdrawPrefixTable :: PrefixTable -> Prefix -> PeerData -> (PrefixTable,Bool)
-withdrawPrefixTable pt pfx peer = (pt', wasBestRoute) where
-    wasBestRoute = maybe
-                         False -- This is the 'prefix not found' return value
-                               -- there are really three possible outcomes, so a tri-valued resuklt could be used
-                               -- a) route was found and removed, but was not the 'best' route
-                               -- b) route was found and removed, and WAS the 'best' route
-                               -- c) the route was not found, which could be a programming error
-                               --    or an external issue
-                         (\oldRouteList -> peerData (head oldRouteList) == peer )
-                         maybeOldRouteList
-    (maybeOldRouteList , pt') = IntMap.updateLookupWithKey tableUpdate (fromPrefix pfx) pt
-    tableUpdate :: Int -> PrefixTableEntry -> Maybe PrefixTableEntry
-    tableUpdate _ routes = let notPeer pd rd = pd /= peerData rd
-                               routes' = filter (notPeer peer) routes
-                           in if null routes' then Nothing else Just routes'
-
-withdraw :: PrefixTable -> [Prefix] -> PeerData -> (PrefixTable,[Prefix])
-withdraw rib prefixes peer = Data.List.foldl' f (rib,[]) prefixes where
-    f (pt,withdrawn) pfx = if p then (pt',pfx:withdrawn) else (pt',withdrawn) where
-        (pt',p) = withdrawPrefixTable pt pfx peer
--}

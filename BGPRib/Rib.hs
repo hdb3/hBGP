@@ -133,10 +133,7 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
 
     ribPush' :: PeerData -> ParsedUpdate -> Rib' -> IO Rib'
     ribPush' peerData ParsedUpdate{..} rib0 =
-        -- # rib1 <- ribUpdateMany peerData puPathAttributes hash nlri rib0
-        -- diagnostic for received updates - TODO convert to trace
-        --print (PrefixTableUtils.lengthRIB $ prefixTable rib0 , PrefixTableUtils.lengthRIB $ prefixTable rib1)
-        -- # ribWithdrawMany peerData withdrawn rib1
+
         ribUpdateMany peerData puPathAttributes hash nlri rib0 >>= ribWithdrawMany peerData withdrawn
 
     reduce :: [(PeerData, Int, [Prefix])] -> [(Int, [Prefix])]
@@ -155,16 +152,12 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
                   ( prefixTable' , updates ) = BGPRib.PrefixTable.update prefixTable pfxs peerData (Just routeData)
                   reducedUpdates = reduce updates
 
-              {--}
               -- this version is the minimal update applicable in the ADDPATH case
-              mapM_ (updatePeer adjRibOutTables) updates
-              
-              {-
+              -- mapM_ (updatePeer adjRibOutTables) updates
+
               -- this version is the promicuous update applicable in the best-external case
               mapM_ (updateAllPeers adjRibOutTables) reducedUpdates 
-              -}
-
-
+              
               return $ Rib' prefixTable' adjRibOutTables
 
     ribWithdrawMany :: PeerData -> [Prefix] -> Rib' -> IO Rib'
