@@ -32,7 +32,7 @@ import BGPRib.PrefixTable(PrefixTable)
 
 getDB :: PrefixTable -> [(Prefix,[RouteData])]
 getDB pt = map f (toList pt) where
-    f (pfx,routes) = (Prefix 0 pfx,map snd routes)
+    f (pfx,routes) = (Prefix pfx,routes)
 
 lengthRIB :: PrefixTable -> Int
 lengthRIB pt = length (toList pt)
@@ -40,7 +40,7 @@ lengthRIB pt = length (toList pt)
 -- TODO - should use 'bestPath' not head......
 getRIB :: PrefixTable -> [(RouteData,Prefix)]
 getRIB pt = map f (toList pt) where
-    f (pfx,ptes) = (snd $ head ptes, Prefix (fst $ head ptes) pfx)
+    f (pfx,ptes) = (head ptes, Prefix pfx)
 
 getFIB :: PrefixTable -> [(Prefix,IPv4)]
 getFIB pt = map f (getRIB pt) where

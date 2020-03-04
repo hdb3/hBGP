@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE Strict #-}
-module BGPlib.Prefixes(Prefix(..),chunkPrefixes,toAddrRange,pathID,mkPrefix,toPrefix,fromPrefix,fromAddrRange,lengthPrefix) where
+module BGPlib.Prefixes(Prefix(..),chunkPrefixes,toAddrRange,mkPrefix,toPrefix,fromPrefix,fromAddrRange,lengthPrefix) where
 import Data.Binary
 import Data.Hashable
 import Data.Binary.Get
@@ -29,35 +29,31 @@ import BGPlib.LibCommon
 -- representation of prefixes as 64 bit words: this mapping allows prefixes to be treated as Ints where useful
 
 -- todo make this Word64 not Int?
-data Prefix = Prefix Word32 Int deriving (Eq,Generic)
+newtype Prefix = Prefix Int deriving (Eq,Generic)
 
 {-# INLINE toPrefix #-}
 toPrefix :: Int -> Prefix
-toPrefix x = Prefix 0 x
+toPrefix = Prefix
 
 {-# INLINE _mkPrefix #-}
 _mkPrefix :: Word8 -> Word32 -> Prefix
-_mkPrefix l v = Prefix 0 $! unsafeShiftL (fromIntegral l) 32 .|. fromIntegral v
+_mkPrefix l v = Prefix $! unsafeShiftL (fromIntegral l) 32 .|. fromIntegral v
 
 {-# INLINE mkPrefix #-}
-mkPrefix :: Word32 -> Word8 -> Word32 -> Prefix
-mkPrefix pathID l v = Prefix pathID  $! unsafeShiftL (fromIntegral l) 32 .|. fromIntegral v
+mkPrefix :: Word8 -> Word32 -> Prefix
+mkPrefix l v = Prefix $! unsafeShiftL (fromIntegral l) 32 .|. fromIntegral v
 
 {-# INLINE fromPrefix #-}
 fromPrefix :: Prefix -> Int
-fromPrefix (Prefix _ pfx) = pfx
+fromPrefix (Prefix pfx) = pfx
 
 {-# INLINE lengthPrefix #-}
 lengthPrefix :: Prefix -> Int
-lengthPrefix (Prefix _ pfx) = fromIntegral $ unsafeShiftR pfx 32
+lengthPrefix (Prefix pfx) = fromIntegral $ unsafeShiftR pfx 32
 
 {-# INLINE addressPrefix #-}
 addressPrefix :: Prefix -> Word32
-addressPrefix (Prefix _ pfx) = fromIntegral $ 0xffffffff .&. pfx
-
-{-# INLINE pathID #-}
-pathID :: Prefix -> Word32
-pathID (Prefix pid _) = pid
+addressPrefix (Prefix pfx) = fromIntegral $ 0xffffffff .&. pfx
 
 instance IsString Prefix where
     fromString = read
@@ -87,7 +83,7 @@ toAddrRange pfx = makeAddrRange (fromHostAddress $ byteSwap32 $ addressPrefix pf
 
 {-# INLINE fromAddrRange #-}
 fromAddrRange :: AddrRange IPv4 -> Prefix
-fromAddrRange ar = mkPrefix 0 (fromIntegral subnet) (byteSwap32 $ toHostAddress ip) where
+fromAddrRange ar = mkPrefix (fromIntegral subnet) (byteSwap32 $ toHostAddress ip) where
                    (ip,subnet) = addrRangePair ar
 
 -- binary format for attributes is 1 byte flags, 1 byte type code, 1 or 2 byte length value depending on a flag bit, then payload
@@ -150,24 +146,19 @@ chunkPrefixes n pfxs = let (xl,l,_) = chunkPrefixes' pfxs in (l : xl)
                                     | otherwise = (l:xl,[pfx],size)
 
     enumeratePrefixes = map (\pfx -> (getLength pfx, pfx)) where
-        getLength pfx = fromIntegral $ 6 + (lengthPrefix pfx - 1) `div` 8
+        getLength pfx = fromIntegral $ 2 + (lengthPrefix pfx - 1) `div` 8
 
 instance Binary Prefix where
 
-    put pfx | subnet == 0 = do putWord32be 0 -- (pathID pfx)
-                               putWord8 0
-            | subnet < 9  = do putWord32be 0 -- (pathID pfx)
-                               putWord8 subnet
+    put pfx | subnet == 0 =    putWord8 0
+            | subnet < 9  = do putWord8 subnet
                                putWord8 (fromIntegral $ unsafeShiftR ip 24)
-            | subnet < 17 = do putWord32be 0 -- (pathID pfx)
-                               putWord8 subnet
+            | subnet < 17 = do putWord8 subnet
                                putWord16be  (fromIntegral $ unsafeShiftR ip 16)
-            | subnet < 25 = do putWord32be 0 -- (pathID pfx)
-                               putWord8 subnet
+            | subnet < 25 = do putWord8 subnet
                                putWord16be  (fromIntegral $ unsafeShiftR ip 16)
                                putWord8 (fromIntegral $ unsafeShiftR ip 8)
-            | otherwise   = do putWord32be 0 -- (pathID pfx)
-                               putWord8 subnet
+            | otherwise   = do putWord8 subnet
                                putWord32be  ip
         where subnet = fromIntegral $ lengthPrefix pfx
               ip = addressPrefix pfx
