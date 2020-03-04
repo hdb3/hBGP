@@ -26,7 +26,7 @@ main :: IO ()
 main = do
     info banner
 
-    config <- getConfig
+    config <- getConfig >>= checkCapabilities >>= fixCapabilities
 
     global <- buildGlobal config
 
@@ -45,7 +45,7 @@ main = do
 
 banner = "hbgp " ++ showVersion version
          ++ if "master" == $(gitBranch) then "" else " (" ++ $(gitBranch)++ ")"
-         
+
 getConfig :: IO Config
 getConfig = do
     args <- getArgs
@@ -75,7 +75,7 @@ buildGlobal c@Config{..} = do
         -- TODO the map creation should be in Config...
         peerMap = Data.Map.fromList $ map (\pc -> (peerConfigIPv4 pc,pc)) configConfiguredPeers
 
-        logger = hPutStrLn stdout
+        logger = putStrLn
 
     exitFlag <- newEmptyMVar
 

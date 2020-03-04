@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, RecordWildCards #-}
 module Router.Config where
 
 -- ## TODO rework the whole Config concept of 'enabled' peers
@@ -10,13 +10,19 @@ module Router.Config where
 --                     (possibly yes, so that extensions can use custom configuration
 --                      without modifying top level code)
 
+-- ## TODO refactor offered/required to required/optional -
+--    the 'offer' consists of both, the response check consists of merely required
+
 -- define the configuration which is passed to the main program
 
-import Data.List(nub,(\\))
+import Data.List(foldl',nub,(\\))
 import Data.IP
 import Data.Word
 import Data.Maybe(fromMaybe)
+import System.Exit(die)
+import Control.Monad(unless)
 import BGPlib.BGPlib
+import Router.Log
 
 data Config = Config { configAS :: Word32
                      , configBGPID :: IPv4
@@ -36,11 +42,92 @@ data Config = Config { configAS :: Word32
                      }
                      deriving (Show,Read)
 
+checkCapabilities :: Config -> IO Config
+checkCapabilities c@Config{..} = do
+    unless (check configOfferedCapabilities configRequiredCapabilities)
+           ( die "check configOfferedCapabilities configRequiredCapabilities")
+    mapM_ checkPeerCapabilities configConfiguredPeers
+    return c
+    where
+   -- offered must include all of required
+
+        check offered required = null (capCodes required \\ capCodes offered)
+        checkPeerCapabilities PeerConfig{..} = unless (check peerConfigOfferedCapabilities peerConfigRequiredCapabilities)
+                                                ( die $ "peer "
+                                                         ++ show peerConfigBGPID
+                                                         ++ " check peerConfigOfferedCapabilities peerConfigRequiredCapabilities"
+                                                )
+
+fixCapabilities :: Config -> IO Config
+-- warn and fix the following cases:
+--   ADDPATH code without addpath capability in offered and required
+--   non-ADDPATH code with addpath capability in offered or required
+
+fixCapabilities = fixCapabilitiesBase
+-- fixCapabilities = fixCapabilitiesAddPath
+
+
+fixCapabilitiesBase :: Config -> IO Config
+fixCapabilitiesBase = removeCapabilities _CapCodeAddPath
+
+fixCapabilitiesAddPath :: Config -> IO Config
+fixCapabilitiesAddPath = addCapabilities ( CapAddPath 1 1 3)
+
+addCapabilities :: Capability -> Config -> IO Config
+addCapabilities cap c@Config{..} = do
+    configOfferedCapabilities' <- addCaps "in configOfferedCapabilities " cap configOfferedCapabilities
+    configRequiredCapabilities' <- addCaps "in configRequiredCapabilities " cap configRequiredCapabilities
+    configConfiguredPeers' <- mapM (addPeerCapabilities cap) configConfiguredPeers
+    return $ c {configOfferedCapabilities = configOfferedCapabilities'
+               , configRequiredCapabilities = configRequiredCapabilities'
+               , configConfiguredPeers = configConfiguredPeers'}
+
+addPeerCapabilities :: Capability -> PeerConfig -> IO PeerConfig
+addPeerCapabilities cap p@PeerConfig{..} = do
+    peerConfigOfferedCapabilities' <- addCaps "in peerConfigOfferedCapabilities " cap peerConfigOfferedCapabilities
+    peerConfigRequiredCapabilities' <- addCaps "in peerConfigRequiredCapabilities " cap peerConfigRequiredCapabilities
+    return $ p {peerConfigOfferedCapabilities = peerConfigOfferedCapabilities'
+               , peerConfigRequiredCapabilities = peerConfigRequiredCapabilities'}
+
+
+addCaps :: String -> Capability -> [Capability] -> IO [Capability]
+addCaps s cap caps =
+    let hasCap :: Capability -> [Capability] -> Bool
+        hasCap cap = foldl' (\p x -> p || eq_ cap x) False
+    in if hasCap cap caps
+        then return caps
+        else do info $ "added capability" ++ show cap
+                return (cap : caps)
+
+removeCapabilities :: CapCode -> Config -> IO Config
+removeCapabilities cc c@Config{..} = do
+    configOfferedCapabilities' <- removeCaps "in configOfferedCapabilities " cc configOfferedCapabilities
+    configRequiredCapabilities' <- removeCaps "in configRequiredCapabilities " cc configRequiredCapabilities
+    configConfiguredPeers' <- mapM (removePeerCapabilities cc) configConfiguredPeers
+    return $ c {configOfferedCapabilities = configOfferedCapabilities'
+               , configRequiredCapabilities = configRequiredCapabilities'
+               , configConfiguredPeers = configConfiguredPeers'}
+
+removePeerCapabilities :: CapCode -> PeerConfig -> IO PeerConfig
+removePeerCapabilities cc p@PeerConfig{..} = do
+    peerConfigOfferedCapabilities' <- removeCaps "in peerConfigOfferedCapabilities " cc peerConfigOfferedCapabilities
+    peerConfigRequiredCapabilities' <- removeCaps "in peerConfigRequiredCapabilities " cc peerConfigRequiredCapabilities
+    return $ p {peerConfigOfferedCapabilities = peerConfigOfferedCapabilities'
+               , peerConfigRequiredCapabilities = peerConfigRequiredCapabilities'}
+
+removeCaps :: String -> CapCode -> [Capability] -> IO [Capability]
+removeCaps s cc caps = do
+    unless (rval == caps)
+           (info $ "removed capability" ++ show (caps \\ rval))
+    return rval where
+    rval = removeCaps_ cc caps
+    removeCaps_ cc = filter ( (cc /=) . capCode)
+
 activePeers :: Config -> [(IPv4,IPv4)]
 activePeers config = map peerConfigIPv4 $ filter peerConfigEnableOutbound (configConfiguredPeers config)
 
 activeOnly :: Config -> Bool
-activeOnly c = null (configEnabledPeers c) && null (filter peerConfigEnableInbound (configConfiguredPeers c)) && not (configAllowDynamicPeers c)
+activeOnly c = null (configEnabledPeers c) && not (any peerConfigEnableInbound (configConfiguredPeers c)) && not (configAllowDynamicPeers c)
 
 data PeerConfig = PeerConfig { peerConfigIPv4 :: (IPv4,IPv4)
                              , peerConfigAS :: Maybe Word32
