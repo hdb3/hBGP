@@ -15,17 +15,18 @@ import Data.Monoid((<>))
 
 import BGPlib.LibCommon
 
+type CapCode = Word8
 --
 -- ref https://www.iana.org/assignments/capability-codes/capability-codes.xml
 --
-_CapCodeMultiprotocol = 1
-_CapCodeRouteRefresh = 2
-_CapCodeGracefulRestart = 64
-_CapCodeAS4 = 65
-_CapCodeAddPath = 69
-_CapCodeEnhancedRouteRefresh = 70
-_CapCodeLLGR = 71
-_CapCodeCiscoRefresh = 128
+_CapCodeMultiprotocol = 1 :: CapCode
+_CapCodeRouteRefresh = 2 :: CapCode
+_CapCodeGracefulRestart = 64 :: CapCode
+_CapCodeAS4 = 65 :: CapCode
+_CapCodeAddPath = 69 :: CapCode
+_CapCodeEnhancedRouteRefresh = 70 :: CapCode
+_CapCodeLLGR = 71 :: CapCode
+_CapCodeCiscoRefresh = 128 :: CapCode
 {-
  The Capability Value field is defined as:
 
@@ -82,6 +83,18 @@ eq_ CapLLGR CapLLGR = True
 eq_ CapCiscoRefresh CapCiscoRefresh = True
 eq_ CapEnhancedRouteRefresh CapEnhancedRouteRefresh = True
 eq_ _ _ = False
+
+capCode :: Capability -> CapCode
+capCode (CapMultiprotocol _ _) = _CapCodeMultiprotocol
+capCode (CapGracefulRestart _ _) = _CapCodeGracefulRestart
+capCode (CapAS4 _) = _CapCodeAS4
+capCode CapAddPath {} = _CapCodeAddPath
+capCode CapRouteRefresh = _CapCodeRouteRefresh
+capCode CapLLGR = _CapCodeLLGR
+capCode CapCiscoRefresh = _CapCodeCiscoRefresh
+capCode CapEnhancedRouteRefresh = _CapCodeEnhancedRouteRefresh
+
+capCodes = map capCode
 
 putCap :: Capability -> Put
 putCap = put
@@ -142,8 +155,7 @@ instance Binary Capability where
         if | t == _CapCodeMultiprotocol -> do
                       afi <- getWord16be
                       _ <- getWord8
-                      safi <- getWord8
-                      return (CapMultiprotocol afi safi)
+                      CapMultiprotocol afi <$> getWord8
            | t == _CapCodeGracefulRestart -> do
                       word0 <- getWord16be
                       let rFlag = testBit word0 15
@@ -152,8 +164,7 @@ instance Binary Capability where
            | t == _CapCodeAS4 -> CapAS4 <$> getWord32be
            | t == _CapCodeAddPath -> do afi <- getWord16be
                                         safi <- getWord8
-                                        bits <- getWord8
-                                        return $ CapAddPath afi safi bits
+                                        CapAddPath afi safi <$> getWord8
            | t == _CapCodeRouteRefresh -> return CapRouteRefresh
            | t == _CapCodeEnhancedRouteRefresh -> return CapEnhancedRouteRefresh
            | t == _CapCodeCiscoRefresh -> return CapCiscoRefresh
