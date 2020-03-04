@@ -63,8 +63,8 @@ fixCapabilities :: Config -> IO Config
 --   ADDPATH code without addpath capability in offered and required
 --   non-ADDPATH code with addpath capability in offered or required
 
-fixCapabilities = fixCapabilitiesBase
--- fixCapabilities = fixCapabilitiesAddPath
+-- fixCapabilities = fixCapabilitiesBase
+fixCapabilities = fixCapabilitiesAddPath
 
 
 fixCapabilitiesBase :: Config -> IO Config
