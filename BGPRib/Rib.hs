@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards, TupleSections #-}
+{-# LANGUAGE RecordWildCards, TupleSections, BangPatterns #-}
 module BGPRib.Rib(Rib,ribPush,newRib,getLocRib,addPeer,delPeer,getPeersInRib,lookupRoutes,pullAllUpdates,getNextHops) where
 import Control.Concurrent
 import qualified Data.Map.Strict as Data.Map
@@ -134,7 +134,7 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
         | otherwise = do
               localPref <- evalLocalPref peerData pathAttributes pfxs
               let routeData = makeRouteData peerData pathAttributes routeId localPref
-                  ( prefixTable' , updates ) = BGPRib.PrefixTable.update prefixTable pfxs routeData
+                  ( !prefixTable' , !updates ) = BGPRib.PrefixTable.update prefixTable pfxs routeData
               updateRibOutWithPeerData peerData routeData updates adjRibOutTables
               return $ Rib' prefixTable' adjRibOutTables
 
