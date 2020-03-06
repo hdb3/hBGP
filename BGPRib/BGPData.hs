@@ -78,5 +78,10 @@ instance Ord PeerData where
 
 instance Ord RouteData where
 
-  compare rd1 rd2 = compare (localPref rd1, pathLength rd1, origin rd1, med rd1, not $ fromEBGP rd1, peerBGPid (peerData rd1), peerIPv4 (peerData rd1))
-                            (localPref rd2, pathLength rd2, origin rd2, med rd2, not $ fromEBGP rd2, peerBGPid (peerData rd2), peerIPv4 (peerData rd2))
+  compare rd1 rd2 = compare (localPref rd1, pathLength rd2, origin rd2, med rd1, fromEBGP rd1, peerBGPid (peerData rd2), peerIPv4 (peerData rd2))
+                            (localPref rd2, pathLength rd1, origin rd1, med rd2, fromEBGP rd2, peerBGPid (peerData rd1), peerIPv4 (peerData rd1))
+
+-- rank as higher some parameters when lower - these are Origin, Path Length, peer BGPID, peer address
+-- ## TODO ## MED comparison is wrong - should only apply when adjacent AS is equal
+-- ## this is in the Path Attributes, obviously, but needs parsing out and caching....
+-- OR - use the peerData AS on the assumption that the AS Path does not lie....
