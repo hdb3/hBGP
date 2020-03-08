@@ -12,7 +12,13 @@ import Data.Binary.Get
 import Data.Binary.Put
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString as B
-import Control.Monad(void,when,unless,fail)
+import Control.Monad(void,when,unless)
+-- *** TODO - 'fail' was replaced by 'error' for compilation with ghc > 8.8
+-- this is probably not a safe approach, but neither possibly was 'fail'.
+-- So, please study how these conditions should be safely handled.
+-- fail may have been better than error....
+-- NB - the Binary instances are at least PARTLY replaced - possibly all of the affected code is redunadant
+-- if not, it should be made so using Builder s.
 import Data.ByteString.Builder
 import Data.Monoid((<>))
 
@@ -82,22 +88,22 @@ class Handle handle where
 
 instance Binary BGPByteString where
 
-    put (BGPByteString (Right bs)) | msgLength > 4096 = fail $ "trying to put an overlong BGPByteString, " ++ show msgLength ++ " bytes"
+    put (BGPByteString (Right bs)) | msgLength > 4096 = error $ "trying to put an overlong BGPByteString, " ++ show msgLength ++ " bytes"
                                    | otherwise = do
         putLazyByteString lBGPMarker
         putWord16be msgLength
         putLazyByteString bs where
             msgLength = fromIntegral $ L.length bs + 18
 
-    put (BGPByteString (Left _)) = fail "trying to but an invalid BGPByteString"
+    put (BGPByteString (Left _)) = error "trying to but an invalid BGPByteString"
 
     get = label "BGPByteString" $ do
         empty <- isEmpty
-        when empty (fail "BGP end of stream")
+        when empty (error "BGP end of stream")
         marker <- getLazyByteString 16
-        unless ( marker == lBGPMarker ) (fail "BGP marker synchronisation error")
+        unless ( marker == lBGPMarker ) (error "BGP marker synchronisation error")
         len <- getWord16be
-        unless ( len < 4097 ) (fail "BGP message length invalid")
+        unless ( len < 4097 ) (error "BGP message length invalid")
         bs <- getLazyByteString (fromIntegral (len-18))
         return (BGPByteString $ Right bs)
 
