@@ -57,13 +57,13 @@ updatePrefixTable :: PrefixTable -> Prefix -> RouteData -> (PrefixTable,Bool)
 updatePrefixTable pt pfx rd = (pt', bestChanged) where
     k =  fromPrefix pfx
     pt' = IntMap.alter ( pteUpdate rd ) k pt
-    newBest = fmap (take 1) ( IntMap.lookup k pt') -- should just use our 'best' lookup?
+    best = fmap (take 1) . IntMap.lookup k
+    newBest = best pt'
     oldBest = fmap (take 1) ( IntMap.lookup k pt)
     bestChanged = oldBest /= newBest
-    -- bestChanged = trace (show (oldBest,newBest)) $ oldBest /= newBest
+
     pteUpdate :: RouteData -> Maybe PrefixTableEntry -> Maybe PrefixTableEntry
-    pteUpdate rd Nothing = Just [rd]
-    pteUpdate rd (Just pte) = Just (pteInsert rd pte) where
+    pteUpdate rd = Just . maybe [rd] (pteInsert rd ) where    
         pteInsert :: RouteData -> PrefixTableEntry -> PrefixTableEntry
 
         pteInsert v = f where
