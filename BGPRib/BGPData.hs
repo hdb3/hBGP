@@ -37,7 +37,7 @@ data RouteData =  RouteData { peerData :: PeerData
                             , med :: Word32
                             , fromEBGP :: Bool
                             , localPref :: Word32
-                            }
+                            } | Withdraw { peerData :: PeerData }
 
 instance Hashable RouteData where
     hashWithSalt _ = routeId
@@ -76,6 +76,7 @@ instance Eq PeerData where
 instance Ord PeerData where
     compare p1 p2 = compare (peerBGPid p1) (peerBGPid p2)
 
+-- note only defined for case where neither parameter is Withdraw (that constructor should never be found in the wild)
 instance Ord RouteData where
 
   compare rd1 rd2 = compare (localPref rd1, pathLength rd2, origin rd2, med rd1, fromEBGP rd1, peerBGPid (peerData rd2), peerIPv4 (peerData rd2))

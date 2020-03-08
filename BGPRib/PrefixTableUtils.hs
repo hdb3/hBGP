@@ -13,14 +13,16 @@ module BGPRib.PrefixTableUtils where
  - hence a fast implementation is essential
 -}
 
-import Data.IntMap.Strict(toList)
+--import Data.IntMap.Strict(toList)
 import qualified Data.List
 import Data.IP
+import Data.Maybe(fromJust)
 
 import BGPlib.BGPlib (Prefix,toPrefix)
 import BGPRib.Common
 import BGPRib.BGPData
-import BGPRib.PrefixTable(PrefixTable,ptHead)
+import BGPRib.PrefixTable(PrefixTable)
+import qualified BGPRib.PT as PT
 
 -- ===================================================
 --
@@ -29,15 +31,18 @@ import BGPRib.PrefixTable(PrefixTable,ptHead)
 -- ===================================================
 
 getDB :: PrefixTable -> [(Prefix,[RouteData])]
-getDB pt = map f (toList pt) where
+getDB pt = map f (PT.ptList pt) where
     f (pfx,routes) = (toPrefix pfx,routes)
 
 lengthRIB :: PrefixTable -> Int
-lengthRIB pt = length (toList pt)
+lengthRIB pt = length (PT.ptList pt)
 
 getRIB :: PrefixTable -> [(RouteData,Prefix)]
-getRIB pt = map f (toList pt) where
-    f (pfx,routes) = (ptHead routes , toPrefix pfx)
+getRIB pt = f (PT.ptList pt) where
+    f [] = []
+    f ((k,pte):ax) | PT.pteNull pte = f ax
+                   | otherwise = (fromJust $ PT.pteBest pte, toPrefix k) : f ax 
+   -- f (pfx,routes) = (fromJust $ PT.pteBest routes, toPrefix pfx)
 
 getFIB :: PrefixTable -> [(Prefix,IPv4)]
 getFIB pt = map f (getRIB pt) where
