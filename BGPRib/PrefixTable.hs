@@ -25,7 +25,9 @@ type PrefixTableEntry = [RouteData]
 type PrefixTable = IntMap.IntMap PrefixTableEntry
 
 instance {-# OVERLAPPING #-} Show PrefixTable where
-    show = show . IntMap.toList
+    show = unlines . map showPTE . IntMap.toList where
+        showPTE (k,v) = show (toPrefix k,v)
+
 
 newPrefixTable :: PrefixTable
 newPrefixTable = IntMap.empty
