@@ -30,20 +30,27 @@ data PeerData = PeerData { globalData :: GlobalData
 
 data RouteData =  RouteData { peerData :: PeerData
                             , pathAttributes :: [PathAttribute]
-                            , routeId :: Int
+                            , routeHash :: Int
                             , pathLength :: Int
                             , nextHop :: IPv4
                             , origin :: Word8
                             , med :: Word32
                             , fromEBGP :: Bool
                             , localPref :: Word32
-                            } | Withdraw { peerData :: PeerData }
+                            }
+                            | Withdraw { peerData :: PeerData }
+                            | NullRoute
+getRouteNextHop :: RouteData -> Maybe IPv4
+getRouteNextHop rd@RouteData{} = Just $ nextHop rd
+getRouteNextHop _ = Nothing
+
+routeId :: RouteData -> Int
+routeId NullRoute = 0
+routeId Withdraw{} = -1
+routeId rd@RouteData{} = routeId rd
 
 instance Hashable RouteData where
-    hashWithSalt _ = routeId
-
-nullRoute :: RouteData
-nullRoute = RouteData undefined undefined 0 undefined undefined undefined undefined undefined undefined
+    hashWithSalt _ = routeHash
 
 localPeer gd = PeerData { globalData = gd
                     , isExternal = False
@@ -68,7 +75,10 @@ instance Show RouteData where
     show rd = "nexthop: " ++ show (nextHop rd) ++ ",  peer ID: " ++ show (peerBGPid $ peerData rd) ++ ",  pref " ++ show (localPref rd)
 
 instance Eq RouteData where
-    a == b = routeId a == routeId b
+    (==) NullRoute NullRoute = True
+    (==) (Withdraw a) (Withdraw b) = a == b
+    (==) a@RouteData{} b@RouteData{} = routeId a == routeId b
+    (==) _ _ = False
 
 instance Eq PeerData where
     p1 == p2 = peerBGPid p1 == peerBGPid p2
@@ -79,8 +89,8 @@ instance Ord PeerData where
 -- note only defined for case where neither parameter is Withdraw (that constructor should never be found in the wild)
 instance Ord RouteData where
 
-  compare rd1 rd2 = compare (localPref rd1, pathLength rd2, origin rd2, med rd1, fromEBGP rd1, peerBGPid (peerData rd2), peerIPv4 (peerData rd2))
-                            (localPref rd2, pathLength rd1, origin rd1, med rd2, fromEBGP rd2, peerBGPid (peerData rd1), peerIPv4 (peerData rd1))
+  compare rd1@RouteData{} rd2@RouteData{} = compare (localPref rd1, pathLength rd2, origin rd2, med rd1, fromEBGP rd1, peerBGPid (peerData rd2), peerIPv4 (peerData rd2))
+                                                    (localPref rd2, pathLength rd1, origin rd1, med rd2, fromEBGP rd2, peerBGPid (peerData rd1), peerIPv4 (peerData rd1))
 
 -- rank as higher some parameters when lower - these are Origin, Path Length, peer BGPID, peer address
 -- ## TODO ## MED comparison is wrong - should only apply when adjacent AS is equal
