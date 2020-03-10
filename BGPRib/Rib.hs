@@ -123,7 +123,7 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
         | null pfxs = return (Rib' prefixTable adjRibOutTables )
         | otherwise = do
             let ( prefixTable' , withdraws ) = BGPRib.PrefixTable.withdraw prefixTable pfxs peerData
-            updateRibOutWithPeerData peerData NullRoute withdraws adjRibOutTables
+            updateRibOutWithPeerData peerData (Withdraw peerData) withdraws adjRibOutTables
             return $ Rib' prefixTable' adjRibOutTables
 
     makeRouteData :: PeerData -> [PathAttribute] -> Int -> Word32 -> RouteData

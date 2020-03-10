@@ -47,7 +47,7 @@ getRouteNextHop _ = Nothing
 routeId :: RouteData -> Int
 routeId NullRoute = 0
 routeId Withdraw{} = -1
-routeId rd@RouteData{} = routeId rd
+routeId rd@RouteData{} = routeHash rd
 
 instance Hashable RouteData where
     hashWithSalt _ = routeHash
@@ -77,7 +77,7 @@ instance Show RouteData where
 instance Eq RouteData where
     (==) NullRoute NullRoute = True
     (==) (Withdraw a) (Withdraw b) = a == b
-    (==) a@RouteData{} b@RouteData{} = routeId a == routeId b
+    (==) a@RouteData{} b@RouteData{} = routeHash a == routeHash b
     (==) _ _ = False
 
 instance Eq PeerData where

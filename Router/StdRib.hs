@@ -63,7 +63,7 @@ buildUpdate :: PeerData -> [Prefix] -> RouteData -> [ParsedUpdate]
 --
 -- Note: the Route source peer can be reached from the RouteData record via peerData
 --
-buildUpdate target prefixes NullRoute = makeUpdate [] prefixes []
+buildUpdate target prefixes NullRoute = []
 buildUpdate target prefixes Withdraw{} = makeUpdate [] prefixes []
 
 buildUpdate target prefixes RouteData{..} = if isExternal target then egpUpdate else igpUpdate
