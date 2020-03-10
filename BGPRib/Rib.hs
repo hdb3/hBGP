@@ -46,7 +46,7 @@ delPeer rib peer = modifyMVar_ rib ( delPeer' peer )
         let (prefixTable',prefixes) = withdrawPeer prefixTable peer
         -- schedule the withdraw dissemination
         -- NOTE - this does not change the AdjRIBMap
-        updateRibOutWithPeerData peer nullRoute prefixes adjRib
+        updateRibOutWithPeerData peer NullRoute prefixes adjRib
         -- now remove this peer completely from the AdjRIBMap
         -- it is liekly that this could be done before the previous action.....
         -- but the semantics should be identical as long as we didn't try to send withdraw messages to the peer which has gone away...
@@ -67,42 +67,22 @@ addPeer rib peer = modifyMVar_ rib ( addPeer' peer )
             -- TODO - this would be the place to insert an end-of-rib marker
         let adjRib' = Data.Map.insert peer aro adjRib
         return $ Rib' prefixTable adjRib'
-{-
-    delayed route look-up logic
-    After an update/withdraw is scheduled the best route may change, or be removed, leaving no route at all.
-    This raises two issues: firstly, the original route may no longer be available, so the immediate update cannot be sent.
-    Secondly, even if the route is still valid, or a withdraw was requested, the optimal behaviour may not be to send the originally selected route.
-    The simple course of action is to discard tbe immediate update, safe in the knowledge that another update for the specific peer is in the pipeline.
-    However, the logic fails when the request is withdraw, since it is possible that the replacement route would be filtered for the specific target peer.
-    Therefore scheduled withdraw should not be discarded.  A similar problem arises when the current route is null, in which case a withdraw is in the pipeline,
-    but if we discard the earlier route and it was also the first route selected for this prefix/peer then a withdraw will be generated without a matching update.
-    This outcome is likely to be rare, and does not compromise route integrity, although a peer may detect the anomaly.
-    A full resoultion is not possible in this design - it motivates a change from use of route hashes to actual route referneces in ARO entries.
 
-    Summary: withdrawals are never discarded, changed non-null routes are...
-
-    New design
-
-    lookupRoutes should return [(Maybe RouteData,[Prefix])] rather than [(RouteData,[Prefix])],
-    where Maybe RouteData allows a withdraw to be represented.  The prescribed filter logic is implemented after initial lookup and before function return.
-    The initial lookup function returns an ARE record (tuple) augmented with the lookup outcome.
-    Before grouping on the lookup outcome the list is filtered according to the description above. 
--}
-
-lookupRoutes :: Rib -> AdjRIBEntry -> IO [(Maybe RouteData,[Prefix])]
-lookupRoutes rib (prefixes,routeHash) = if 0 == routeHash
-    then return [(Nothing,prefixes)] 
-    else do
+lookupRoutes :: Rib -> AdjRIBEntry -> IO (Maybe (RouteData,[Prefix]))
+lookupRoutes rib (prefixes,routeHash) = do
         rib' <- readMVar rib
-        let pxrs = map (\prefix -> (queryPrefixTable (prefixTable rib') prefix, prefix)) prefixes
-            discardChanged (mrd,_) = maybe True (\rd -> routeHash == routeId rd) mrd
-        return $ group $ filter discardChanged pxrs
+        let myLookup = map (\pfx -> ( queryPrefixTable (prefixTable rib') pfx, pfx))
+            myFilter = filter ((routeHash ==) . routeId .fst )
+            unchangedPrefixes = myFilter $ myLookup prefixes
+            route = fst $ head unchangedPrefixes  -- safe becuase only called after test for null
+        return $ if null unchangedPrefixes then Nothing else Just (route,map snd unchangedPrefixes)
 
 getNextHops :: Rib -> [Prefix] -> IO [(Prefix,Maybe IPv4)]
 getNextHops rib prefixes = do
     rib' <- readMVar rib
-    let getNextHop prefix = (prefix,) $ nextHop <$> queryPrefixTable (prefixTable rib') prefix
-    return $ map getNextHop prefixes
+    return $ map
+             (\prefix -> (prefix,) $ getRouteNextHop $ queryPrefixTable (prefixTable rib') prefix)
+             prefixes
 
 pullAllUpdates :: PeerData -> Rib -> IO [AdjRIBEntry]
 pullAllUpdates peer rib = do
@@ -143,11 +123,11 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
         | null pfxs = return (Rib' prefixTable adjRibOutTables )
         | otherwise = do
             let ( prefixTable' , withdraws ) = BGPRib.PrefixTable.withdraw prefixTable pfxs peerData
-            updateRibOutWithPeerData peerData nullRoute withdraws adjRibOutTables
+            updateRibOutWithPeerData peerData NullRoute withdraws adjRibOutTables
             return $ Rib' prefixTable' adjRibOutTables
 
     makeRouteData :: PeerData -> [PathAttribute] -> Int -> Word32 -> RouteData
-    makeRouteData peerData pathAttributes routeId overrideLocalPref = RouteData {..}
+    makeRouteData peerData pathAttributes routeHash overrideLocalPref = RouteData {..}
         where
         pathLength = getASPathLength pathAttributes
         fromEBGP = isExternal peerData
@@ -158,12 +138,5 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
 
 updateRibOutWithPeerData :: PeerData -> RouteData -> [Prefix] -> AdjRIB -> IO ()
 updateRibOutWithPeerData originPeer routeData updates adjRib = sequence_ $ Data.Map.mapWithKey updateWithKey adjRib
-    where updateWithKey destinationPeer table = when ( destinationPeer /= originPeer )
-                                                     ( insertAdjRIBTable (updates, routeId routeData ) table )
-    -- returning routes to the originator seems unprofitable
-    -- however real routers do exactly this (e.g. Cisco IOS) and it may simplify matters to follow suit...
-    -- hence this version of updateWithKey can be replaced with a simpler one....
-          updateWithKey' _ = insertAdjRIBTable (updates, routeId routeData)
-    -- in future this could be a run-time configuration option.....
-
+    where updateWithKey _ = insertAdjRIBTable (updates, routeId routeData)
     

@@ -82,8 +82,9 @@ updatePrefixTable pt pfx rd = (pt', bestChanged) where
 
 -- this function finds the best route for a specicif prefix
 -- if the requirement is bulk look up then another function might be better.....
-queryPrefixTable :: PrefixTable -> Prefix -> Maybe RouteData
-queryPrefixTable table pfx = fmap ptHead (IntMap.lookup (fromPrefix pfx) table)
+
+queryPrefixTable :: PrefixTable -> Prefix -> RouteData
+queryPrefixTable table pfx = maybe NullRoute ptHead (IntMap.lookup (fromPrefix pfx) table)
 
 showRibAt :: PrefixTable -> Prefix -> String
 showRibAt table pfx = show (IntMap.lookup (fromPrefix pfx) table)
