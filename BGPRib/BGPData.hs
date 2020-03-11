@@ -47,7 +47,7 @@ getRouteNextHop _ = Nothing
 routeId :: RouteData -> Int
 routeId NullRoute = 0
 routeId Withdraw{} = -1
-routeId rd@RouteData{} = routeId rd
+routeId rd@RouteData{} = routeHash rd
 
 instance Hashable RouteData where
     hashWithSalt _ = routeHash
@@ -77,7 +77,7 @@ instance Show RouteData where
 instance Eq RouteData where
     (==) NullRoute NullRoute = True
     (==) (Withdraw a) (Withdraw b) = a == b
-    (==) a@RouteData{} b@RouteData{} = routeId a == routeId b
+    (==) a@RouteData{} b@RouteData{} = routeHash a == routeHash b
     (==) _ _ = False
 
 instance Eq PeerData where
@@ -88,7 +88,6 @@ instance Ord PeerData where
 
 -- note only defined for case where neither parameter is Withdraw (that constructor should never be found in the wild)
 instance Ord RouteData where
-
   compare rd1@RouteData{} rd2@RouteData{} = compare (localPref rd1, pathLength rd2, origin rd2, med rd1, fromEBGP rd1, peerBGPid (peerData rd2), peerIPv4 (peerData rd2))
                                                     (localPref rd2, pathLength rd1, origin rd1, med rd2, fromEBGP rd2, peerBGPid (peerData rd1), peerIPv4 (peerData rd1))
 

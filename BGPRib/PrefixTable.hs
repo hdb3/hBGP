@@ -25,29 +25,31 @@ type PrefixTableEntry = PT.PTE
 type PrefixTable = PT.PT
 
 instance {-# OVERLAPPING #-} Show PrefixTable where
-    show = show . PT.ptList
+    show = unlines . map showPTE . PT.ptList where
+        showPTE (k,v) = show (toPrefix k,v)
+
 
 newPrefixTable :: PrefixTable
 newPrefixTable = PT.ptNew
 
-update:: PrefixTable -> [Prefix] -> RouteData -> (PrefixTable,[Prefix])
+update:: PrefixTable -> [Prefix] -> RouteData -> (PrefixTable,[(Prefix,RouteData)])
 update pt pfxs route = Data.List.foldl' f (pt,[]) pfxs where
     f (pt',acc) pfx = (pt'',acc') where
-        acc' = if old /= new then pfx:acc else acc
+        acc' = if (PT.pteBest new) == (PT.pteBest old) then acc else (pfx,PT.pteBest new):acc
         (old,new,pt'') = PT.ptUpdate (fromPrefix pfx) route pt
 
-queryPrefixTable :: PrefixTable -> Prefix -> Maybe RouteData
+queryPrefixTable :: PrefixTable -> Prefix -> RouteData
 queryPrefixTable table pfx = PT.pteBest $ PT.ptQuery (fromPrefix pfx) table
 
 showRibAt :: PrefixTable -> Prefix -> String
 showRibAt table pfx = show (PT.ptQuery (fromPrefix pfx) table)
 
-withdraw :: PrefixTable -> [Prefix] -> PeerData -> (PrefixTable,[Prefix])
-
+-- TODO merge update and withdraw by using a route value of Withdraw {..}
+withdraw :: PrefixTable -> [Prefix] -> PeerData -> (PrefixTable,[(Prefix,RouteData)])
 withdraw pt pfxs pd = Data.List.foldl' f (pt,[]) pfxs where
-    f (pt',acc) pfx = let acc' = if (PT.pteBest new) == (PT.pteBest old) then acc else pfx:acc
+    f (pt',acc) pfx = let acc' = if (PT.pteBest new) == (PT.pteBest old) then acc else (pfx,PT.pteBest new):acc
                           (old,new,pt'') = PT.ptUpdate (fromPrefix pfx) (Withdraw pd) pt'
                       in (pt'',acc')
 
-withdrawPeer :: PrefixTable -> PeerData -> (PrefixTable,[Prefix])
+withdrawPeer :: PrefixTable -> PeerData -> (PrefixTable,[(Prefix,RouteData)])
 withdrawPeer pt = withdraw pt (map toPrefix $ PT.ptKeys pt)

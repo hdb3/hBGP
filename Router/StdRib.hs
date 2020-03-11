@@ -4,6 +4,7 @@ import Control.Monad.Extra(when,concatMapM)
 import System.Timeout(timeout)
 import Data.Maybe(fromMaybe)
 import Data.Word
+import Data.List(foldl')
 
 import BGPlib.BGPlib hiding (nlri,withdrawn)
 import BGPRib.BGPRib
@@ -49,7 +50,7 @@ addRouteRib rib peer prefix nextHop = BGPRib.ribPush rib peer (igpUpdate nextHop
 delRouteRib :: Rib -> PeerData -> AddrRange IPv4 -> IO()
 delRouteRib rib peer prefix = BGPRib.ribPush rib peer (originateWithdraw [fromAddrRange prefix])
 
-buildUpdate :: PeerData -> [Prefix] -> Maybe RouteData -> [ParsedUpdate]
+buildUpdate :: PeerData -> [Prefix] -> RouteData -> [ParsedUpdate]
 -- there are three distinct 'peers' and associated PeerData potentially in scope here
 --     the peer which originated the route
 --     the peer which will receive this update ('target')
@@ -64,7 +65,7 @@ buildUpdate :: PeerData -> [Prefix] -> Maybe RouteData -> [ParsedUpdate]
 -- Note: the Route source peer can be reached from the RouteData record via peerData
 --
 buildUpdate target prefixes Nothing = makeUpdate [] prefixes []
-buildUpdate target prefixes (Just RouteData{..}) = if isExternal target then egpUpdate else igpUpdate
+buildUpdate target prefixes RouteData{..} = if isExternal target then egpUpdate else igpUpdate
     where
     igpUpdate = makeUpdate prefixes
                            []

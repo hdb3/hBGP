@@ -5,6 +5,7 @@ import qualified Data.ByteString.Char8 as C8
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.HashMap.Strict as HashMap
 import Data.Hashable(Hashable)
+import Data.List(foldl')
 
 toHex :: C8.ByteString -> String
 toHex = C8.unpack . Base16.encode
@@ -20,6 +21,14 @@ groupBy_ = HashMap.toList . fromList where
 
 -- ugly old definition...
 --groupBy_ = HashMap.toList . HashMap.fromListWith (++) . Prelude.map (\(a,b) -> (a,[b]))
+
+-- TODO prove this function
+groupBy :: (a -> a -> Bool) -> [a] -> [[a]]
+groupBy _ [] = []
+groupBy p zx@(z:_) = g zx where
+    f = foldl' (\(ax,bx) c -> if p z c then (c:ax,bx) else (ax,c:bx)) ([],[])
+    g ax = let (bx,cx) = f ax
+        in bx : g cx
 
 -- group and groupBy_ perform the same functions - hopefully, for small datasets at least, group is faster - e.g. for a handful of equivalent elements
 group :: Eq a => [(a, b)] -> [(a, [b])]

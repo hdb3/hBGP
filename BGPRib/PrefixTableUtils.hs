@@ -41,7 +41,7 @@ getRIB :: PrefixTable -> [(RouteData,Prefix)]
 getRIB pt = f (PT.ptList pt) where
     f [] = []
     f ((k,pte):ax) | PT.pteNull pte = f ax
-                   | otherwise = (fromJust $ PT.pteBest pte, toPrefix k) : f ax 
+                   | otherwise = (PT.pteBest pte, toPrefix k) : f ax 
    -- f (pfx,routes) = (fromJust $ PT.pteBest routes, toPrefix pfx)
 
 getFIB :: PrefixTable -> [(Prefix,IPv4)]

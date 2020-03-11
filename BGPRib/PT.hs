@@ -8,7 +8,7 @@ class PrefixTableEntry pte where
   pteNull :: pte a -> Bool
   pteEmpty :: pte a
   pteUpdate :: (Route r) => r -> pte r -> pte r
-  pteBest :: (Route r) => pte r -> Maybe r
+  pteBest :: (Route r) => pte r -> r
 
 ---And the instance for List is:
 instance PrefixTableEntry [] where
@@ -17,8 +17,8 @@ instance PrefixTableEntry [] where
 
   pteEmpty = []
 
-  pteBest [] = Nothing
-  pteBest (a:_) = Just a
+  pteBest [] = BGPRib.PT.null
+  pteBest (a:_) = a
 
   pteUpdate r0 rx = if isWithdraw r0 then f'' rx else f rx where
     
@@ -42,12 +42,17 @@ class (Show a) => Route a where
   eq :: a -> a -> Bool
   gt :: a -> a -> Bool
   isWithdraw :: a -> Bool
+  isNull :: a -> Bool
+  null :: a
 
 instance Route RouteData where
   eq r1 r2 = peerData r1 == peerData r2
   gt r1 r2 = r1 > r2
   isWithdraw Withdraw {} = True
   isWithdraw _ = False
+  isNull NullRoute = True
+  isNull _ = False
+  null = NullRoute
 
 {-
   ### TODO - work out why this is not valid, i.e. define a class PrefixTable

@@ -4,9 +4,10 @@ import Control.Concurrent
 import qualified Data.Map.Strict as Data.Map
 import Control.Monad(unless,when,void)
 -- TODO replace Data.List with Data.List.EXtra and use nubOrd not nub
-import Data.List(intercalate)
+import Data.List(intercalate,foldl')
 import Data.Word(Word32)
 import Data.IP
+import Control.Arrow(second)
 
 import BGPlib.BGPlib
 
@@ -46,7 +47,7 @@ delPeer rib peer = modifyMVar_ rib ( delPeer' peer )
         let (prefixTable',prefixes) = withdrawPeer prefixTable peer
         -- schedule the withdraw dissemination
         -- NOTE - this does not change the AdjRIBMap
-        updateRibOutWithPeerData peer nullRoute prefixes adjRib
+        updateRibOutWithPeerData peer prefixes adjRib
         -- now remove this peer completely from the AdjRIBMap
         -- it is liekly that this could be done before the previous action.....
         -- but the semantics should be identical as long as we didn't try to send withdraw messages to the peer which has gone away...
@@ -89,20 +90,22 @@ addPeer rib peer = modifyMVar_ rib ( addPeer' peer )
     Before grouping on the lookup outcome the list is filtered according to the description above. 
 -}
 
-lookupRoutes :: Rib -> AdjRIBEntry -> IO [(Maybe RouteData,[Prefix])]
+lookupRoutes :: Rib -> AdjRIBEntry -> IO [(RouteData,[Prefix])]
 lookupRoutes rib (prefixes,routeHash) = if 0 == routeHash
-    then return [(Nothing,prefixes)] 
+    then return [(NullRoute,prefixes)] 
     else do
         rib' <- readMVar rib
         let pxrs = map (\prefix -> (queryPrefixTable (prefixTable rib') prefix, prefix)) prefixes
-            discardChanged (mrd,_) = maybe True (\rd -> routeHash == routeId rd) mrd
+            discardChanged (mrd,_) = (\rd -> routeHash == routeId rd) mrd
         return $ group $ filter discardChanged pxrs
 
 getNextHops :: Rib -> [Prefix] -> IO [(Prefix,Maybe IPv4)]
 getNextHops rib prefixes = do
     rib' <- readMVar rib
-    let getNextHop prefix = (prefix,) $ nextHop <$> queryPrefixTable (prefixTable rib') prefix
-    return $ map getNextHop prefixes
+    return $ map
+             (\prefix -> (prefix,) $ getRouteNextHop $ queryPrefixTable (prefixTable rib') prefix)
+             prefixes
+
 
 pullAllUpdates :: PeerData -> Rib -> IO [AdjRIBEntry]
 pullAllUpdates peer rib = do
@@ -135,7 +138,7 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
               localPref <- evalLocalPref peerData pathAttributes pfxs
               let routeData = makeRouteData peerData pathAttributes routeId localPref
                   ( !prefixTable' , !updates ) = BGPRib.PrefixTable.update prefixTable pfxs routeData
-              updateRibOutWithPeerData peerData routeData updates adjRibOutTables
+              updateRibOutWithPeerData peerData updates adjRibOutTables
               return $ Rib' prefixTable' adjRibOutTables
 
     ribWithdrawMany :: PeerData -> [Prefix] -> Rib' -> IO Rib'
@@ -143,11 +146,11 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
         | null pfxs = return (Rib' prefixTable adjRibOutTables )
         | otherwise = do
             let ( prefixTable' , withdraws ) = BGPRib.PrefixTable.withdraw prefixTable pfxs peerData
-            updateRibOutWithPeerData peerData nullRoute withdraws adjRibOutTables
+            updateRibOutWithPeerData peerData withdraws adjRibOutTables
             return $ Rib' prefixTable' adjRibOutTables
 
     makeRouteData :: PeerData -> [PathAttribute] -> Int -> Word32 -> RouteData
-    makeRouteData peerData pathAttributes routeId overrideLocalPref = RouteData {..}
+    makeRouteData peerData pathAttributes routeHash overrideLocalPref = RouteData {..}
         where
         pathLength = getASPathLength pathAttributes
         fromEBGP = isExternal peerData
@@ -156,14 +159,43 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
         nextHop = getNextHop pathAttributes
         origin = getOrigin pathAttributes
 
-updateRibOutWithPeerData :: PeerData -> RouteData -> [Prefix] -> AdjRIB -> IO ()
-updateRibOutWithPeerData originPeer routeData updates adjRib = sequence_ $ Data.Map.mapWithKey updateWithKey adjRib
-    where updateWithKey destinationPeer table = when ( destinationPeer /= originPeer )
-                                                     ( insertAdjRIBTable (updates, routeId routeData ) table )
-    -- returning routes to the originator seems unprofitable
-    -- however real routers do exactly this (e.g. Cisco IOS) and it may simplify matters to follow suit...
-    -- hence this version of updateWithKey can be replaced with a simpler one....
-          updateWithKey' _ = insertAdjRIBTable (updates, routeId routeData)
-    -- in future this could be a run-time configuration option.....
+updateRibOutWithPeerData :: PeerData -> [(Prefix,RouteData)] -> AdjRIB -> IO ()
+updateRibOutWithPeerData _ updates adjRIB = sequence_ $ Data.Map.map action adjRIB
 
-    
+-- reminder: type AdjRIB = Data.Map.Map PeerData AdjRIBTable
+--         : insertNAdjRIBTable :: [([Prefix],Int)] -> AdjRIBTable -> IO ()
+--
+--         - applying an action to every AdjRIBTable in an 'AdjRIB' is achived by
+--         -    sequence_ $ Data.Map.map action
+--         - where 'action' is  AdjRIBTable -> IO ()
+--         - If the requirement is to execute an action which is sependent upon the peer context then
+--         -    sequence_ $ Data.Map.mapWithKey action'
+--         - is required, where 'action'' is PeerData -> AdjRIBTable -> IO ()
+
+-- this is a simple wrapper / rearrangement function
+-- insertNAdjRIBTable consumes type of form [( [Prefix], Int )]
+-- whilst the input type is [(Prefix,RouteData)]
+
+-- returning routes to the originator may seem unprofitable
+-- however real routers do exactly this (e.g. Cisco IOS) and it may simplify matters to follow suit...
+-- Especially considering that the alternative is to issue withdrawals with no material reduction in complexity on either side
+
+-- there would an ordering issue if applying a filter against returned routes to the origin:
+-- But we don't care and so the operation is very simple....
+
+    where 
+        action :: AdjRIBTable -> IO ()
+        action = insertNAdjRIBTable (f updates)
+        f0 :: [(Prefix,RouteData)] -> [(Prefix,Int)]
+        f0 = map (second routeId)
+        f1 :: [(Prefix,Int)] -> [([Prefix],Int)]
+        f1 = groupByFirst
+        f :: [(Prefix,RouteData)] -> [([Prefix],Int)]
+        f = f1 . f0
+
+groupByFirst :: (Eq a) => [(a,b)] -> [(a,[b])]
+groupByFirst [] = []
+groupByFirst zx = g zx where
+    f q = foldl' (\(ax,bx) (c,d) -> if q==c then (d:ax,bx) else (ax,(c,d):bx)) ([],[])
+    g [] = []
+    g ux@((v,_):_) = let (sx,tx) = f v ux in (v,sx) : (g tx)
