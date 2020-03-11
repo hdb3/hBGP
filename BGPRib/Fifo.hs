@@ -31,6 +31,7 @@ enqueueN :: MVar ([a],[a] ) -> [a] -> IO ()
 enqueueN mvar items = do
     maybeFifo <- tryTakeMVar mvar
     let (h,t) = fromMaybe ([],[]) maybeFifo
+        cat [] bx = bx
         cat (a:[]) bx = a:bx
         cat (a:ax) bx = cat ax (a:ax)
     putMVar mvar (cat items h,t)

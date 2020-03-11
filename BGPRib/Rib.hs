@@ -16,7 +16,7 @@ import BGPRib.PrefixTable
 import qualified BGPRib.PrefixTableUtils as PrefixTableUtils
 import BGPRib.Update
 import BGPRib.AdjRIBOut
-import BGPRib.Common(group)
+import BGPRib.Common(groupBySecond)
 
 type Rib = MVar Rib'
 -- TODO rename AdjRIB -> AdjRIBMap
@@ -70,34 +70,51 @@ addPeer rib peer = modifyMVar_ rib ( addPeer' peer )
         return $ Rib' prefixTable adjRib'
 {-
     delayed route look-up logic
-    After an update/withdraw is scheduled the best route may change, or be removed, leaving no route at all.
-    This raises two issues: firstly, the original route may no longer be available, so the immediate update cannot be sent.
-    Secondly, even if the route is still valid, or a withdraw was requested, the optimal behaviour may not be to send the originally selected route.
-    The simple course of action is to discard tbe immediate update, safe in the knowledge that another update for the specific peer is in the pipeline.
-    However, the logic fails when the request is withdraw, since it is possible that the replacement route would be filtered for the specific target peer.
-    Therefore scheduled withdraw should not be discarded.  A similar problem arises when the current route is null, in which case a withdraw is in the pipeline,
-    but if we discard the earlier route and it was also the first route selected for this prefix/peer then a withdraw will be generated without a matching update.
-    This outcome is likely to be rare, and does not compromise route integrity, although a peer may detect the anomaly.
-    A full resoultion is not possible in this design - it motivates a change from use of route hashes to actual route referneces in ARO entries.
 
-    Summary: withdrawals are never discarded, changed non-null routes are...
+    This function performs three functions:
+       takes routeIDs and returns full RouteData objects
+       checks that the route did not change since the update was originally scheduled
+       drops the update for the case where it has changed.
 
-    New design
 
-    lookupRoutes should return [(Maybe RouteData,[Prefix])] rather than [(RouteData,[Prefix])],
-    where Maybe RouteData allows a withdraw to be represented.  The prescribed filter logic is implemented after initial lookup and before function return.
-    The initial lookup function returns an ARE record (tuple) augmented with the lookup outcome.
-    Before grouping on the lookup outcome the list is filtered according to the description above. 
+    redux - 
+    
+    the older versions reapplied 'grouping' to accoodate incosistent treatment of prefixes in a block - whether
+    this was ever an issue is not clear - but this insatnce cannot suffer from this becuase updates are either consistent or discarded.
+    So, no 'group' function is required.....
+
+    analysis in case of no filter - implication that a changed result is always an indicator for a valid follow on update.
+    therefore the simple rule that changed route -> discard is universally applicable
+
+    regrading filters - optimal correct behaviour requires either preserved state from last sent route or recalculated equivalent.
+    unsolicited withdraw would allow safe behaviour - but this is only needed in the context of export filter capability, and can easily be implmented
+    when that capability is built.
+    
+    an alternate implementation might simply return the latest route, and mark that prefix/route combination as sent using a sequence number
+    then later queued updates can be ignored.  Whether that is better is unclear, but it is more complex, and so not taken up for now.
+    A superficial analysis argues tgat defrred transmission is sensible, because updates for churning prefixes would thereby be deferred in favour of stable ones.
 -}
 
-lookupRoutes :: Rib -> AdjRIBEntry -> IO [(RouteData,[Prefix])]
-lookupRoutes rib (prefixes,routeHash) = if 0 == routeHash
-    then return [(NullRoute,prefixes)] 
-    else do
+lookupRoutes :: Rib -> AdjRIBEntry -> IO (Maybe (RouteData,[Prefix]))
+-- TODO make return value no longer a list
+{- logic - lookup Route for each prefix
+         - discard prefixes whose Routes do not match the given routeHash
+         - return a singleton list item with a copy of the matched Route and list of retained prefixes
+
+         - for simplicity generate (Route,prefix) tuples then filter them
+         - and use the copy of Route from the first one left, if any. 
+ -}
+lookupRoutes rib (prefixes,routeHash) = do
         rib' <- readMVar rib
-        let pxrs = map (\prefix -> (queryPrefixTable (prefixTable rib') prefix, prefix)) prefixes
-            discardChanged (mrd,_) = (\rd -> routeHash == routeId rd) mrd
-        return $ group $ filter discardChanged pxrs
+        let -- myLookup (r,pfxs) = (lookUp r, pfxs)
+            myLookup = map (\pfx -> ( queryPrefixTable (prefixTable rib') pfx, pfx))
+            myFilter = filter ((routeHash ==) . routeId .fst )
+            unchangedPrefixes = myFilter $ myLookup prefixes
+            route = fst $ head unchangedPrefixes  -- safe becuase only called after test for null
+        -- pxrs = map (\prefix -> (queryPrefixTable (prefixTable rib') prefix, prefix)) prefixes
+            -- discardChanged (mrd,_) = (\rd -> routeHash == routeId rd) mrd
+        -- return $ filter discardChanged pxrs
+        return $ if null unchangedPrefixes then Nothing else Just (route,map snd unchangedPrefixes) 
 
 getNextHops :: Rib -> [Prefix] -> IO [(Prefix,Maybe IPv4)]
 getNextHops rib prefixes = do
@@ -189,13 +206,6 @@ updateRibOutWithPeerData _ updates adjRIB = sequence_ $ Data.Map.map action adjR
         f0 :: [(Prefix,RouteData)] -> [(Prefix,Int)]
         f0 = map (second routeId)
         f1 :: [(Prefix,Int)] -> [([Prefix],Int)]
-        f1 = groupByFirst
+        f1 = groupBySecond
         f :: [(Prefix,RouteData)] -> [([Prefix],Int)]
         f = f1 . f0
-
-groupByFirst :: (Eq a) => [(a,b)] -> [(a,[b])]
-groupByFirst [] = []
-groupByFirst zx = g zx where
-    f q = foldl' (\(ax,bx) (c,d) -> if q==c then (d:ax,bx) else (ax,(c,d):bx)) ([],[])
-    g [] = []
-    g ux@((v,_):_) = let (sx,tx) = f v ux in (v,sx) : (g tx)

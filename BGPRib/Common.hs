@@ -47,3 +47,17 @@ group_ ((Just a,b):cx) = if null r then [ (a,s) ] else  (a,s) : group_ r
     (s,r) = foldl acc ([b],[]) cx
     acc (u,v) (Nothing ,_) = (u,v)
     acc (u,v) (Just x,y) = if a == x then (y:u,v) else (u,(Just x,y):v)
+
+groupByFirst :: (Eq a) => [(a,b)] -> [(a,[b])]
+groupByFirst [] = []
+groupByFirst zx = g zx where
+    f q = foldl' (\(ax,bx) (c,d) -> if q==c then (d:ax,bx) else (ax,(c,d):bx)) ([],[])
+    g [] = []
+    g ux@((v,_):_) = let (sx,tx) = f v ux in (v,sx) : (g tx)
+
+groupBySecond :: (Eq b) => [(a,b)] -> [([a],b)]
+groupBySecond [] = []
+groupBySecond zx = g zx where
+    f q = foldl' (\(ax,bx) (c,d) -> if q==d then (c:ax,bx) else (ax,(c,d):bx)) ([],[])
+    g [] = []
+    g ux@((_,v):_) = let (sx,tx) = f v ux in (sx,v) : (g tx)

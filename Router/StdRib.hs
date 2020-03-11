@@ -64,7 +64,9 @@ buildUpdate :: PeerData -> [Prefix] -> RouteData -> [ParsedUpdate]
 --
 -- Note: the Route source peer can be reached from the RouteData record via peerData
 --
-buildUpdate target prefixes Nothing = makeUpdate [] prefixes []
+buildUpdate target prefixes NullRoute = makeUpdate [] prefixes []
+buildUpdate target prefixes Withdraw{} = makeUpdate [] prefixes []
+
 buildUpdate target prefixes RouteData{..} = if isExternal target then egpUpdate else igpUpdate
     where
     igpUpdate = makeUpdate prefixes
@@ -91,5 +93,9 @@ updateFromAdjRibEntrys rib target = concatMapM (updateFromAdjRibEntry rib target
     where
 
     updateFromAdjRibEntry :: Rib -> PeerData -> AdjRIBEntry -> IO [ParsedUpdate]
-    updateFromAdjRibEntry rib target (prefixes,routeHash) =
-        concatMap (\(route,prefixes) -> buildUpdate target prefixes route) <$> lookupRoutes rib (prefixes,routeHash)
+    updateFromAdjRibEntry rib target (prefixes,routeHash) = 
+        -- do mlookup <- lookupRoutes rib (prefixes,routeHash)
+        --    return $ maybe []
+        --                   (\(route,prefixes') -> buildUpdate target prefixes' route)
+        --                   mlookup
+        maybe [] (\(route,prefixes') -> buildUpdate target prefixes' route) <$> lookupRoutes rib (prefixes,routeHash)
