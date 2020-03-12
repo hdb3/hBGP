@@ -66,8 +66,8 @@ getLocalPref pas = maybe 0 (\(PathAttributeLocalPref x) -> x) (getPathAttribute 
 setMED :: Word32 -> [PathAttribute] -> [PathAttribute]
 setMED = insertPathAttribute . PathAttributeMultiExitDisc
 
-getMED :: [PathAttribute] -> Word32
-getMED pas = maybe 0 (\(PathAttributeMultiExitDisc x) -> x) (getPathAttribute TypeCodePathAttributeMultiExitDisc pas)
+getMED :: [PathAttribute] -> Maybe Word32
+getMED pas = fmap (\(PathAttributeMultiExitDisc x) -> x) (getPathAttribute TypeCodePathAttributeMultiExitDisc pas)
 
 setOrigin :: Word8 -> [PathAttribute] -> [PathAttribute]
 setOrigin = insertPathAttribute . PathAttributeOrigin

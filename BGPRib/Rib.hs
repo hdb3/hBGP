@@ -8,6 +8,7 @@ import Data.List(intercalate,foldl')
 import Data.Word(Word32)
 import Data.IP
 import Control.Arrow(second)
+import Debug.Trace
 
 import BGPlib.BGPlib
 
@@ -145,8 +146,7 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
     where
 
     ribPush' :: PeerData -> ParsedUpdate -> Rib' -> IO Rib'
-    ribPush' peerData ParsedUpdate{..} rib = 
-        ribUpdateMany peerData puPathAttributes hash nlri rib >>= ribWithdrawMany peerData withdrawn
+    ribPush' peerData ParsedUpdate{..} rib = ribUpdateMany peerData puPathAttributes hash nlri rib >>= ribWithdrawMany peerData withdrawn
 
     ribUpdateMany :: PeerData -> [PathAttribute] -> Int -> [Prefix] -> Rib' -> IO Rib'
     ribUpdateMany peerData pathAttributes routeId pfxs (Rib' prefixTable adjRibOutTables )
@@ -156,13 +156,16 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
               let routeData = makeRouteData peerData pathAttributes routeId localPref
                   ( !prefixTable' , !updates ) = BGPRib.PrefixTable.update prefixTable pfxs routeData
               updateRibOutWithPeerData peerData updates adjRibOutTables
-              return $ Rib' prefixTable' adjRibOutTables
+              return $ Rib' (if importFilter routeData then trace "importFilter: filtered" prefixTable
+                                                       else prefixTable'
+                            )
+                            adjRibOutTables
 
     ribWithdrawMany :: PeerData -> [Prefix] -> Rib' -> IO Rib'
     ribWithdrawMany peerData pfxs (Rib' prefixTable adjRibOutTables)
         | null pfxs = return (Rib' prefixTable adjRibOutTables )
         | otherwise = do
-            let ( prefixTable' , withdraws ) = BGPRib.PrefixTable.withdraw prefixTable pfxs peerData
+            let ( !prefixTable' , !withdraws ) = BGPRib.PrefixTable.update prefixTable pfxs (Withdraw peerData)
             updateRibOutWithPeerData peerData withdraws adjRibOutTables
             return $ Rib' prefixTable' adjRibOutTables
 
@@ -171,13 +174,14 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
         where
         (pathLength, originAS, lastAS) = getASPathDetail pathAttributes
         fromEBGP = isExternal peerData
-        med = if fromEBGP then 0 else getMED pathAttributes
+        med = getMED pathAttributes -- currently not used for tiebreak -- only present value is for forwarding on IBGP
         localPref = if fromEBGP then overrideLocalPref else getLocalPref pathAttributes
         nextHop = getNextHop pathAttributes
         origin = getOrigin pathAttributes
 
 updateRibOutWithPeerData :: PeerData -> [(Prefix,RouteData)] -> AdjRIB -> IO ()
-updateRibOutWithPeerData _ updates adjRIB = sequence_ $ Data.Map.map action adjRIB
+updateRibOutWithPeerData triggerPeer updates adjRIB = sequence_ $ Data.Map.mapWithKey action adjRIB
+-- updateRibOutWithPeerData _ updates adjRIB = sequence_ $ Data.Map.map action adjRIB
 
 -- reminder: type AdjRIB = Data.Map.Map PeerData AdjRIBTable
 --         : insertNAdjRIBTable :: [([Prefix],Int)] -> AdjRIBTable -> IO ()
@@ -198,14 +202,32 @@ updateRibOutWithPeerData _ updates adjRIB = sequence_ $ Data.Map.map action adjR
 -- Especially considering that the alternative is to issue withdrawals with no material reduction in complexity on either side
 
 -- there would an ordering issue if applying a filter against returned routes to the origin:
--- But we don't care and so the operation is very simple....
+-- But if we don't care the operation is very simple....
 
     where 
-        action :: AdjRIBTable -> IO ()
-        action = insertNAdjRIBTable (f updates)
-        f0 :: [(Prefix,RouteData)] -> [(Prefix,Int)]
-        f0 = map (second routeId)
-        f1 :: [(Prefix,Int)] -> [([Prefix],Int)]
-        f1 = groupBySecond
-        f :: [(Prefix,RouteData)] -> [([Prefix],Int)]
-        f = f1 . f0
+        action :: PeerData -> AdjRIBTable -> IO ()
+        action targetPeer = insertNAdjRIBTable (f updates) where
+            f0 :: [(Prefix,RouteData)] -> [(Prefix,Int)]
+            f0 = map (second routeId)
+            f1 :: [(Prefix,Int)] -> [([Prefix],Int)]
+            f1 = groupBySecond
+            f :: [(Prefix,RouteData)] -> [([Prefix],Int)]
+            f = f1 . f0 . applyExportFilter exportFilter
+            applyExportFilter :: (PeerData -> PeerData -> RouteData -> Bool) -> [(Prefix,RouteData)] -> [(Prefix,RouteData)]
+            applyExportFilter xf = map (\(pfx,rd) -> if xf triggerPeer targetPeer rd then (pfx,rd) else (pfx,Withdraw undefined ))
+            -- note: a more complete exportFilter fraemwork will enable substitution of either
+            -- Withdraw or NUllRoute depening on the previous state - this is a holding implementation
+            -- ## TODO - consider whether WIthdraw constructor should carry PeerData at all....
+            -- (the use is for input to RIB, not export (RIB never exports Withdraw, ony NullRoute))
+
+importFilter :: RouteData -> Bool
+-- True --> exclude from RIB
+importFilter route@RouteData{} = pathLoopCheck route where
+    pathLoopCheck r = elemASPath (myAS $ globalData $ peerData r) (pathAttributes r)
+importFilter _ = error "importFilter only defined for updates"
+
+exportFilter :: PeerData -> PeerData -> RouteData -> Bool
+exportFilter trigger target route@RouteData{} = if iBGPRelayCheck then iBGPRelayCheck else trace "export filtered" iBGPRelayCheck where
+    iBGPRelayCheck = fromEBGP route || isExternal target
+exportFilter trigger target NullRoute = True
+exportFilter trigger target Withdraw{} = False

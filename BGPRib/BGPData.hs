@@ -34,7 +34,7 @@ data RouteData =  RouteData { peerData :: PeerData
                             , pathLength :: Int
                             , nextHop :: IPv4
                             , origin :: Word8
-                            , med :: Word32
+                            , med :: Maybe Word32
                             , fromEBGP :: Bool
                             , localPref :: Word32
                             , originAS :: Word32
@@ -65,8 +65,10 @@ localPeer gd = PeerData { globalData = gd
                     , peerLocalPref = 0
                     }
 
+-- ## TODO - consider an adjunct 'DdummyPeerData' type for safety (where/how is this used?)
 dummyPeerData :: PeerData
 dummyPeerData = PeerData dummyGlobalData True 64513 "127.0.0.2" "127.0.0.2" 0 "127.0.0.1" 0 0
+
 dummyGlobalData :: GlobalData
 dummyGlobalData = GlobalData 64512 "127.0.0.1"
 
@@ -90,10 +92,8 @@ instance Ord PeerData where
 
 -- note only defined for case where neither parameter is Withdraw (that constructor should never be found in the wild)
 instance Ord RouteData where
-  compare rd1@RouteData{} rd2@RouteData{} = compare (localPref rd1, pathLength rd2, origin rd2, med rd1, fromEBGP rd1, peerBGPid (peerData rd2), peerIPv4 (peerData rd2))
-                                                    (localPref rd2, pathLength rd1, origin rd1, med rd2, fromEBGP rd2, peerBGPid (peerData rd1), peerIPv4 (peerData rd1))
+  compare rd1@RouteData{} rd2@RouteData{} = compare (localPref rd1, pathLength rd2, origin rd2, fromEBGP rd1, peerBGPid (peerData rd2), peerIPv4 (peerData rd2))
+                                                    (localPref rd2, pathLength rd1, origin rd1, fromEBGP rd2, peerBGPid (peerData rd1), peerIPv4 (peerData rd1))
 
 -- rank as higher some parameters when lower - these are Origin, Path Length, peer BGPID, peer address
--- ## TODO ## MED comparison is wrong - should only apply when adjacent AS is equal
--- ## this is in the Path Attributes, obviously, but needs parsing out and caching....
--- OR - use the peerData AS on the assumption that the AS Path does not lie....
+-- ## TODO ## MED comparison is slightly tricky - only applies when adjacent AS is equal, and needs to accomodate missing Meds in either or both routes
