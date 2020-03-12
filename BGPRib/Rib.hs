@@ -154,12 +154,10 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
         | otherwise = do
               localPref <- evalLocalPref peerData pathAttributes pfxs
               let routeData = makeRouteData peerData pathAttributes routeId localPref
-                  ( !prefixTable' , !updates ) = BGPRib.PrefixTable.update prefixTable pfxs routeData
+                  routeData' = if importFilter routeData then trace "importFilter: filtered" $ Withdraw peerData else routeData
+                  ( !prefixTable' , !updates ) = BGPRib.PrefixTable.update prefixTable pfxs routeData'
               updateRibOutWithPeerData peerData updates adjRibOutTables
-              return $ Rib' (if importFilter routeData then trace "importFilter: filtered" prefixTable
-                                                       else prefixTable'
-                            )
-                            adjRibOutTables
+              return $ Rib' prefixTable' adjRibOutTables
 
     ribWithdrawMany :: PeerData -> [Prefix] -> Rib' -> IO Rib'
     ribWithdrawMany peerData pfxs (Rib' prefixTable adjRibOutTables)
