@@ -1,4 +1,4 @@
-{-#LANGUAGE OverloadedStrings #-}
+{-#LANGUAGE OverloadedStrings, RecordWildCards #-}
 module BGPRib.BGPData where
 
 {- peer data holds persistent/static data about a BGP session peer
@@ -76,7 +76,9 @@ instance Show PeerData where
     show pd = " peer AS: " ++ show (peerAS pd) ++ ",  peer addr: " ++ show (peerIPv4 pd)
 
 instance Show RouteData where
-    show rd = "nexthop: " ++ show (nextHop rd) ++ ",  peer ID: " ++ show (peerBGPid $ peerData rd) ++ ",  pref " ++ show (localPref rd)
+    show rd@RouteData{..} = getASPathList pathAttributes ++ " nexthop: " ++ show nextHop ++ ",  peer ID: " ++ show (peerBGPid peerData) ++ ",  pref " ++ show localPref
+    show NullRoute = "NullRoute"
+    show Withdraw{} = "Withdraw"
 
 instance Eq RouteData where
     (==) NullRoute NullRoute = True

@@ -35,7 +35,7 @@ newPrefixTable = PT.ptNew
 update:: PrefixTable -> [Prefix] -> RouteData -> (PrefixTable,[(Prefix,RouteData)])
 update pt pfxs route = Data.List.foldl' f (pt,[]) pfxs where
     f (pt',acc) pfx = (pt'',acc') where
-        acc' = if (PT.pteBest new) == (PT.pteBest old) then acc else (pfx,PT.pteBest new):acc
+        acc' = if PT.pteBest new == PT.pteBest old then acc else (pfx,PT.pteBest new):acc
         (old,new,pt'') = PT.ptUpdate (fromPrefix pfx) route pt
 
 queryPrefixTable :: PrefixTable -> Prefix -> RouteData
@@ -46,10 +46,11 @@ showRibAt table pfx = show (PT.ptQuery (fromPrefix pfx) table)
 
 -- TODO merge update and withdraw by using a route value of Withdraw {..}
 withdraw :: PrefixTable -> [Prefix] -> PeerData -> (PrefixTable,[(Prefix,RouteData)])
-withdraw pt pfxs pd = Data.List.foldl' f (pt,[]) pfxs where
-    f (pt',acc) pfx = let acc' = if (PT.pteBest new) == (PT.pteBest old) then acc else (pfx,PT.pteBest new):acc
-                          (old,new,pt'') = PT.ptUpdate (fromPrefix pfx) (Withdraw pd) pt'
-                      in (pt'',acc')
+withdraw pt pfxs pd = update pt pfxs (Withdraw pd)
+-- withdraw pt pfxs pd = Data.List.foldl' f (pt,[]) pfxs where
+--     f (pt',acc) pfx = let acc' = if (PT.pteBest new) == (PT.pteBest old) then acc else (pfx,PT.pteBest new):acc
+--                           (old,new,pt'') = PT.ptUpdate (fromPrefix pfx) (Withdraw pd) pt'
+--                       in (pt'',acc')
 
 withdrawPeer :: PrefixTable -> PeerData -> (PrefixTable,[(Prefix,RouteData)])
 withdrawPeer pt = withdraw pt (map toPrefix $ PT.ptKeys pt)

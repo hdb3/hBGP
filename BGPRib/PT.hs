@@ -13,7 +13,7 @@ class PrefixTableEntry pte where
 ---And the instance for List is:
 instance PrefixTableEntry [] where
 
-  pteNull [] = True
+  pteNull = Prelude.null
 
   pteEmpty = []
 

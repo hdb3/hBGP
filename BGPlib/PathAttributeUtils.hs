@@ -31,6 +31,12 @@ getAS4Path = fromJust . getPathAttribute TypeCodePathAttributeAS4Path
 
 getASPathAttribute pax = fromMaybe (getAS2Path pax) (getPathAttribute TypeCodePathAttributeAS4Path pax)
 
+getASPathList :: [PathAttribute] -> String
+getASPathList = list . getASPathContent where
+    list [] = "[]"
+    list [ASSequence seq] = show seq
+    list _ = error "AS Set and multi Sequence detail not written yet"
+
 getASPathDetail :: [PathAttribute] -> (Int, Word32, Word32)
 getASPathDetail = detail . getASPathContent where
     detail [] = (0,0,0)

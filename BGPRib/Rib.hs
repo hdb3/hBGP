@@ -80,13 +80,6 @@ addPeer rib peer = modifyMVar_ rib ( addPeer' peer )
 
     redux - 
     
-    the older versions reapplied 'grouping' to accoodate incosistent treatment of prefixes in a block - whether
-    this was ever an issue is not clear - but this insatnce cannot suffer from this becuase updates are either consistent or discarded.
-    So, no 'group' function is required.....
-
-    analysis in case of no filter - implication that a changed result is always an indicator for a valid follow on update.
-    therefore the simple rule that changed route -> discard is universally applicable
-
     regrading filters - optimal correct behaviour requires either preserved state from last sent route or recalculated equivalent.
     unsolicited withdraw would allow safe behaviour - but this is only needed in the context of export filter capability, and can easily be implmented
     when that capability is built.
@@ -97,24 +90,16 @@ addPeer rib peer = modifyMVar_ rib ( addPeer' peer )
 -}
 
 lookupRoutes :: Rib -> AdjRIBEntry -> IO (Maybe (RouteData,[Prefix]))
--- TODO make return value no longer a list
-{- logic - lookup Route for each prefix
-         - discard prefixes whose Routes do not match the given routeHash
-         - return a singleton list item with a copy of the matched Route and list of retained prefixes
-
-         - for simplicity generate (Route,prefix) tuples then filter them
-         - and use the copy of Route from the first one left, if any. 
- -}
 lookupRoutes rib (prefixes,routeHash) = do
         rib' <- readMVar rib
-        let -- myLookup (r,pfxs) = (lookUp r, pfxs)
+        let 
             myLookup = map (\pfx -> ( queryPrefixTable (prefixTable rib') pfx, pfx))
-            myFilter = filter ((routeHash ==) . routeId .fst )
+            -- myFilter = filter ((routeHash ==) . routeId .fst )
+            -- the following line removes the suppress changed routes check
+            -- which is essential for filters to work correctly
+            myFilter = id
             unchangedPrefixes = myFilter $ myLookup prefixes
             route = fst $ head unchangedPrefixes  -- safe becuase only called after test for null
-        -- pxrs = map (\prefix -> (queryPrefixTable (prefixTable rib') prefix, prefix)) prefixes
-            -- discardChanged (mrd,_) = (\rd -> routeHash == routeId rd) mrd
-        -- return $ filter discardChanged pxrs
         return $ if null unchangedPrefixes then Nothing else Just (route,map snd unchangedPrefixes) 
 
 getNextHops :: Rib -> [Prefix] -> IO [(Prefix,Maybe IPv4)]
@@ -165,7 +150,7 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
         | otherwise = do
             let ( !prefixTable' , !withdraws ) = BGPRib.PrefixTable.update prefixTable pfxs (Withdraw peerData)
             updateRibOutWithPeerData peerData withdraws adjRibOutTables
-            return $ Rib' prefixTable' adjRibOutTables
+            return $ trace ("ribWithdrawMany: " ++ show withdraws) $ Rib' prefixTable' adjRibOutTables
 
     makeRouteData :: PeerData -> [PathAttribute] -> Int -> Word32 -> RouteData
     makeRouteData peerData pathAttributes routeHash overrideLocalPref = RouteData {..}
@@ -178,8 +163,8 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
         origin = getOrigin pathAttributes
 
 updateRibOutWithPeerData :: PeerData -> [(Prefix,RouteData)] -> AdjRIB -> IO ()
-updateRibOutWithPeerData triggerPeer updates adjRIB = sequence_ $ Data.Map.mapWithKey action adjRIB
--- updateRibOutWithPeerData _ updates adjRIB = sequence_ $ Data.Map.map action adjRIB
+updateRibOutWithPeerData triggerPeer updates adjRIB = 
+    sequence_ $ Data.Map.mapWithKey action adjRIB
 
 -- reminder: type AdjRIB = Data.Map.Map PeerData AdjRIBTable
 --         : insertNAdjRIBTable :: [([Prefix],Int)] -> AdjRIBTable -> IO ()
@@ -191,17 +176,6 @@ updateRibOutWithPeerData triggerPeer updates adjRIB = sequence_ $ Data.Map.mapWi
 --         -    sequence_ $ Data.Map.mapWithKey action'
 --         - is required, where 'action'' is PeerData -> AdjRIBTable -> IO ()
 
--- this is a simple wrapper / rearrangement function
--- insertNAdjRIBTable consumes type of form [( [Prefix], Int )]
--- whilst the input type is [(Prefix,RouteData)]
-
--- returning routes to the originator may seem unprofitable
--- however real routers do exactly this (e.g. Cisco IOS) and it may simplify matters to follow suit...
--- Especially considering that the alternative is to issue withdrawals with no material reduction in complexity on either side
-
--- there would an ordering issue if applying a filter against returned routes to the origin:
--- But if we don't care the operation is very simple....
-
     where 
         action :: PeerData -> AdjRIBTable -> IO ()
         action targetPeer = insertNAdjRIBTable (f updates) where
@@ -211,21 +185,24 @@ updateRibOutWithPeerData triggerPeer updates adjRIB = sequence_ $ Data.Map.mapWi
             f1 = groupBySecond
             f :: [(Prefix,RouteData)] -> [([Prefix],Int)]
             f = f1 . f0 . applyExportFilter exportFilter
-            applyExportFilter :: (PeerData -> PeerData -> RouteData -> Bool) -> [(Prefix,RouteData)] -> [(Prefix,RouteData)]
-            applyExportFilter xf = map (\(pfx,rd) -> if xf triggerPeer targetPeer rd then (pfx,rd) else (pfx,Withdraw undefined ))
-            -- note: a more complete exportFilter fraemwork will enable substitution of either
-            -- Withdraw or NUllRoute depening on the previous state - this is a holding implementation
+            applyExportFilter :: (PeerData -> PeerData -> RouteData -> RouteData) -> [(Prefix,RouteData)] -> [(Prefix,RouteData)]
+            applyExportFilter xf = map (\(pfx,rd) -> (pfx, xf triggerPeer targetPeer rd))
             -- ## TODO - consider whether WIthdraw constructor should carry PeerData at all....
             -- (the use is for input to RIB, not export (RIB never exports Withdraw, ony NullRoute))
 
 importFilter :: RouteData -> Bool
--- True --> exclude from RIB
 importFilter route@RouteData{} = pathLoopCheck route where
     pathLoopCheck r = elemASPath (myAS $ globalData $ peerData r) (pathAttributes r)
 importFilter _ = error "importFilter only defined for updates"
 
-exportFilter :: PeerData -> PeerData -> RouteData -> Bool
-exportFilter trigger target route@RouteData{} = if iBGPRelayCheck then iBGPRelayCheck else trace "export filtered" iBGPRelayCheck where
+exportFilter :: PeerData -> PeerData -> RouteData -> RouteData
+exportFilter trigger target route@RouteData{} = if checks then route else trace "export filtered" $ Withdraw undefined where
+    checks = iBGPRelayCheck && noReturnCheck
     iBGPRelayCheck = fromEBGP route || isExternal target
-exportFilter trigger target NullRoute = True
-exportFilter trigger target Withdraw{} = False
+    noReturnCheck = target /= peerData route
+exportFilter trigger target NullRoute = trace "export filter applied to null route" NullRoute
+exportFilter trigger target Withdraw{} = if checks then trace "export withdraw allowed" $ Withdraw undefined
+                                                   else trace "export withdraw filtered" NullRoute where
+    checks = iBGPRelayCheck && noReturnCheck
+    iBGPRelayCheck = isExternal trigger || isExternal target
+    noReturnCheck = target /= trigger
