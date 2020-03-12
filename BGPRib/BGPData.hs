@@ -37,6 +37,8 @@ data RouteData =  RouteData { peerData :: PeerData
                             , med :: Word32
                             , fromEBGP :: Bool
                             , localPref :: Word32
+                            , originAS :: Word32
+                            , lastAS :: Word32
                             }
                             | Withdraw { peerData :: PeerData }
                             | NullRoute
