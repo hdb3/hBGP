@@ -37,6 +37,8 @@ data RouteData =  RouteData { peerData :: PeerData
                             , med :: Word32
                             , fromEBGP :: Bool
                             , localPref :: Word32
+                            , originAS :: Word32
+                            , lastAS :: Word32
                             , poisoned :: Bool
                             }
 
@@ -44,7 +46,7 @@ instance Hashable RouteData where
     hashWithSalt _ = routeId
 
 nullRoute :: RouteData
-nullRoute = RouteData undefined undefined 0 undefined undefined undefined undefined undefined undefined undefined
+nullRoute = RouteData undefined undefined 0 undefined undefined undefined undefined undefined undefined undefined undefined undefined
 
 localPeer gd = PeerData { globalData = gd
                     , isExternal = False

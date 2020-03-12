@@ -124,7 +124,7 @@ getLocRib rib = do
     return (prefixTable rib')
 
 checkPoison :: PeerData -> [PathAttribute] -> [Prefix] -> IO Bool
-checkPoison peerData pathAttributes pfxs = return $ elem 666 $ flattenPath $ getASPathContent pathAttributes
+checkPoison peerData pathAttributes _ = return $ elemASPath 666 pathAttributes
 
 ribPush :: Rib -> PeerData -> ParsedUpdate -> IO()
 ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
@@ -171,7 +171,7 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
     makeRouteData :: PeerData -> [PathAttribute] -> Int -> Word32 -> Bool -> RouteData
     makeRouteData peerData pathAttributes routeId overrideLocalPref poisoned = RouteData {..}
         where
-        pathLength = getASPathLength pathAttributes
+        (pathLength, originAS, lastAS) = getASPathDetail pathAttributes
         fromEBGP = isExternal peerData
         med = if fromEBGP then 0 else getMED pathAttributes
         localPref = if fromEBGP then overrideLocalPref else getLocalPref pathAttributes
