@@ -8,8 +8,7 @@ import Data.List(intercalate,foldl')
 import Data.Word(Word32)
 import Data.IP
 import Control.Arrow(second)
-import Debug.Trace
-
+--import Debug.Trace
 import BGPlib.BGPlib
 
 import BGPRib.BGPData
@@ -18,6 +17,8 @@ import qualified BGPRib.PrefixTableUtils as PrefixTableUtils
 import BGPRib.Update
 import BGPRib.AdjRIBOut
 import BGPRib.Common(groupBySecond)
+
+trace _ x = x
 
 type Rib = MVar Rib'
 -- TODO rename AdjRIB -> AdjRIBMap
@@ -150,7 +151,7 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
         | otherwise = do
             let ( !prefixTable' , !withdraws ) = BGPRib.PrefixTable.update prefixTable pfxs (Withdraw peerData)
             updateRibOutWithPeerData peerData withdraws adjRibOutTables
-            return $ trace ("ribWithdrawMany: " ++ show withdraws) $ Rib' prefixTable' adjRibOutTables
+            return $ Rib' prefixTable' adjRibOutTables
 
     makeRouteData :: PeerData -> [PathAttribute] -> Int -> Word32 -> RouteData
     makeRouteData peerData pathAttributes routeHash overrideLocalPref = RouteData {..}
