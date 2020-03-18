@@ -19,7 +19,7 @@ import Data.Bits
 import Data.Word 
 import System.Environment(getArgs)
 import Codec.Compression.GZip(decompress)
-import Prefixes
+import MRTPrefixes
 import BogonFilter
 
 newtype BGPMessage = BGPMessage SBS.ByteString
@@ -29,6 +29,8 @@ instance Show BGPMessage where
 newtype BGPAttributes = BGPAttributes SBS.ByteString
 instance Show BGPAttributes where
     show (BGPAttributes bs) = "BGPAttributes: " ++ toHex bs
+
+fromBGPAttributes (BGPAttributes bs) = bs
 
 newtype HexByteString = HexByteString SBS.ByteString
 instance Show HexByteString where

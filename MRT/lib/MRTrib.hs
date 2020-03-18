@@ -4,6 +4,7 @@ module MRTrib ( module MRTlib
               , getMRTRibV4,getMRTRibV6,showMRTRibV4,showMRTRibV6
               , getMRTRibs
               , getMRTRibsV6
+              , sortRibsOnPrefixCount,sortRibsOnPathCount,fromRouteMapv4
               , Peer, MRTRib,Rib
               , RouteMapv4,RouteMapv6
               , MRTRibV4,MRTRibV6
@@ -13,7 +14,7 @@ import qualified Data.IntMap.Strict as Map
 import FarmHash(hash64)
 import Data.Array.IArray
 import Data.Maybe(fromMaybe)
-import Data.List(foldl',reverse)
+import Data.List(foldl',reverse,sortOn)
 
 import MRTlib
 
@@ -145,3 +146,12 @@ showMRTRibV6 a = "IPv6 peers ("
                       ++ unlines ( map showMRTRibV6Entry a)
     where
     showMRTRibV6Entry (i,p,r) = show i ++ " " ++ show p ++ " " ++ showStatsRouteMap r
+
+sortRibsOnPathCount :: MRTRibV4 -> MRTRibV4
+sortRibsOnPathCount = sortOn ( (\(_,_,a) -> pathCountRouteMap a))
+
+sortRibsOnPrefixCount :: MRTRibV4 -> MRTRibV4
+sortRibsOnPrefixCount = sortOn ( (\(_,_,a) -> prefixCountRouteMap a))
+
+fromRouteMapv4 :: Map.IntMap (BGPAttributes,IP4PrefixList) -> [(BGPAttributes,IP4PrefixList)]
+fromRouteMapv4 = Map.elems

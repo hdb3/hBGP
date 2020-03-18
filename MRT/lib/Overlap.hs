@@ -7,12 +7,7 @@ import Prelude hiding (head)
 import Data.List(foldl')
 import Data.Bits(testBit,setBit)
 import Data.Word
---import Text.Printf
-import Prefixes
-
---type Prefix = (Word8,Word32)
---instance {-# INCOHERENT #-} Show Prefix where
-    --show (l,v) = printf "%08x:%2d" v l
+import MRTPrefixes
 
 -- regarding optimisation via strictness and unpacking - the strict form (bang patterns only)
 -- showed ~10-20% better performance
