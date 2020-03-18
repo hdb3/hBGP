@@ -13,13 +13,21 @@ import Data.String(IsString,fromString)
 data Prefix = Prefix !(Word8,Word32) deriving Eq
 --newtype Prefix = Prefix (Word8,Word32) deriving Eq
 --type Prefix = (Word8,Word32)
+toPrefix :: Word8 -> Word32 -> Prefix
+toPrefix a b = Prefix (a,b)
+
+fromPrefix :: Prefix -> (Word8, Word32) 
+fromPrefix (Prefix (a,b)) = (a, b) 
+
+lengthPrefix :: Prefix -> Word8 
+lengthPrefix (Prefix (a,_)) = a
 
 instance {-# INCOHERENT #-} IsString Prefix where
     fromString = read
 
-instance {-# INCOHERENT #-} Read Prefix where
-    readsPrec _ = readSipfx where
-        readSipfx s = let (a,s') = head $ readsPrec 0 s in [(toPrefix a,s')]
+instance Read Prefix where
+    readsPrec _ = readSpfx where
+        readSpfx s = let (a,s') = head $ reads s in [(fromAddrRange a,s')]
 
 instance {-# INCOHERENT #-} Show Prefix where
     show = show.fromPrefix

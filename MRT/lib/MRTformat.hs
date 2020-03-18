@@ -19,7 +19,7 @@ import Data.Bits
 import Data.Word 
 import System.Environment(getArgs)
 import Codec.Compression.GZip(decompress)
-import Prefixes
+import MRTPrefixes
 import BogonFilter
 
 newtype BGPMessage = BGPMessage SBS.ByteString
