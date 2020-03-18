@@ -12,7 +12,7 @@ import Data.Maybe(mapMaybe)
 import Data.IP
 import Data.Word(byteSwap32)
 import MRTlib
-import Prefixes
+import MRTPrefixes
 import Overlap
 
 type CustomFilter = MRTRecord -> Bool
