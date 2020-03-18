@@ -61,7 +61,7 @@ updateBuilder limit attrs pfxs =
         <> word16BE (fromIntegral $ basePayloadLength + len)
         <> word8 2
         <> word16BE 0
-        <> word16BE (fromIntegral len)
+        <> word16BE (fromIntegral attributeLength)
         <> byteStringCopy (fromBGPAttributes attrs)
         <> prefixesBuilder bloc
     basePayloadLength = 16 + 1 + 2 + 2 + 2 + attributeLength

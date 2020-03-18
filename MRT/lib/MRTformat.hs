@@ -16,7 +16,8 @@ import Data.Attoparsec.Binary
 import Control.Monad(unless)
 import Data.IP hiding(ipv4,ipv6)
 import Data.Bits
-import Data.Word 
+import Data.Word
+import Data.List(isSuffixOf)
 import System.Environment(getArgs)
 import Codec.Compression.GZip(decompress)
 import MRTPrefixes
@@ -77,19 +78,14 @@ mrtBogonFilter = filter p where
     p RIBIPV4Unicast{..} = bogonFilter (Prefix (re4Length,toHostAddress re4Address))
     p _ = True
 
---getMRTTableDumpV2 :: IO (MRTRecord,[MRTRecord]) -- first member is guaranteed to be MRTlib.MRTPeerIndexTable
 getMRTTableDumpV2 :: IO [MRTRecord] -- first member is guaranteed to be MRTlib.MRTPeerIndexTable
-getMRTTableDumpV2 = do
-    mrtList <- getMRT
-    return $ validate mrtList
+getMRTTableDumpV2 = validate <$> getMRT
     where
-    --validate ( a@MRTPeerIndexTable{} : b) = (a,b)
     validate ( a@MRTPeerIndexTable{} : b) = a:b
     validate _ = error "expected MRTPeerIndexTable as first record in RIB file"
     getMRT = fmap mrtParse BS.getContents
 
 getMRTTableDumps :: IO [[MRTRecord]] -- first members are guaranteed to be MRTlib.MRTPeerIndexTable
---getMRTTableDumps = fmap (:[]) getMRTTableDumpV2
 getMRTTableDumps = do
     args <- getArgs
     if null args
@@ -98,7 +94,15 @@ getMRTTableDumps = do
     where
     fgetMRTTableDumpV2 fname = fmap ( mrtParse . decompress) (BS.readFile fname)
     
-        
+-- read only one MRT file from the argument list, or stdin        
+getMRTTableDump :: IO [MRTRecord]
+getMRTTableDump =
+    do args <- getArgs
+       mrtParse <$> if null args then BS.getContents
+                    else if "gz" `isSuffixOf` head args then decompress <$> BS.readFile (head args)
+                    else BS.readFile (head args)
+
+               
 
 --
 -- Core attoparsec parser follows
@@ -107,7 +111,7 @@ getMRTTableDumps = do
 -- this is the lazy version.....
 mrtParse :: BS.ByteString -> [MRTRecord]
 mrtParse bs = mrtParse' (parse' bs) where
-    parse' bs' = DAB.parse rawMRTParse bs'
+    parse' = DAB.parse rawMRTParse
     mrtParse' (DAB.Done _ r) = r
     mrtParse' (DAB.Fail _ sx s) = error $ show (s,sx)
 
@@ -153,7 +157,7 @@ bgpMessage = do
     marker <- DAB.take 16
     unless ( marker == SBS.replicate 16 0xff ) (fail "BGP marker synchronisation error")
     l <- anyWord16be
-    fmap BGPMessage $ DAB.take (fromIntegral l - 18)
+    BGPMessage <$> DAB.take (fromIntegral l - 18)
 
 string16 :: Parser String
 string16 = fmap Char8.unpack bs16
