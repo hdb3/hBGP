@@ -19,8 +19,9 @@ toPrefix a b = Prefix (a,b)
 fromPrefix :: Prefix -> (Word8, Word32) 
 fromPrefix (Prefix (a,b)) = (a, b) 
 
-lengthPrefix :: Prefix -> Word8 
-lengthPrefix (Prefix (a,_)) = a
+{-# INLINE subnet #-}
+subnet :: Prefix -> Word8 
+subnet (Prefix (a,_)) = a
 
 instance {-# INCOHERENT #-} IsString Prefix where
     fromString = read

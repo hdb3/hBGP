@@ -30,6 +30,8 @@ newtype BGPAttributes = BGPAttributes SBS.ByteString
 instance Show BGPAttributes where
     show (BGPAttributes bs) = "BGPAttributes: " ++ toHex bs
 
+fromBGPAttributes (BGPAttributes bs) = bs
+
 newtype HexByteString = HexByteString SBS.ByteString
 instance Show HexByteString where
     show (HexByteString bs) = toHex bs
