@@ -1,8 +1,8 @@
 module Main where
 
 import qualified Data.List
-import BGPlib
-import BGPReader(readMsgs)
+import BGPlib.BGPlib
+import BGPRib.BGPReader(readMsgs)
 
 main = do
     msgs <-readMsgs
