@@ -23,5 +23,5 @@ dumpRib p routes = do
   let (attr, pfxs) = head routes
   putStrLn $ show pfxs ++ " : " ++ show attr
   h <- openFile "updates.raw" WriteMode
-  hPutUpdate h attr pfxs
+  hPutUpdates h routes
   hClose h
