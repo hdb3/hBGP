@@ -2,4 +2,4 @@ resolver: lts-14.27
 packages:
 - .
 ghc-options:
-    "$everything": -O2 -threaded
+    "$everything": -O3 -threaded -Wunused-imports
