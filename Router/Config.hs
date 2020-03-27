@@ -42,6 +42,10 @@ data Config = Config { configAS :: Word32
                      }
                      deriving (Show,Read)
 
+-- TODO take all of this capability munging out of IO
+-- It should either return an Either or just error.....
+-- dying in situ is not any better than an error
+
 checkCapabilities :: Config -> IO Config
 checkCapabilities c@Config{..} = do
     unless (check configOfferedCapabilities configRequiredCapabilities)
