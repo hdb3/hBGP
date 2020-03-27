@@ -1,4 +1,4 @@
-cabal-version:       2.2
+cabal-version:       2.4
 name:                hbgp
 version:             2.1.0.0
 license:             Apache-2.0
@@ -10,10 +10,25 @@ category:            Network
 extra-source-files:  README.md
 build-type:          Simple
 
-executable hbgp
-  main-is:             Router/Router.hs
-  other-modules:       Router.Monitor, Router.Console, BGPRib.PT, BGPlib.AttoBGP , Router.BGPHandle, BGPRib.AdjRIBOut , BGPRib.BGPData , BGPRib.BGPReader , BGPRib.BGPRib , BGPRib.BogonFilter , BGPRib.Common , BGPRib.Fifo , BGPRib.PathFilter , BGPRib.PrefixTable , BGPRib.PrefixTableUtils , BGPRib.Rib , BGPRib.Update , BGPlib.ASPath , BGPlib.BGPlib , BGPlib.BGPparse , BGPlib.Capabilities , BGPlib.Codes , BGPlib.GetBGPMsg , BGPlib.LibCommon , BGPlib.PathAttributeUtils , BGPlib.PathAttributes , BGPlib.Prefixes , BGPlib.RFC4271 , Paths_hbgp , Router.BgpFSM , Router.Collision , Router.Config , Router.Global , Router.Log , Router.CreateUpdate , Router.Open , Router.Redistributor , Router.StdRib , Session.Session , ZServ.Debug , ZServ.WireFormat , ZServ.ZMsg , ZServ.ZMsgBinary , ZServ.ZServ , ZServ.ZSpec
+common base
   other-extensions:    DataKinds, DuplicateRecordFields, RecordWildCards, MultiWayIf, OverloadedStrings, FlexibleInstances, TupleSections, Strict, MultiParamTypeClasses, FunctionalDependencies, ForeignFunctionInterface, TypeSynonymInstances, FlexibleContexts, DeriveGeneric, BangPatterns, ConstrainedClassMethods
   build-depends:       filepath, gitrev, transformers, haskeline, base , bytestring , iproute , attoparsec , attoparsec-binary , base16-bytestring , pretty-hex , io-streams , network , binary , containers , time , unix , sorted-list , hashable , unordered-containers , sorted-list , farmhash , extra , deepseq
+  other-modules:       Router.Monitor, Router.Console, BGPRib.PT, BGPlib.AttoBGP , Router.BGPHandle, BGPRib.AdjRIBOut , BGPRib.BGPData , BGPRib.BGPReader , BGPRib.BGPRib , BGPRib.BogonFilter , BGPRib.Common , BGPRib.Fifo , BGPRib.PathFilter , BGPRib.PrefixTable , BGPRib.PrefixTableUtils , BGPRib.Rib , BGPRib.Update , BGPlib.ASPath , BGPlib.BGPlib , BGPlib.BGPparse , BGPlib.Capabilities , BGPlib.Codes , BGPlib.GetBGPMsg , BGPlib.LibCommon , BGPlib.PathAttributeUtils , BGPlib.PathAttributes , BGPlib.Prefixes , BGPlib.RFC4271 , Paths_hbgp , Router.BgpFSM , Router.Collision , Router.Config , Router.Global , Router.Log , Router.CreateUpdate , Router.Open , Router.Redistributor , Router.StdRib , Session.Session , ZServ.Debug , ZServ.WireFormat , ZServ.ZMsg , ZServ.ZMsgBinary , ZServ.ZServ , ZServ.ZSpec
   default-language:    Haskell2010
+
+executable hbgp.event
+  import: base
+  main-is:             Router/Router.hs
   cpp-options:         -DLOGMODE=Event
+
+executable hbgp
+  import: base
+  main-is:             Router/Router.hs
+  cpp-options:         -DLOGMODE=Warn
+
+executable mrtdump
+  main-is:		MRTrib-dump.hs
+  hs-source-dirs:	MRT/lib , MRT/app
+  default-language:	Haskell2010
+  build-depends:	base, iproute, bytestring, zlib, base16-bytestring, attoparsec, attoparsec-binary, hashable, farmhash, array, containers, unix
+  other-modules:	MRTBuilder, MRTPrefixes, MRTformat, MRTlib, MRTrib, BogonFilter
