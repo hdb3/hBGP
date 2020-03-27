@@ -2,9 +2,6 @@
 module BGPRib.Rib(Rib,ribPush,newRib,getLocRib,addPeer,delPeer,getPeersInRib,lookupRoutes,pullAllUpdates,getNextHops) where
 import Control.Concurrent
 import qualified Data.Map.Strict as Data.Map
-import Control.Monad(unless,when,void)
--- TODO replace Data.List with Data.List.EXtra and use nubOrd not nub
-import Data.List(intercalate,foldl')
 import Data.Word(Word32)
 import Data.IP
 import Control.Arrow(second)
@@ -112,9 +109,12 @@ getNextHops rib prefixes = do
 
 
 pullAllUpdates :: PeerData -> Rib -> IO [AdjRIBEntry]
+-- TODO - look into why this is sometimes called with a peer not in the map...
+-- this happens at peer down and the suspicion is that it implies that
+-- there may be some withdrawals which are improperly dropped
 pullAllUpdates peer rib = do
     (Rib' _ arot) <- readMVar rib
-    dequeueAll (arot Data.Map.! peer)
+    maybe (return []) dequeueAll (arot Data.Map.!? peer)
 
 -- TODO write and use the function 'getAdjRibForPeer'
 
