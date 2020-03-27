@@ -7,7 +7,6 @@ import Data.ByteString.Builder.Extra (byteStringCopy)
 import Data.IP (toHostAddress)
 import Data.Monoid ((<>))
 import Data.Word
-import MRTPrefixes
 import MRTlib
 import System.IO (Handle)
 

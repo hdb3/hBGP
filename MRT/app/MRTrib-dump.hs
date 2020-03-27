@@ -1,7 +1,7 @@
 module Main where
 
 import Control.Monad (when)
-import Data.List (elem, isPrefixOf)
+import Data.List (isPrefixOf)
 import Data.Maybe (maybe)
 import MRTBuilder
 import MRTrib
