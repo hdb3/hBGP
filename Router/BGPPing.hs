@@ -5,17 +5,21 @@ module Main where
 
 import Control.Concurrent
 import Control.Monad (forever)
+import Control.Monad.Extra (ifM)
 import Data.IP
 import Data.List (partition)
 import Data.Maybe (fromJust)
+-- import Data.Bool.Extras(bool)
 import Foreign.C.Error
 import GHC.IO.Exception (ioe_description)
 import qualified Network.Socket as NS
 import System.Environment (getArgs)
-import System.Exit (die)
+import System.Exit (die, exitSuccess)
 import System.IO
 import System.IO.Error
 import Text.Read (readMaybe)
+
+retryOnBusy = False
 
 main :: IO ()
 main = do
@@ -24,7 +28,6 @@ main = do
   let (optargs, posargs) = partition (('-' ==) . head) args
       addresses = map getIPv4 posargs
       passive = elem "--listen" optargs
-  -- print (args,optargs, posargs,passive,addresses)
   if  | (elem Nothing addresses) -> do
         putStrLn "could not parse addresses"
         usage
@@ -44,103 +47,146 @@ usage = do
 
 listener :: NS.PortNumber -> IPv4 -> IPv4 -> IO ()
 listener port peer local = do
-  eSock <- tryIOError (bindSock' port (toHostAddress local))
-  either
-    ( \e -> do
-        Errno errno <- getErrno
-        if  | errno == 13 ->
-              die
-                "permission error binding port (are you su?) (or try: sysctl net.ipv4.ip_unprivileged_port_start=179?)"
-            | errno == 99 ->
-              die "address error binding port - host configuration mismatch?"
-            | errno `elem` [98] ->
-              do
-                hPutStrLn stderr "waiting to bind port"
-                threadDelay 10000000
-                listener port peer local
-            | otherwise ->
-              error $ errReport' errno e
-    )
-    ( \(listeningSocket, _) -> do
-        putStrLn "listener waiting"
-        forever
-          ( do
-              s <- NS.accept listeningSocket
-              forkIO $ listenClient s
-          )
-    )
-    eSock
-  where
-    bindSock' port ip = do
-      sock <- NS.socket NS.AF_INET NS.Stream NS.defaultProtocol
-      NS.setSocketOption sock NS.ReuseAddr 1
-      NS.setSocketOption sock NS.NoDelay 1
-      NS.bind sock (NS.SockAddrInet port ip)
-      NS.listen sock 100
-      return (sock, addr)
-    listenClient (sock, NS.SockAddrInet _ remoteHostAddress) = do
-      (NS.SockAddrInet _ localHostAddress) <- NS.getSocketName sock
-      let addressPair = (fromHostAddress localHostAddress, fromHostAddress remoteHostAddress)
-      putStrLn $ "received connect from " ++ show (fromHostAddress remoteHostAddress)
-      wrap sock
-
-wrap :: NS.Socket -> IO ()
-wrap sock = do
-  peerAddress <- NS.getPeerName sock
-  let ip = fromPeerAddress peerAddress
-      fromPeerAddress (NS.SockAddrInet _ ip) = fromHostAddress ip
-  catchIOError
+  listeningSocket <- bind port local
+  putStrLn $ "listener waiting on " ++ show local ++ " for connection from " ++ show peer
+  forever
     ( do
-        putStrLn "connected"
-        NS.close sock
-        putStrLn $ "app terminated for : " ++ show ip
+        (sock, _) <- NS.accept listeningSocket
+        ifM (common sock peer local) exitSuccess (putStrLn "unexpected transport addresses in passive connect - continuing")
     )
-    ( \e -> do
-        Errno errno <- getErrno
-        putStrLn $
-          "Exception in session with "
-            ++ show ip
-            ++ " - "
-            ++ errReport errno e
-    )
+  where
+    bind :: NS.PortNumber -> IPv4 -> IO NS.Socket
+    bind port address = catchIOError (unwrappedBind port address) bindErrorHandler
+      where
+        --
+        unwrappedBind :: NS.PortNumber -> IPv4 -> IO NS.Socket
+        unwrappedBind port ip = do
+          sock <- NS.socket NS.AF_INET NS.Stream NS.defaultProtocol
+          NS.setSocketOption sock NS.ReuseAddr 1
+          NS.setSocketOption sock NS.NoDelay 1
+          NS.bind sock (NS.SockAddrInet port (toHostAddress ip))
+          NS.listen sock 100
+          return sock
+        --
+        bindErrorHandler e = do
+          Errno errno <- getErrno
+          if  | errno == 13 ->
+                die
+                  "permission error binding port (are you su?) (or try: sysctl net.ipv4.ip_unprivileged_port_start=179?)"
+              | errno == 99 ->
+                die "address error binding port - host configuration mismatch?"
+              | errno `elem` [98] ->
+                if retryOnBusy
+                  then do
+                    hPutStrLn stderr "waiting to bind port"
+                    threadDelay 10000000 -- 10 seconds
+                    bind port address
+                  else die "port already in use"
+              | otherwise ->
+                die $
+                  unlines
+                    [ "*** UNKNOWN exception, please record this",
+                      "error " ++ ioeGetErrorString e,
+                      "errno " ++ show errno,
+                      "description " ++ ioe_description e
+                    ]
 
 talker :: NS.PortNumber -> IPv4 -> IPv4 -> IO ()
 talker port peer local = do
-  putStrLn $ "run: " ++ show (peer, local) ++ " start"
-  sock <- connectTo port peer local
-  putStrLn "run: connected"
+  putStrLn $ "talker connecting from " ++ show local ++ " to " ++ show peer
+  --sock <- unwrappedConnect port peer local
+  sock <- wrappedConnect port peer local
+  putStrLn "active: connected"
+  ifM (common sock peer local) exitSuccess (die "unexpected transport addreses in active connect")
   where
-    connectTo port peer local =
-      catchIOError
-        ( do
-            sock <- NS.socket NS.AF_INET NS.Stream NS.defaultProtocol
-            NS.setSocketOption sock NS.NoDelay 1
-            NS.bind sock (NS.SockAddrInet 0 $ toHostAddress local)
-            NS.connect sock $ NS.SockAddrInet port $ toHostAddress peer
-            return $ Just sock
-        )
-        ( \e -> do
-            Errno errno <- getErrno
-            -- most errors are timeouts or connection rejections from unattended ports
-            -- a better way to report would be handy - repeated console messages are not useful!
-            putStrLn $
-              "Exception connecting to "
-                ++ show peer
-                ++ " - "
-                ++ errReport errno e
-            return Nothing
-        )
+    unwrappedConnect :: NS.PortNumber -> IPv4 -> IPv4 -> IO NS.Socket
+    unwrappedConnect port peer local = do
+      sock <- newSock
+      setNoDelay sock
+      bind sock local
+      connect sock port peer
+      return sock
+    wrappedConnect :: NS.PortNumber -> IPv4 -> IPv4 -> IO NS.Socket
+    wrappedConnect port peer local = catchIOError (unwrappedConnect port peer local) connectErrorHandler
+      where
+        connectErrorHandler e = do
+          Errno errno <- getErrno
+          if  | errno == 99 ->
+                error "address error binding port - host configuration mismatch?"
+              | otherwise -> do
+                putStrLn $ "errorString: " ++ ioeGetErrorString e
+                putStrLn $ "errno " ++ show errno
+                putStrLn $ "description " ++ ioe_description e
+                threadDelay 3000000 -- 3 seconds
+                wrappedConnect port peer local
 
-errReport errno e
-  | errno `elem` [2, 32, 99, 104, 107, 115] =
-    ioe_description e ++ " (" ++ show errno ++ ")"
-  | otherwise =
-    errReport' errno e
+common :: NS.Socket -> IPv4 -> IPv4 -> IO Bool
+common sock expectedPeerAddress expectedLocalAddress = do
+  receivedPeerAddress <- getPeerAddress sock
+  receivedLocalAddress <- getLocalAddress sock
+  if (expectedPeerAddress, expectedLocalAddress) == (receivedPeerAddress, receivedLocalAddress)
+    then do
+      putStrLn $ "got expected connection with " ++ show receivedPeerAddress
+      return True
+    else do
+      putStrLn $ "got unwanted connection - got " ++ show (receivedPeerAddress, receivedLocalAddress) ++ " expecting " ++ show (expectedPeerAddress, expectedLocalAddress)
+      NS.close sock
+      return False
 
-errReport' errno e =
-  unlines
-    [ "*** UNKNOWN exception, please record this",
-      "error " ++ ioeGetErrorString e,
-      "errno " ++ show errno,
-      "description " ++ ioe_description e
-    ]
+sockAddr :: NS.SockAddr -> IPv4
+sockAddr (NS.SockAddrInet _ hostAddress) = fromHostAddress hostAddress
+
+getPeerAddress :: NS.Socket -> IO IPv4
+getPeerAddress sock = fmap sockAddr (NS.getPeerName sock)
+
+getLocalAddress :: NS.Socket -> IO IPv4
+getLocalAddress sock = fmap sockAddr (NS.getSocketName sock)
+
+newSock = NS.socket NS.AF_INET NS.Stream NS.defaultProtocol
+
+bind s addr = catchIOError (NS.bind s (NS.SockAddrInet 0 $ toHostAddress addr)) (genericErrorHandler "bind")
+
+connect s port addr = catchIOError (NS.connect s (NS.SockAddrInet port (toHostAddress addr))) (genericErrorHandler "connect")
+
+setNoDelay s = NS.setSocketOption s NS.NoDelay 1 >> return s
+
+genericErrorHandler s e = do
+  putStrLn $ "error in " ++ s
+  Errno errno <- getErrno
+  putStrLn $ "errorString: " ++ ioeGetErrorString e
+  putStrLn $ "errno " ++ show errno
+  putStrLn $ "description " ++ ioe_description e
+
+-- experimenatal stuff #########################################
+
+connectTo'' port local remote = newSock'' >>= setNoDelay'' >>= bind'' local >>= connect'' port remote
+  where
+    newSock'' = NS.socket NS.AF_INET NS.Stream NS.defaultProtocol
+    bind'' addr s = catchIOError (NS.bind s (NS.SockAddrInet 0 $ toHostAddress addr) >> return s) (genericErrorHandler'' "bind")
+    connect'' port addr s = catchIOError (NS.connect s (NS.SockAddrInet port (toHostAddress addr)) >> return s) (genericErrorHandler'' "connect")
+    setNoDelay'' s = NS.setSocketOption s NS.NoDelay 1 >> return s
+    genericErrorHandler'' s e = do
+      putStrLn $ "error in " ++ s
+      Errno errno <- getErrno
+      putStrLn $ "errorString: " ++ ioeGetErrorString e
+      putStrLn $ "errno " ++ show errno
+      putStrLn $ "description " ++ ioe_description e
+      return $ error "can't help with this one...."
+
+connectTo' port local remote = newSock' >>= setNoDelay' >>= bind' local >>= connect' port remote
+  where
+    newSock' = Just <$> NS.socket NS.AF_INET NS.Stream NS.defaultProtocol
+    bind' addr (Just sock) = catchIOError (NS.bind sock (NS.SockAddrInet 0 $ toHostAddress addr) >> return (Just sock)) (genericErrorHandler' sock "bind")
+    bind' _ Nothing = return Nothing
+    connect' port addr (Just sock) = catchIOError (NS.connect sock (NS.SockAddrInet port (toHostAddress addr)) >> return (Just sock)) (genericErrorHandler' sock "connect")
+    connect' _ _ Nothing = return Nothing
+    setNoDelay' (Just s) = NS.setSocketOption s NS.NoDelay 1 >> return (Just s)
+    setNoDelay' Nothing = return Nothing
+    genericErrorHandler' sock s e = do
+      putStrLn $ "error in " ++ s
+      Errno errno <- getErrno
+      putStrLn $ "errorString: " ++ ioeGetErrorString e
+      putStrLn $ "errno " ++ show errno
+      putStrLn $ "description " ++ ioe_description e
+      NS.close sock
+      return Nothing
