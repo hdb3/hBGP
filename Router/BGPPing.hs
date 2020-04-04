@@ -6,10 +6,12 @@ module Main where
 import Control.Concurrent
 import Control.Monad (forever)
 import Control.Monad.Extra (ifM)
+import qualified Data.ByteString as ByteString
+import Data.ByteString.Builder
+import Data.ByteString.Builder.Extra (byteStringCopy)
 import Data.IP
 import Data.List (partition)
-import Data.Maybe (fromJust)
--- import Data.Bool.Extras(bool)
+import Data.Maybe (fromJust,isJust)
 import Foreign.C.Error
 import GHC.IO.Exception (ioe_description)
 import qualified Network.Socket as NS
@@ -18,6 +20,9 @@ import System.Exit (die, exitSuccess)
 import System.IO
 import System.IO.Error
 import Text.Read (readMaybe)
+import BGPlib.BGPlib(BGPMessage,)
+import BGPlib.AttoBGP(bgpParser1,bgpParser)
+import Data.Attoparsec.ByteString(parse,parseWith,maybeResult)
 
 retryOnBusy = False
 
@@ -127,11 +132,32 @@ common sock expectedPeerAddress expectedLocalAddress = do
   if (expectedPeerAddress, expectedLocalAddress) == (receivedPeerAddress, receivedLocalAddress)
     then do
       putStrLn $ "got expected connection with " ++ show receivedPeerAddress
-      return True
+      validateConnection sock
     else do
       putStrLn $ "got unwanted connection - got " ++ show (receivedPeerAddress, receivedLocalAddress) ++ " expecting " ++ show (expectedPeerAddress, expectedLocalAddress)
       NS.close sock
       return False
+  where
+    validateConnection sock = do
+      handle <- NS.socketToHandle sock System.IO.ReadWriteMode
+      hPutKeepalive handle
+      msg <- get1 handle
+      maybe (do putStrLn "BGP receive failed"
+                return False)
+            (\m -> do putStrLn $ "got " ++ show m
+                      return True)
+             msg
+    get1 :: Handle -> IO (Maybe BGPMessage)
+    get1 h = do
+      --putStrLn "read from handle"
+      bs <- ByteString.hGetSome h 4096
+      --putStrLn $ "read complete, got " ++ show (ByteString.length bs) ++ " bytes"
+      return $ maybeResult ( parse bgpParser1 bs)
+
+
+-- if this is a real BGP peer session then we should expect some input
+-- we can safely send any valid BGP message (keepalive? open?) - or wait for an OPEN?
+-- if the response comes to our message and can be parsed then unless we want to verify remote identity and configuration that is sufficient....
 
 sockAddr :: NS.SockAddr -> IPv4
 sockAddr (NS.SockAddrInet _ hostAddress) = fromHostAddress hostAddress
@@ -190,3 +216,16 @@ connectTo' port local remote = newSock' >>= setNoDelay' >>= bind' local >>= conn
       putStrLn $ "description " ++ ioe_description e
       NS.close sock
       return Nothing
+
+-- #########
+-- below and needed imports should be in a seprate module, which should be provided by BGPlib
+hPutKeepalive :: Handle -> IO ()
+hPutKeepalive handle = hPutBuilder handle keepaliveBuilder
+  where
+    keepaliveBuilder :: Builder
+    keepaliveBuilder =
+      marker
+        <> word16BE 19
+        <> word8 4
+    marker :: Builder
+    marker = byteStringCopy $ ByteString.replicate 16 0xff
