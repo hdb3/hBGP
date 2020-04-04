@@ -3,15 +3,18 @@
 
 module Main where
 
+import BGPlib.AttoBGP (bgpParser, bgpParser1)
+import BGPlib.BGPlib (BGPMessage)
 import Control.Concurrent
 import Control.Monad (forever)
 import Control.Monad.Extra (ifM)
+import Data.Attoparsec.ByteString (maybeResult, parse, parseWith)
 import qualified Data.ByteString as ByteString
 import Data.ByteString.Builder
 import Data.ByteString.Builder.Extra (byteStringCopy)
 import Data.IP
 import Data.List (partition)
-import Data.Maybe (fromJust,isJust)
+import Data.Maybe (fromJust, isJust)
 import Foreign.C.Error
 import GHC.IO.Exception (ioe_description)
 import qualified Network.Socket as NS
@@ -20,9 +23,6 @@ import System.Exit (die, exitSuccess)
 import System.IO
 import System.IO.Error
 import Text.Read (readMaybe)
-import BGPlib.BGPlib(BGPMessage,)
-import BGPlib.AttoBGP(bgpParser1,bgpParser)
-import Data.Attoparsec.ByteString(parse,parseWith,maybeResult)
 
 retryOnBusy = False
 
@@ -142,18 +142,18 @@ common sock expectedPeerAddress expectedLocalAddress = do
       handle <- NS.socketToHandle sock System.IO.ReadWriteMode
       hPutKeepalive handle
       msg <- get1 handle
-      maybe (do putStrLn "BGP receive failed"
-                return False)
-            (\m -> do putStrLn $ "got " ++ show m
-                      return True)
-             msg
+      maybe
+        ( do
+            putStrLn "BGP receive failed"
+            return False
+        )
+        ( \m -> do
+            putStrLn $ "got " ++ show m
+            return True
+        )
+        msg
     get1 :: Handle -> IO (Maybe BGPMessage)
-    get1 h = do
-      --putStrLn "read from handle"
-      bs <- ByteString.hGetSome h 4096
-      --putStrLn $ "read complete, got " ++ show (ByteString.length bs) ++ " bytes"
-      return $ maybeResult ( parse bgpParser1 bs)
-
+    get1 h = (maybeResult . parse bgpParser1) <$> (ByteString.hGetSome h 4096)
 
 -- if this is a real BGP peer session then we should expect some input
 -- we can safely send any valid BGP message (keepalive? open?) - or wait for an OPEN?
