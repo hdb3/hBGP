@@ -8,13 +8,13 @@ import BGPlib.BGPlib (BGPMessage)
 import Control.Concurrent
 import Control.Monad (forever)
 import Control.Monad.Extra (ifM)
-import Data.Attoparsec.ByteString (maybeResult, parse, parseWith)
+import Data.Attoparsec.ByteString (IResult (..), maybeResult, parse, parseWith)
 import qualified Data.ByteString as ByteString
 import Data.ByteString.Builder
 import Data.ByteString.Builder.Extra (byteStringCopy)
 import Data.IP
 import Data.List (partition)
-import Data.Maybe (fromJust, isJust)
+import Data.Maybe (fromJust)
 import Foreign.C.Error
 import GHC.IO.Exception (ioe_description)
 import qualified Network.Socket as NS
@@ -141,6 +141,8 @@ common sock expectedPeerAddress expectedLocalAddress = do
     validateConnection sock = do
       handle <- NS.socketToHandle sock System.IO.ReadWriteMode
       hPutKeepalive handle
+      hPutKeepalive handle
+      getOneAtATime handle (\msg -> putStrLn $ "gota BGP message " ++ show msg)
       msg <- get1 handle
       maybe
         ( do
@@ -153,7 +155,29 @@ common sock expectedPeerAddress expectedLocalAddress = do
         )
         msg
     get1 :: Handle -> IO (Maybe BGPMessage)
-    get1 h = (maybeResult . parse bgpParser1) <$> (ByteString.hGetSome h 4096)
+    get1 h = (maybeResult . parse bgpParser1) <$> ByteString.hGetSome h 4096
+    getN :: Handle -> (BGPMessage -> IO ()) -> IO ()
+    getN h action = go ByteString.empty []
+      where
+        feed = do
+          putStrLn "start feed"
+          bs <- ByteString.hGetSome h 65536
+          putStrLn $ "get returned with " ++ show (ByteString.length bs) ++ " bytes"
+          return bs
+        go bs (msg : msgx) = do
+          action msg
+          go bs msgx
+        go bs [] = do
+          iResult <- parseWith feed bgpParser bs
+          -- iResult <- parseWith (ByteString.hGetSome h 65536) bgpParser bs
+          case iResult of
+            Done _ [] -> do
+              putStrLn "parse returned empty list"
+              return ()
+            Done i r -> go i r
+            Fail _ context description -> do
+              putStrLn $ "parse failed: " ++ description
+              mapM_ putStrLn context
 
 -- if this is a real BGP peer session then we should expect some input
 -- we can safely send any valid BGP message (keepalive? open?) - or wait for an OPEN?
@@ -229,3 +253,17 @@ hPutKeepalive handle = hPutBuilder handle keepaliveBuilder
         <> word8 4
     marker :: Builder
     marker = byteStringCopy $ ByteString.replicate 16 0xff
+
+getOneAtATime :: Handle -> (BGPMessage -> IO ()) -> IO ()
+getOneAtATime h action = feed >>= go
+  where
+    feed = ByteString.hGetSome h 65536
+    go bs = do
+      iResult <- parseWith feed bgpParser1 bs
+      case iResult of
+        Done i msg -> do
+          action msg
+          go i
+        Fail _ context description -> do
+          putStrLn $ "parse failed: " ++ description
+          mapM_ putStrLn context
