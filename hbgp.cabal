@@ -36,5 +36,5 @@ executable mrtdump
 executable bgpping
   main-is:		Router/BGPPing.hs
   default-language:	Haskell2010
-  build-depends:	base, network, iproute, containers, extra, bytestring, binary, deepseq, attoparsec, attoparsec-binary, hashable
+  build-depends:	base, network, iproute, containers, extra, bytestring, binary, deepseq, attoparsec, attoparsec-binary, hashable, base16-bytestring
   other-modules: BGPlib.ASPath, BGPlib.AttoBGP, BGPlib.BGPlib, BGPlib.BGPparse, BGPlib.Capabilities, BGPlib.Codes, BGPlib.GetBGPMsg, BGPlib.LibCommon, BGPlib.PathAttributeUtils, BGPlib.PathAttributes, BGPlib.Prefixes, BGPlib.RFC4271

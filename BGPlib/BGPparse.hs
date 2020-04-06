@@ -1,6 +1,8 @@
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE RecordWildCards #-}
+
 module BGPlib.BGPparse where
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString as B
@@ -37,7 +39,18 @@ data BGPMessage = BGPOpen { myAutonomousSystem :: Word16, holdTime :: Word16, bg
                   | BGPTimeout
                   | BGPError String
                   | BGPEndOfStream
-                    deriving (Show,Eq,Generic)
+                    deriving (Eq,Generic)
+
+instance Show BGPMessage where
+  show (BGPUpdate {..}) = if | B.null attributes ->  "Update {}"  
+                             | null nlri -> "Update {attributes = " ++ toHex attributes ++ "}" 
+                             | null withdrawn -> "Update {nlri = " ++ show nlri ++ ", attributes = " ++ toHex attributes ++ "}"                                           
+                             | otherwise -> "Update {withdrawn = " ++ show withdrawn ++ ", nlri = " ++ show nlri ++ ", attributes = " ++ toHex attributes ++ "}" 
+  show (BGPNotify {..}) = "Notify: " ++ show code ++ " / " ++ show subCode ++ " errorData " ++ toHex' errorData ++ "}"
+  show BGPKeepalive = "Keepalive"
+  show BGPTimeout = "Timeout"
+  show BGPEndOfStream = "BGPEndOfStream"
+  show (BGPError s ) = "Error: " ++ s
 
 toAS2 :: Word32 -> Word16
 toAS2 as | as < 0x10000 = fromIntegral as
