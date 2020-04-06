@@ -1,17 +1,8 @@
 module BGPRib.Common (module BGPRib.Common, module Data.IP) where
 import Data.IP
-import qualified Data.ByteString.Lazy as L
-import qualified Data.ByteString.Char8 as C8
-import qualified Data.ByteString.Base16 as Base16
 import qualified Data.HashMap.Strict as HashMap
 import Data.Hashable(Hashable)
 import Data.List(foldl')
-
-toHex :: C8.ByteString -> String
-toHex = C8.unpack . Base16.encode
-
-toHex' :: L.ByteString -> String
-toHex' = toHex . L.toStrict
 
 -- this is a (hopefully) effiecent function in cae of large list based maps
 -- which partitions values with a common key into distinct lists
