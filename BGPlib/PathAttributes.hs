@@ -245,6 +245,11 @@ instance {-# OVERLAPPING #-} Binary [PathAttribute] where
 
     put = putn
     get = getn
+encodePathAttributes :: [PathAttribute] -> B.ByteString
+encodePathAttributes = L.toStrict . encode
+
+decodePathAttributes :: B.ByteString -> [PathAttribute]
+decodePathAttributes =  decode . L.fromStrict
 
 instance {-# OVERLAPPING #-} Binary [Word64] where
 

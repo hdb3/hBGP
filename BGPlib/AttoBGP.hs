@@ -71,7 +71,7 @@ bgpParser1 = do
                withdrawnLength <- fromIntegral <$> A.anyWord16be
                withdrawn <- parsePrefixes withdrawnLength
                pathLength <- fromIntegral <$> A.anyWord16be
-               rawPath <- L.fromStrict <$> A.take pathLength
+               rawPath <- A.take pathLength
                let nlriLength = length - withdrawnLength - pathLength - 23
                nlri <- parsePrefixes nlriLength
                return $ BGPUpdate withdrawn rawPath nlri
