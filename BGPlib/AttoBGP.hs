@@ -13,7 +13,7 @@ import BGPlib.Prefixes
 import BGPlib.BGPparse(BGPMessage(..))
 import Data.Word
 import Data.Bits
-import Control.Applicative((<|>))
+import Control.Applicative((<|>),Alternative,liftA2)
 
 terminatingWireParser = wireParser1 <|> return B.empty
 eosWireParser = B.null
@@ -32,8 +32,16 @@ wireParser1 = do
     else if typeCode < 1 || typeCode > 4 then fail $ "invalid type code (" ++ show typeCode ++ ")"
     else A.take (length - 18)
 
+
+--bgpParser = A.many1 bgpParser1 A.<?>  "BGP intermediate format Parser"
+
 bgpParser :: Parser [ BGPMessage ]
-bgpParser = A.many' bgpParser1 A.<?>  "BGP intermediate format Parser"
+bgpParser = many1Till bgpParser1 A.atEnd
+
+{-# INLINE many1Till #-}
+many1Till :: Alternative f => f a -> f b -> f [a]
+many1Till p end = liftA2 (:) p scan
+    where scan = (end *> pure []) <|> liftA2 (:) p scan
 
 terminatingBGPParser = bgpParser1 <|> return BGPEndOfStream
 eosBGPParser msg = BGPEndOfStream == msg
