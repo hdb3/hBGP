@@ -23,6 +23,7 @@ import System.Exit (die, exitSuccess)
 import System.IO
 import System.IO.Error
 import Text.Read (readMaybe)
+import Router.BGPPingParser
 
 retryOnBusy = False
 
