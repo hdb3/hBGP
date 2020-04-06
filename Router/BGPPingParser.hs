@@ -41,11 +41,15 @@ type Val = [BGPMessage]
 action = mapM_ display
 parser = bgpParser
 
--- display m = case m of (BGPUpdate {..}) -> putStrLn $ if | ByteString.null attributes ->  "BGPUpdate {}"  
---                                                         | null nlri -> "BGPUpdate {attributes = " ++ toHex attributes ++ "}" 
---                                                         | null withdrawn -> "BGPUpdate {nlri = " ++ show nlri ++ ", attributes = " ++ toHex attributes ++ "}"                                           
---                                                         | otherwise -> "BGPUpdate {withdrawn = " ++ show withdrawn ++ ", nlri = " ++ show nlri ++ ", attributes = " ++ toHex attributes ++ "}" 
---                       otherwise -> print m
+display m = putChar $ case m of (BGPUpdate {..}) -> if | ByteString.null attributes ->  'E'  
+                                                       | null nlri -> 'A' 
+                                                       | null withdrawn -> 'u'                                           
+                                                       | otherwise -> 'U'
+                                (BGPNotify {}) -> 'N'
+                                BGPKeepalive -> 'K'
+                                BGPTimeout -> 'T'
+                                BGPEndOfStream -> 'X'
+                                (BGPError _ ) -> '?'
 
 getNext :: IO BS -> Parser Val -> BS -> IO (Maybe (BS, Val))
 getNext getter myParser bs = go (parse myParser bs)
@@ -59,13 +63,18 @@ getNext getter myParser bs = go (parse myParser bs)
 
 -- An example of this strategy:
 
-getter = do
-  putStrLn "enter getter"
-  bs <- ByteString.hGetSome stdin 65536
+getterNoisy = do
+  putStrLn "enter getter for 64K"
+  bs <- ByteString.hGetSome stdin _64K
   putStrLn $ "exit getter with " ++ show (ByteString.length bs) ++ " bytes"
   return bs
 
--- getter = ByteString.hGetSome stdin 65536
+_64K = 65536 :: Int
+_1M = 1024 * 1024 :: Int
+_16M = 16 * _1M
+getterQuiet = ByteString.hGetSome stdin _16M
+
+getter = getterQuiet
 
 example =
   let go bs = do
