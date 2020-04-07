@@ -3,7 +3,7 @@
 
 module Main where
 
-import BGPlib.AttoBGP (bgpParser)
+import BGPlib.AttoBGP (bgpParser1)
 import BGPlib.BGPlib (BGPMessage)
 import Control.Concurrent
 import Control.Monad (forever)
@@ -98,32 +98,48 @@ listener port peer local = do
 
 talker :: NS.PortNumber -> IPv4 -> IPv4 -> IO ()
 talker port peer local = do
-  putStrLn $ "talker connecting from " ++ show local ++ " to " ++ show peer
-  --sock <- unwrappedConnect port peer local
-  sock <- wrappedConnect port peer local
+  putStrLn $ "connecting to " ++ show peer ++ " from " ++ show local
+  sock <- newSock
+  setNoDelay sock
+  bind sock local
+  connect sock port peer
   putStrLn "active: connected"
   ifM (common sock peer local) exitSuccess (die "unexpected transport addreses in active connect")
   where
-    unwrappedConnect :: NS.PortNumber -> IPv4 -> IPv4 -> IO NS.Socket
-    unwrappedConnect port peer local = do
-      sock <- newSock
-      setNoDelay sock
-      bind sock local
-      connect sock port peer
-      return sock
-    wrappedConnect :: NS.PortNumber -> IPv4 -> IPv4 -> IO NS.Socket
-    wrappedConnect port peer local = catchIOError (unwrappedConnect port peer local) connectErrorHandler
-      where
-        connectErrorHandler e = do
-          Errno errno <- getErrno
-          if  | errno == 99 ->
-                error "address error binding port - host configuration mismatch?"
-              | otherwise -> do
-                putStrLn $ "errorString: " ++ ioeGetErrorString e
-                putStrLn $ "errno " ++ show errno
-                putStrLn $ "description " ++ ioe_description e
-                threadDelay 3000000 -- 3 seconds
-                wrappedConnect port peer local
+    connect :: NS.Socket -> NS.PortNumber -> IPv4 -> IO ()
+    connect sock port peer =
+      catchIOError
+        (NS.connect sock (NS.SockAddrInet port (toHostAddress peer)))
+        ( \e -> do
+            Errno errno <- getErrno
+            if  | elem errno [2, 103] -> do
+                  putStrLn $ ioe_description e ++ "(" ++ show errno ++ ") retrying in 3 seconds"
+                  threadDelay 3000000 -- 3 seconds
+                  connect sock port peer
+                | otherwise -> do
+                  putStrLn "connect error"
+                  putStrLn $ "errorString: " ++ ioeGetErrorString e
+                  putStrLn $ "errno " ++ show errno
+                  putStrLn $ "description " ++ ioe_description e
+                  putStrLn "retrying in 3 seconds"
+                  threadDelay 3000000 -- 3 seconds
+                  connect sock port peer
+        )
+    bind :: NS.Socket -> IPv4 -> IO ()
+    bind sock addr =
+      catchIOError
+        (NS.bind sock (NS.SockAddrInet 0 $ toHostAddress addr))
+        ( \e -> do
+            Errno errno <- getErrno
+            if  | errno == 99 ->
+                  error "address error binding port - host configuration mismatch?"
+                | otherwise -> do
+                  putStrLn "biind error"
+                  putStrLn $ "errorString: " ++ ioeGetErrorString e
+                  putStrLn $ "errno " ++ show errno
+                  putStrLn $ "description " ++ ioe_description e
+            die ("fatal error can't continue")
+        )
 
 common :: NS.Socket -> IPv4 -> IPv4 -> IO Bool
 common sock expectedPeerAddress expectedLocalAddress = do
@@ -170,54 +186,8 @@ getLocalAddress sock = fmap sockAddr (NS.getSocketName sock)
 
 newSock = NS.socket NS.AF_INET NS.Stream NS.defaultProtocol
 
-bind s addr = catchIOError (NS.bind s (NS.SockAddrInet 0 $ toHostAddress addr)) (genericErrorHandler "bind")
-
-connect s port addr = catchIOError (NS.connect s (NS.SockAddrInet port (toHostAddress addr))) (genericErrorHandler "connect")
-
 setNoDelay s = NS.setSocketOption s NS.NoDelay 1 >> return s
 
-genericErrorHandler s e = do
-  putStrLn $ "error in " ++ s
-  Errno errno <- getErrno
-  putStrLn $ "errorString: " ++ ioeGetErrorString e
-  putStrLn $ "errno " ++ show errno
-  putStrLn $ "description " ++ ioe_description e
-
--- experimenatal stuff #########################################
-
-connectTo'' port local remote = newSock'' >>= setNoDelay'' >>= bind'' local >>= connect'' port remote
-  where
-    newSock'' = NS.socket NS.AF_INET NS.Stream NS.defaultProtocol
-    bind'' addr s = catchIOError (NS.bind s (NS.SockAddrInet 0 $ toHostAddress addr) >> return s) (genericErrorHandler'' "bind")
-    connect'' port addr s = catchIOError (NS.connect s (NS.SockAddrInet port (toHostAddress addr)) >> return s) (genericErrorHandler'' "connect")
-    setNoDelay'' s = NS.setSocketOption s NS.NoDelay 1 >> return s
-    genericErrorHandler'' s e = do
-      putStrLn $ "error in " ++ s
-      Errno errno <- getErrno
-      putStrLn $ "errorString: " ++ ioeGetErrorString e
-      putStrLn $ "errno " ++ show errno
-      putStrLn $ "description " ++ ioe_description e
-      return $ error "can't help with this one...."
-
-connectTo' port local remote = newSock' >>= setNoDelay' >>= bind' local >>= connect' port remote
-  where
-    newSock' = Just <$> NS.socket NS.AF_INET NS.Stream NS.defaultProtocol
-    bind' addr (Just sock) = catchIOError (NS.bind sock (NS.SockAddrInet 0 $ toHostAddress addr) >> return (Just sock)) (genericErrorHandler' sock "bind")
-    bind' _ Nothing = return Nothing
-    connect' port addr (Just sock) = catchIOError (NS.connect sock (NS.SockAddrInet port (toHostAddress addr)) >> return (Just sock)) (genericErrorHandler' sock "connect")
-    connect' _ _ Nothing = return Nothing
-    setNoDelay' (Just s) = NS.setSocketOption s NS.NoDelay 1 >> return (Just s)
-    setNoDelay' Nothing = return Nothing
-    genericErrorHandler' sock s e = do
-      putStrLn $ "error in " ++ s
-      Errno errno <- getErrno
-      putStrLn $ "errorString: " ++ ioeGetErrorString e
-      putStrLn $ "errno " ++ show errno
-      putStrLn $ "description " ++ ioe_description e
-      NS.close sock
-      return Nothing
-
--- #########
 -- below and needed imports should be in a seprate module, which should be provided by BGPlib
 hPutKeepalive :: Handle -> IO ()
 hPutKeepalive handle = hPutBuilder handle keepaliveBuilder
