@@ -42,6 +42,7 @@ data BGPMessage = BGPOpen { myAutonomousSystem :: Word16, holdTime :: Word16, bg
                     deriving (Eq,Generic)
 
 instance Show BGPMessage where
+  show (BGPOpen {..}) = "Open {AS: " ++ show myAutonomousSystem ++ " Hold-time: " ++ show holdTime ++ " BGPID: " ++ show bgpID ++ " Caps: " ++ show caps ++ "}"
   show (BGPUpdate {..}) = if | B.null attributes ->  "Update {}"  
                              | null nlri -> "Update {attributes = " ++ toHex attributes ++ "}" 
                              | null withdrawn -> "Update {nlri = " ++ show nlri ++ ", attributes = " ++ toHex attributes ++ "}"                                           
