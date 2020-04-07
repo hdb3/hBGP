@@ -28,28 +28,35 @@ _CapCodeEnhancedRouteRefresh = 70 :: CapCode
 _CapCodeLLGR = 71 :: CapCode
 _CapCodeCiscoRefresh = 128 :: CapCode
 {-
- The Capability Value field is defined as:
+RFC5492:
+   The parameter contains one or more triples <Capability Code,
+   Capability Length, Capability Value>, where each triple is encoded as
+   shown below:
 
-                     0       7      15      23      31
-                     +-------+-------+-------+-------+
-                     |      AFI      | Res.  | SAFI  |
-                     +-------+-------+-------+-------+
+       +------------------------------+
+       | Capability Code (1 octet)    |
+       +------------------------------+
+       | Capability Length (1 octet)  |
+       +------------------------------+
+       | Capability Value (variable)  |
+       +------------------------------+
 
-   The use and meaning of this field is as follow:
+   The use and meaning of these fields are as follows:
 
-      AFI  - Address Family Identifier (16 bit), encoded the same way as
-          in the Multiprotocol Extensions
+      Capability Code:
 
-      Res. - Reserved (8 bit) field.  SHOULD be set to 0 by the sender
-          and ignored by the receiver.
+         Capability Code is a one octet field that unambiguously
+         identifies individual capabilities.
 
-          Note that not setting the field value to 0 may create issues
-          for a receiver not ignoring the field.  In addition, this
-          definition is problematic if it is ever attempted to redefine
-          the field.
+      Capability Length:
 
-      SAFI - Subsequent Address Family Identifier (8 bit), encoded the
-          same way as in the Multiprotocol Extensions.
+         Capability Length is a one octet field that contains the length
+         of the Capability Value field in octets.
+
+      Capability Value:
+
+         Capability Value is a variable length field that is interpreted
+         according to the value of the Capability Code field.
 
 -}
 
@@ -71,6 +78,7 @@ data Capability = CapMultiprotocol Word16 Word8
                 | CapLLGR
                 | CapCiscoRefresh
                 | CapEnhancedRouteRefresh
+                | CapUnknown Word8 B.ByteString
                   deriving (Show,Eq,Read,Generic, NFData)
 
 eq_ :: Capability -> Capability -> Bool
@@ -82,6 +90,8 @@ eq_ CapRouteRefresh CapRouteRefresh = True
 eq_ CapLLGR CapLLGR = True
 eq_ CapCiscoRefresh CapCiscoRefresh = True
 eq_ CapEnhancedRouteRefresh CapEnhancedRouteRefresh = True
+-- need to consider if/when comparing CapUnknown returns True
+eq_ (CapUnknown _ _) (CapUnknown _ _) = True
 eq_ _ _ = False
 
 capCode :: Capability -> CapCode
@@ -147,6 +157,11 @@ instance Binary Capability where
         putWord8 0
         putWord8 safi
 
+    put (CapUnknown t bs) = do
+        putWord8 t
+        putWord8 $ fromIntegral (B.length bs)
+        putByteString bs
+
     get = label "Capability" $ do
         t <- getWord8
         l <- getWord8
@@ -169,8 +184,7 @@ instance Binary Capability where
            | t == _CapCodeEnhancedRouteRefresh -> return CapEnhancedRouteRefresh
            | t == _CapCodeCiscoRefresh -> return CapCiscoRefresh
            | t == _CapCodeLLGR -> if l == 0 then return CapLLGR else error "LLGR with non null payload not handled"
-           | otherwise        -> do error $ "Unexpected type code: " ++ show t
-                                    return undefined
+           | otherwise -> CapUnknown  t <$> getByteString (fromIntegral l)
 
 buildOptionalParameters :: [ Capability ] -> ByteString
 buildOptionalParameters capabilities | not $ null capabilities = let caps = L.concat $ map encode capabilities in
