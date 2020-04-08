@@ -54,8 +54,10 @@ executable bgpclient
   import: bgplib
   main-is:		Router/BGPClient.hs
   build-depends: extra
-  other-modules:  Router.BGPPingParser
+  other-modules:  Router.BGPConnect
 
 executable bgpserv
   import: bgplib
   main-is:		Router/BGPServer.hs
+  build-depends: extra
+  other-modules:  Router.BGPConnect
