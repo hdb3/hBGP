@@ -1,12 +1,24 @@
 {-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE OverloadedStrings #-}
 
-module Router.BGPConnect(clientConnect, getServerSession, openServerSocket, showSockAddresses) where
+module Router.BGPConnect
+  ( Socket,
+    close,
+    gracefulClose,
+    socketToHandle,
+    clientConnect,
+    getServerSession,
+    openServerSocket,
+    getSockAddresses,
+  )
+where
 
 import Control.Concurrent
 import Data.IP
+import Data.Word
 import Foreign.C.Error
+import Foreign.C.Types (CInt)
 import GHC.IO.Exception (ioe_description)
+import Network.Socket (Socket, gracefulClose, close,socketToHandle)
 import qualified Network.Socket as NS
 import System.Exit (die)
 import System.IO
@@ -14,15 +26,15 @@ import System.IO.Error
 
 retryOnBusy = False
 
-clientConnect :: NS.PortNumber -> IPv4 -> IPv4 -> IO NS.Socket
+clientConnect :: Word16 -> IPv4 -> IPv4 -> IO Socket
 clientConnect port peer local = do
   sock <- NS.socket NS.AF_INET NS.Stream NS.defaultProtocol
   NS.setSocketOption sock NS.NoDelay 1
   bind sock local
-  connect' sock port peer
+  connect' sock (fromIntegral port) peer
   return sock
   where
-    connect' :: NS.Socket -> NS.PortNumber -> IPv4 -> IO ()
+    connect' :: Socket -> NS.PortNumber -> IPv4 -> IO ()
     connect' sock port peer =
       catchIOError
         (NS.connect sock (NS.SockAddrInet port (toHostAddress peer)))
@@ -34,7 +46,7 @@ clientConnect port peer local = do
                   connect' sock port peer
                 | otherwise -> unknownSocketErrorHandler e errno
         )
-    bind :: NS.Socket -> IPv4 -> IO ()
+    bind :: Socket -> IPv4 -> IO ()
     bind sock addr =
       catchIOError
         (NS.bind sock (NS.SockAddrInet 0 $ toHostAddress addr))
@@ -44,19 +56,19 @@ clientConnect port peer local = do
                 | otherwise -> unknownSocketErrorHandler e errno
         )
 
-getServerSession :: NS.Socket -> IO NS.Socket
+getServerSession :: Socket -> IO Socket
 getServerSession listeningSocket = fst <$> NS.accept listeningSocket
 
-openServerSocket :: NS.PortNumber -> IPv4 -> IO NS.Socket
+openServerSocket :: Word16 -> IPv4 -> IO Socket
 openServerSocket port address = do
   sock <- NS.socket NS.AF_INET NS.Stream NS.defaultProtocol
   NS.setSocketOption sock NS.ReuseAddr 1
   NS.setSocketOption sock NS.NoDelay 1
-  serverBind sock port address
+  serverBind sock (fromIntegral port) address
   NS.listen sock 100
   return sock
   where
-    serverBind :: NS.Socket -> NS.PortNumber -> IPv4 -> IO ()
+    serverBind :: Socket -> NS.PortNumber -> IPv4 -> IO ()
     serverBind sock port ip =
       catchIOError
         (NS.bind sock (NS.SockAddrInet port (toHostAddress ip)))
@@ -77,6 +89,7 @@ openServerSocket port address = do
                 | otherwise -> unknownSocketErrorHandler e errno
         )
 
+unknownSocketErrorHandler :: IOError -> CInt -> IO ()
 unknownSocketErrorHandler e errno =
   die $
     unlines
@@ -86,8 +99,9 @@ unknownSocketErrorHandler e errno =
         "description " ++ ioe_description e
       ]
 
-showSockAddresses :: NS.Socket -> IO String
-showSockAddresses sock = do
+getSockAddresses :: Socket -> IO ((Word16, IPv4), (Word16, IPv4))
+getSockAddresses sock = do
+  let render (NS.SockAddrInet port address) = (fromIntegral port, fromHostAddress address)
   peer <- NS.getPeerName sock
   local <- NS.getSocketName sock
-  return $ show (local, peer)
+  return (render local, render peer)

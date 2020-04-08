@@ -1,14 +1,11 @@
-{-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE OverloadedStrings #-}
-
 module Main where
 
 import Data.IP
-import qualified Network.Socket as NS
+import Data.Word
+import Router.BGPConnect
 import System.Environment (getArgs)
 import System.Exit (die)
 import Text.Read (readMaybe)
-import Router.BGPConnect
 
 main :: IO ()
 main = do
@@ -22,16 +19,16 @@ main = do
         (listener 179)
         (readMaybe (head args))
 
-listener :: NS.PortNumber -> IPv4 -> IO ()
+listener :: Word16 -> IPv4 -> IO ()
 listener port local = do
   serverSocket <- openServerSocket port local
   putStrLn $ "listener waiting on " ++ show local ++ ":" ++ show port
   sock1 <- getServerSession serverSocket
   putStr "got connection (1): "
-  showSockAddresses sock1 >>= putStrLn
+  getSockAddresses sock1 >>= print
   sock2 <- getServerSession serverSocket
   putStr "got connection (2): "
-  showSockAddresses sock2 >>= putStrLn
-  NS.gracefulClose sock1 100000
-  NS.gracefulClose sock2 100000
+  getSockAddresses sock2 >>= print
+  gracefulClose sock1 100000
+  gracefulClose sock2 100000
   putStrLn "disconnected"

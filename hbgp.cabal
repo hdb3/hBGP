@@ -40,24 +40,24 @@ common bgplib
 
 executable parsetest
   import: bgplib
-  main-is:		Router/ParserTest.hs
+  main-is: Router/ParserTest.hs
   build-depends:	base
   other-modules:  Router.BGPPingParser
 
 executable bgpping
   import: bgplib
-  main-is:		Router/BGPPing.hs
+  main-is: Router/BGPPing.hs
   build-depends:	extra
-  other-modules:  Router.BGPPingParser
+  other-modules:  Router.BGPPingParser, Router.BGPConnect
 
 executable bgpclient
   import: bgplib
-  main-is:		Router/BGPClient.hs
+  main-is: Router/BGPClient.hs
   build-depends: extra
-  other-modules:  Router.BGPConnect
+  other-modules: Router.BGPConnect
 
 executable bgpserv
   import: bgplib
-  main-is:		Router/BGPServer.hs
+  main-is: Router/BGPServer.hs
   build-depends: extra
-  other-modules:  Router.BGPConnect
+  other-modules: Router.BGPConnect

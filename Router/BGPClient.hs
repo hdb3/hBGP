@@ -1,14 +1,11 @@
-{-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE OverloadedStrings #-}
-
 module Main where
 
 import Data.IP
-import qualified Network.Socket as NS
+import Data.Word
+import Router.BGPConnect
 import System.Environment (getArgs)
 import System.Exit (die)
 import Text.Read (readMaybe)
-import Router.BGPConnect
 
 main :: IO ()
 main = do
@@ -27,10 +24,10 @@ main = do
             return
             (readMaybe (args !! n))
 
-talker :: NS.PortNumber -> IPv4 -> IPv4 -> IO ()
+talker :: Word16 -> IPv4 -> IPv4 -> IO ()
 talker port peer local = do
   putStrLn $ "connecting to " ++ show peer ++ " from " ++ show local
   sock <- clientConnect port peer local
   putStrLn "connected"
-  NS.gracefulClose sock 100000
+  gracefulClose sock 100000
   putStrLn "disconnected"
