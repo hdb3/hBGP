@@ -61,3 +61,9 @@ executable bgpserv
   main-is: Router/BGPServer.hs
   build-depends: extra
   other-modules: Router.BGPConnect
+
+executable bgprelay
+  import: bgplib
+  main-is: Router/BGPRelay.hs
+  build-depends: extra
+  other-modules: Router.BGPConnect, Router.BGPPingParser
