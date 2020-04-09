@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 
 module BGPlib.BGPparse where
-
+import Debug.Trace
 import BGPlib.BGPMessage
 import BGPlib.Capabilities
 import BGPlib.LibCommon
@@ -54,7 +54,7 @@ instance Binary BGPMessage where
     putLazyByteString errData
   put BGPKeepalive = putWord8 _BGPKeepalive
 
-  get = label "BGPMessage" $ do
+  get = label "BGPMessage" $ trace "***TRACE BGPparse get" $ do
     msgType <- getWord8
     if  | _BGPOpen == msgType -> do
           msgVer <- getWord8
@@ -67,7 +67,7 @@ instance Binary BGPMessage where
           unless
             (optionalParametersLength == fromIntegral (L.length optionalParameters))
             (fail "optional parameter length wrong (Open)")
-          return $ BGPOpen myAutonomousSystem holdTime (fromHostAddress bgpID) (parseOptionalParameters optionalParameters)
+          return $ BGPOpen myAutonomousSystem holdTime (fromHostAddress bgpID) [] -- really this is an error because we are now using atto
         | _BGPUpdate == msgType -> do
           withdrawnRoutesLength <- getWord16be
           withdrawnRoutes <- getLazyByteString $ fromIntegral withdrawnRoutesLength
