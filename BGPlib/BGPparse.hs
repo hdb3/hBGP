@@ -1,29 +1,17 @@
-{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE MultiWayIf #-}
 
 module BGPlib.BGPparse where
-import qualified Data.ByteString.Lazy as L
-import qualified Data.ByteString as B
+
+import BGPlib.BGPMessage
+import BGPlib.Capabilities
+import BGPlib.LibCommon
+import Control.Monad (unless)
 import Data.Binary
 import Data.Binary.Get
 import Data.Binary.Put
-import Data.IP
-import Control.Monad(unless)
-
-import BGPlib.RFC4271
-import BGPlib.Prefixes
-import BGPlib.Capabilities
-import BGPlib.PathAttributes
-import BGPlib.LibCommon
-import BGPlib.GetBGPMsg(BGPByteString(..),RcvStatus(..))
-
-_BGPOpen = 1 :: Word8
-_BGPUpdate = 2 :: Word8
-_BGPNotify = 3 :: Word8
-_BGPKeepalive = 4 :: Word8
-_BGPVersion = 4 :: Word8
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as L
 
 decodeBGPByteString :: BGPByteString -> BGPMessage
 decodeBGPByteString (BGPByteString (Left Timeout)) = BGPTimeout
@@ -31,118 +19,69 @@ decodeBGPByteString (BGPByteString (Left EndOfStream)) = BGPEndOfStream
 decodeBGPByteString (BGPByteString (Left (Error s))) = BGPError s
 decodeBGPByteString (BGPByteString (Right lbs)) = decode lbs :: BGPMessage
 
-data BGPMessage = BGPOpen { myAutonomousSystem :: Word16, holdTime :: Word16, bgpID :: IPv4, caps :: [ Capability ] }
-                  | BGPKeepalive
-                  | BGPNotify { code :: EnumNotificationCode, subCode :: NotificationSubcode, errorData :: L.ByteString }
-                  -- | BGPUpdate { withdrawn :: [Prefix], attributes :: [PathAttribute], nlri :: [Prefix], pathHash :: Int }
-                  | BGPUpdate { withdrawn :: [Prefix], attributes :: B.ByteString, nlri :: [Prefix] }
-                  | BGPTimeout
-                  | BGPError String
-                  | BGPEndOfStream
-                    deriving (Eq,Generic)
-
-instance Show BGPMessage where
-  show (BGPOpen {..}) = "Open {AS: " ++ show myAutonomousSystem ++ " Hold-time: " ++ show holdTime ++ " BGPID: " ++ show bgpID ++ " Caps: " ++ show caps ++ "}"
-  show (BGPUpdate {..}) = if | B.null attributes ->  "Update {}"  
-                             | null nlri -> "Update {attributes = " ++ toHex attributes ++ "}" 
-                             | null withdrawn -> "Update {nlri = " ++ show nlri ++ ", attributes = " ++ toHex attributes ++ "}"                                           
-                             | otherwise -> "Update {withdrawn = " ++ show withdrawn ++ ", nlri = " ++ show nlri ++ ", attributes = " ++ toHex attributes ++ "}" 
-  show (BGPNotify {..}) = "Notify: " ++ show code ++ " / " ++ show subCode ++ " errorData " ++ toHex' errorData ++ "}"
-  show BGPKeepalive = "Keepalive"
-  show BGPTimeout = "Timeout"
-  show BGPEndOfStream = "BGPEndOfStream"
-  show (BGPError s ) = "Error: " ++ s
-
-toAS2 :: Word32 -> Word16
-toAS2 as | as < 0x10000 = fromIntegral as
-         | otherwise = 23456
-
-display :: BGPMessage -> String
-display BGPOpen{} = "BGPOpen"
-display BGPKeepalive{} = "BGPKeepalive"
-display BGPNotify{} = "BGPNotify"
-display BGPUpdate{} = "BGPUpdate"
-display BGPTimeout{} = "BGPTimeout"
-display BGPError{} = "BGPError"
-display BGPEndOfStream{} = "BGPEndOfStream"
-isKeepalive :: BGPMessage -> Bool
-isKeepalive BGPKeepalive = True
-isKeepalive _ = False
-
-isOpen :: BGPMessage -> Bool
-isOpen BGPOpen{} = True
-isOpen _ = False
-
-isUpdate :: BGPMessage -> Bool
-isUpdate BGPUpdate{} = True
-isUpdate _ = False
-
 instance {-# OVERLAPPING #-} Binary [BGPMessage] where
-    put _ = error "it would not make sense to encode BGPmessage list without a wireformat envelope"
+  put _ = error "it would not make sense to encode BGPmessage list without a wireformat envelope"
 
 encodeBGPMessage :: BGPMessage -> L.ByteString
 encodeBGPMessage = encode
+
 instance Binary BGPMessage where
+  put (BGPOpen myAutonomousSystem holdTime bgpID caps) = do
+    putWord8 _BGPOpen
+    putWord8 _BGPVersion
+    putWord16be myAutonomousSystem
+    putWord16be holdTime
+    putWord32le $ toHostAddress bgpID
+    let optionalParameters = buildOptionalParameters caps
+    putWord8 $ fromIntegral $ B.length optionalParameters
+    putByteString optionalParameters
+  put (BGPUpdate withdrawnRoutes pathAttributes nlri) = do
+    putWord8 _BGPUpdate
+    putWord16be withdrawnRoutesLength
+    putLazyByteString withdrawnRoutesBS
+    putWord16be pathAttributesLength
+    putByteString pathAttributes
+    putLazyByteString nlriBS
+    where
+      withdrawnRoutesBS = encode withdrawnRoutes
+      nlriBS = encode nlri
+      withdrawnRoutesLength = fromIntegral $ L.length withdrawnRoutesBS
+      pathAttributesLength = fromIntegral $ B.length pathAttributes
+  put (BGPNotify code subCode errData) = do
+    putWord8 _BGPNotify
+    putWord8 $ encode8 code
+    putWord8 subCode
+    putLazyByteString errData
+  put BGPKeepalive = putWord8 _BGPKeepalive
 
-    put (BGPOpen myAutonomousSystem holdTime bgpID caps) = do putWord8 _BGPOpen
-                                                              putWord8 _BGPVersion
-                                                              putWord16be myAutonomousSystem
-                                                              putWord16be holdTime
-                                                              putWord32le $ toHostAddress bgpID
-                                                              let optionalParameters = buildOptionalParameters caps
-                                                              putWord8 $ fromIntegral $ B.length optionalParameters
-                                                              putByteString optionalParameters
-
-    put (BGPUpdate withdrawnRoutes pathAttributes nlri ) = do
-                                                               putWord8 _BGPUpdate
-                                                               putWord16be withdrawnRoutesLength
-                                                               putLazyByteString withdrawnRoutesBS
-                                                               putWord16be pathAttributesLength
-                                                               putByteString pathAttributes
-                                                               putLazyByteString nlriBS
-                                                               where
-                                                                   withdrawnRoutesBS = encode withdrawnRoutes
-                                                                   --pathAttributesBS = encode pathAttributes
-                                                                   nlriBS = encode nlri
-                                                                   withdrawnRoutesLength = fromIntegral $ L.length withdrawnRoutesBS
-                                                                   pathAttributesLength = fromIntegral $ B.length pathAttributes
-
-    put (BGPNotify code subCode errData) = do putWord8 _BGPNotify
-                                              putWord8 $ encode8 code
-                                              putWord8 subCode
-                                              putLazyByteString errData
-
-    put BGPKeepalive                                = putWord8 _BGPKeepalive
-
-    --get = undefined
-
-    get = label "BGPMessage" $ do
-             msgType <- getWord8
-             if | _BGPOpen == msgType -> do
-                                           msgVer  <- getWord8
-                                           unless (msgVer == _BGPVersion) (fail "Bad version(Open)")
-                                           myAutonomousSystem <- getWord16be
-                                           holdTime <- getWord16be
-                                           bgpID <- getWord32le
-                                           optionalParametersLength <- getWord8
-                                           optionalParameters <- getRemainingLazyByteString
-                                           unless (optionalParametersLength == fromIntegral (L.length optionalParameters))
-                                                  (fail "optional parameter length wrong (Open)")
-                                           return $ BGPOpen myAutonomousSystem holdTime (fromHostAddress bgpID)  ( parseOptionalParameters optionalParameters )
-                | _BGPUpdate == msgType -> do
-                                           withdrawnRoutesLength <- getWord16be
-                                           withdrawnRoutes <- getLazyByteString $ fromIntegral withdrawnRoutesLength
-                                           pathAttributesLength <- getWord16be
-                                           pathAttributes <- getByteString $ fromIntegral pathAttributesLength
-                                           nlri <- getRemainingLazyByteString
-                                           return $ BGPUpdate (decode withdrawnRoutes) pathAttributes (decode nlri)
-                | _BGPNotify == msgType -> do
-                                           errorCode <- getWord8
-                                           errorSubcode <- getWord8
-                                           errorData <- getRemainingLazyByteString
-                                           -- return $ BGPNotify (decode8 errorCode) errorSubcode (decode errorData)
-                                           -- decoding the error data depends on the type of notification!
-                                           -- e.g. Bad Peer AS contains just the unwanted (?) peer AS number
-                                           return $ BGPNotify (decode8 errorCode) errorSubcode errorData
-                | _BGPKeepalive == msgType -> return BGPKeepalive
-                | otherwise -> fail "Bad type code"
+  get = label "BGPMessage" $ do
+    msgType <- getWord8
+    if  | _BGPOpen == msgType -> do
+          msgVer <- getWord8
+          unless (msgVer == _BGPVersion) (fail "Bad version(Open)")
+          myAutonomousSystem <- getWord16be
+          holdTime <- getWord16be
+          bgpID <- getWord32le
+          optionalParametersLength <- getWord8
+          optionalParameters <- getRemainingLazyByteString
+          unless
+            (optionalParametersLength == fromIntegral (L.length optionalParameters))
+            (fail "optional parameter length wrong (Open)")
+          return $ BGPOpen myAutonomousSystem holdTime (fromHostAddress bgpID) (parseOptionalParameters optionalParameters)
+        | _BGPUpdate == msgType -> do
+          withdrawnRoutesLength <- getWord16be
+          withdrawnRoutes <- getLazyByteString $ fromIntegral withdrawnRoutesLength
+          pathAttributesLength <- getWord16be
+          pathAttributes <- getByteString $ fromIntegral pathAttributesLength
+          nlri <- getRemainingLazyByteString
+          return $ BGPUpdate (decode withdrawnRoutes) pathAttributes (decode nlri)
+        | _BGPNotify == msgType -> do
+          errorCode <- getWord8
+          errorSubcode <- getWord8
+          errorData <- getRemainingLazyByteString
+          -- return $ BGPNotify (decode8 errorCode) errorSubcode (decode errorData)
+          -- decoding the error data depends on the type of notification!
+          -- e.g. Bad Peer AS contains just the unwanted (?) peer AS number
+          return $ BGPNotify (decode8 errorCode) errorSubcode errorData
+        | _BGPKeepalive == msgType -> return BGPKeepalive
+        | otherwise -> fail "Bad type code"
