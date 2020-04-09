@@ -6,13 +6,12 @@ import Data.IP
 import Control.Concurrent
 import Control.Exception
 import Data.Maybe(fromJust,isJust,fromMaybe)
-import Data.Either(either)
 import qualified Data.Map.Strict as Data.Map
 import Control.Applicative ((<|>))
 import Control.Monad(void)
 
 import BGPlib.BGPlib
-
+import BGPlib.BGPHandle
 import BGPRib.BGPRib(ParsedUpdate(NullUpdate),parseUpdate,PeerData(..),myBGPid,myAS)
 -- TODO = move Update.hs, and ppssibly some or all of BGPData, from bgprib to bgplib, so that bgprib does not need to be imported here.....
 --        the needed thing in BGPData is PeerData, but what else should move to is less obvious
@@ -26,7 +25,6 @@ import Router.Collision
 import Router.Global
 import Router.Config
 import Router.Log
-import Router.BGPHandle
 
 data FSMState = St { handle :: BGPHandle
                    , peerName :: SockAddr

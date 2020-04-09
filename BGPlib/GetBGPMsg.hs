@@ -12,74 +12,55 @@ import Data.Bits
 import qualified Data.ByteString as B
 import Data.ByteString.Builder
 import qualified Data.ByteString.Lazy as L
--- import Data.Monoid ((<>))
-import qualified Network.Socket as NS
-import Network.Socket.ByteString.Lazy as NSB
 import qualified System.IO as SI
 import System.IO.Error (catchIOError)
 import System.Timeout (timeout)
 
-type NSSocket = NS.Socket
-
-type SIHandle = SI.Handle
-
-instance Handle SIHandle where
-  hPut = L.hPut
-  hGet = L.hGet
-
-hGetRawMsg :: SIHandle -> Int -> IO BGPByteString
+hGetRawMsg :: SI.Handle -> Int -> IO BGPByteString
 hGetRawMsg = getRawMsg
-
-instance Handle NSSocket where
-  hPut h s = void (NSB.send h s)
-  hGet h n = NSB.recv h (fromIntegral n) -- Network.Socket uses Int64 not Int !
 
 lBGPMarker = L.replicate 16 0xff
 
 _BGPMarker = B.replicate 16 0xff
 
-class Handle handle where
-  hPut :: handle -> L.ByteString -> IO ()
-  hGet :: handle -> Int -> IO L.ByteString
+getRawMsg :: SI.Handle -> Int -> IO BGPByteString
+getRawMsg h t = getNextTimeout t h
 
-  getRawMsg :: handle -> Int -> IO BGPByteString
-  getRawMsg h t = getNextTimeout t h
+getNextTimeout :: Int -> SI.Handle -> IO BGPByteString
+getNextTimeout t bsock =
+  let t' = t * 1000000
+    in do
+        resMaybe <- timeout t' (getNext bsock)
+        maybe
+          (return (BGPByteString $ Left Timeout))
+          return
+          resMaybe
 
-  getNextTimeout :: Int -> handle -> IO BGPByteString
-  getNextTimeout t bsock =
-    let t' = t * 1000000
-     in do
-          resMaybe <- timeout t' (getNext bsock)
-          maybe
-            (return (BGPByteString $ Left Timeout))
-            return
-            resMaybe
+getNext :: SI.Handle -> IO BGPByteString
+getNext h =
+  catchIOError
+    (getNext' h)
+    (\e -> return (BGPByteString $ Left (Error (show e))))
 
-  getNext :: handle -> IO BGPByteString
-  getNext h =
-    catchIOError
-      (getNext' h)
-      (\e -> return (BGPByteString $ Left (Error (show e))))
-
-  getNext' :: handle -> IO BGPByteString
-  getNext' h = do
-    header <- hGet h 18
-    if L.length header < 18
-      then return $ BGPByteString $ Left EndOfStream
-      else do
-        let (m, l) = L.splitAt 16 header
-            l' = fromIntegral $ getWord16 l
-        if m /= lBGPMarker
-          then return $ BGPByteString $ Left $ Error "Bad marker in GetBGPByteString"
-          else
-            if l' < 19 || l' > 4096
-              then return $ BGPByteString $ Left $ Error "Bad length in GetBGPByteString"
-              else do
-                let bl = l' - 18
-                body <- hGet h bl
-                if L.length body /= fromIntegral bl
-                  then return $ BGPByteString $ Left EndOfStream
-                  else return $ BGPByteString $ Right body
+getNext' :: SI.Handle -> IO BGPByteString
+getNext' h = do
+  header <- L.hGet h 18
+  if L.length header < 18
+    then return $ BGPByteString $ Left EndOfStream
+    else do
+      let (m, l) = L.splitAt 16 header
+          l' = fromIntegral $ getWord16 l
+      if m /= lBGPMarker
+        then return $ BGPByteString $ Left $ Error "Bad marker in GetBGPByteString"
+        else
+          if l' < 19 || l' > 4096
+            then return $ BGPByteString $ Left $ Error "Bad length in GetBGPByteString"
+            else do
+              let bl = l' - 18
+              body <- L.hGet h bl
+              if L.length body /= fromIntegral bl
+                then return $ BGPByteString $ Left EndOfStream
+                else return $ BGPByteString $ Right body
     where
       getWord16 :: L.ByteString -> Word16
       getWord16 lbs = getWord16' $ map fromIntegral (L.unpack lbs)
@@ -121,14 +102,8 @@ instance {-# OVERLAPPING #-} Binary [BGPByteString] where
 wireFormat :: L.ByteString -> L.ByteString
 wireFormat bs = toLazyByteString $ lazyByteString lBGPMarker <> word16BE (fromIntegral $ 18 + L.length bs) <> lazyByteString bs
 
-sndRawMessage :: NSSocket -> L.ByteString -> IO ()
-sndRawMessage h bgpMsg = void $ send h $ wireFormat bgpMsg
-
-sndRawMessages :: NSSocket -> [L.ByteString] -> IO ()
-sndRawMessages h bgpMsgs = void $ send h $ L.concat $ map wireFormat bgpMsgs
-
-hSndRawMessage :: SIHandle -> L.ByteString -> IO ()
+hSndRawMessage :: SI.Handle -> L.ByteString -> IO ()
 hSndRawMessage h bgpMsg = void $ L.hPut h $ wireFormat bgpMsg
 
-hSndRawMessages :: SIHandle -> [L.ByteString] -> IO ()
+hSndRawMessages :: SI.Handle -> [L.ByteString] -> IO ()
 hSndRawMessages h bgpMsgs = void $ L.hPut h $ L.concat $ map wireFormat bgpMsgs

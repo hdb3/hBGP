@@ -1,4 +1,4 @@
-module Router.BGPHandle (BGPIOException (..), BGPHandle, getBGPHandle, bgpSnd, bgpRcv, bgpSndAll, bgpClose) where
+module BGPlib.BGPHandle (BGPIOException (..), BGPHandle, getBGPHandle, bgpSnd, bgpRcv, bgpSndAll, bgpClose) where
 
 import BGPlib.AttoBGP
 import BGPlib.BGPMessage (BGPMessage (..))
