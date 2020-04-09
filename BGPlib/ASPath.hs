@@ -13,7 +13,7 @@ import Data.Attoparsec.ByteString -- from package attoparsec
 import Data.Attoparsec.Binary -- from package attoparsec-binary
 
 import Data.Hashable
-
+import Data.ByteString.Builder
 import BGPlib.Codes
 import BGPlib.LibCommon
 
@@ -28,6 +28,9 @@ import BGPlib.LibCommon
 -- the type is 1 or two which codes either a Set or Sequence
 -- note: 4 byte AS numbers may be used inthe AS PATH as well as in the AS4_PATH
 -- therefore decoding AS_PATH requires to know whether 2 or 4 byte AS numbers are in use.
+
+buildASPath :: ASPath -> (Word16,Builder)
+buildASPath = error "undefined"
 
 instance {-# OVERLAPPING #-}(ASNumber asn) =>  Binary [ASSegment asn] where
     put = putn

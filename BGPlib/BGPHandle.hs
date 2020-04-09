@@ -1,4 +1,4 @@
-module BGPlib.BGPHandle (BGPIOException (..), BGPHandle, getBGPHandle, bgpSnd, bgpRcv, bgpSndAll, bgpClose) where
+module BGPlib.BGPHandle (BGPIOException (..), BGPHandle, getBGPHandle, bgpSnd, bgpRcv, bgpSndAll, bgpClose, wireFormat, byteStreamToBGPMessages) where
 
 import BGPlib.AttoBGP
 import BGPlib.BGPMessage (BGPMessage (..))
@@ -23,6 +23,9 @@ newtype BGPIOException = BGPIOException String deriving (Show)
 instance Exception BGPIOException
 
 data BGPHandle = BGPHandle Socket (IORef B.ByteString)
+
+byteStreamToBGPMessages :: B.ByteString -> [BGPMessage] 
+byteStreamToBGPMessages bs = let Right msgs = parseOnly bgpParser bs in msgs
 
 getBGPHandle :: Socket -> IO BGPHandle
 getBGPHandle s = do

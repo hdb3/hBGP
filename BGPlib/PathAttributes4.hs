@@ -1,18 +1,18 @@
 {-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE FlexibleInstances #-}
+{- LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DeriveGeneric #-}
+{- LANGUAGE DeriveGeneric #-}
 module BGPlib.PathAttributes4 (module BGPlib.Codes
                               , module BGPlib.PathAttributes4
                               , module BGPlib.ASPath4) where
 import Data.Binary(Binary(..),encode,decode)
-import Data.Binary.Get
-import Data.Binary.Put
+-- import Data.Binary.Get
+-- import Data.Binary.Put
 import Data.Word
 import Data.List(find, deleteBy, sortOn)
 import Data.IP
 import Data.Hashable
-import GHC.Generics(Generic)
+-- import GHC.Generics(Generic)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
 import Control.Monad

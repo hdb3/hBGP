@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -7,16 +5,11 @@ module BGPlib.BGPMessage where
 
 import BGPlib.Capabilities
 import BGPlib.LibCommon
--- import BGPlib.PathAttributes
 import BGPlib.Prefixes
 import BGPlib.RFC4271
--- import Control.Monad (unless)
-import Data.Binary
--- import Data.Binary.Get
--- import Data.Binary.Put
+import Data.Word
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
--- import Data.IP
 
 _BGPOpen = 1 :: Word8
 
@@ -36,7 +29,7 @@ data BGPMessage
   | BGPTimeout
   | BGPError String
   | BGPEndOfStream
-  deriving (Eq, Generic)
+  deriving (Eq)
 
 instance Show BGPMessage where
   show BGPOpen {..} = "Open {AS: " ++ show myAutonomousSystem ++ " Hold-time: " ++ show holdTime ++ " BGPID: " ++ show bgpID ++ " Caps: " ++ show caps ++ "}"

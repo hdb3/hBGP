@@ -1,23 +1,15 @@
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 
 module BGPlib.Capabilities where
 
-import BGPlib.LibCommon
 import qualified Data.Attoparsec.Binary as A
-import Data.Attoparsec.ByteString (Parser)
 import qualified Data.Attoparsec.ByteString as A
-import Data.Binary
-import Data.Binary.Put
+import Data.Word
 import Data.Bits
 import qualified Data.ByteString as B
-import Data.ByteString (ByteString)
-import Data.ByteString.Builder
 import qualified Data.ByteString.Lazy as L
+import Data.ByteString.Builder
+
 
 type CapCode = Word8
 
@@ -80,28 +72,18 @@ This should reflect the structure used for the Open variant of the (parsed) BGPM
 
 -}
 
--- graceful restart
--- see RFC 4724
---
---this is a complex capability in theory however the simple instance is very simple
--- we only implement the basic verion
---
---AS4 - 32bit ASNs
---see RFC6793
---the capability is just the local 32bit ASN
---
 data Capability
   = CapMultiprotocol Word16 Word8
   | CapGracefulRestart Bool Word16
   | CapAS4 Word32
-  | CapAddPath Word16 Word8 Word8 -- in future the encoding of Send / Receive / Both could be made symbolic / typed
+  | CapAddPath Word16 Word8 Word8
   | CapRouteRefresh
   | CapLLGR
   | CapCiscoRefresh
   | CapEnhancedRouteRefresh
   | CapExtendedLength
   | CapUnknown Word8 B.ByteString
-  deriving (Show, Eq, Read, Generic, NFData)
+  deriving (Show, Eq, Read)
 
 eq_ :: Capability -> Capability -> Bool
 eq_ (CapMultiprotocol _ _) (CapMultiprotocol _ _) = True
@@ -129,97 +111,42 @@ capCode CapEnhancedRouteRefresh = _CapCodeEnhancedRouteRefresh
 capCode CapExtendedLength = _CapCodeExtendedLength
 
 capCodes = map capCode
-
-putCap :: Capability -> Put
-putCap = put
-
-getCap :: Get Capability
-getCap = error "Binary get deprecated"
   
 capsEncode :: [Capability] -> L.ByteString
-capsEncode = encode
+capsEncode = toLazyByteString . snd . parameterBuilder
 
-instance {-# OVERLAPPING #-} Binary [Capability] where
-  put = putn
-  get = error "Binary get deprecated"
-  
-instance Binary Capability where
-  put CapRouteRefresh = do
-    putWord8 _CapCodeRouteRefresh
-    putWord8 0
-  put CapCiscoRefresh = do
-    putWord8 _CapCodeCiscoRefresh
-    putWord8 0
-  put CapEnhancedRouteRefresh = do
-    putWord8 _CapCodeEnhancedRouteRefresh
-    putWord8 0
-  put (CapAS4 as4) = do
-    putWord8 _CapCodeAS4
-    putWord8 4
-    putWord32be as4
-  put (CapAddPath afi safi bits) = do
-    putWord8 _CapCodeAddPath
-    putWord8 4
-    putWord16be afi
-    putWord8 safi
-    putWord8 bits
-  put (CapGracefulRestart rFlag restartTime) = do
-    putWord8 _CapCodeGracefulRestart
-    putWord8 2
-    putWord16be $ if rFlag then setBit restartTime 15 else restartTime
-  put (CapMultiprotocol afi safi) = do
-    putWord8 _CapCodeMultiprotocol
-    putWord8 4
-    putWord16be afi
-    putWord8 0
-    putWord8 safi
-  put CapExtendedLength = do
-    putWord8 _CapCodeExtendedLength
-    putWord8 0
-  put (CapUnknown t bs) = do
-    putWord8 t
-    putWord8 $ fromIntegral (B.length bs)
-    putByteString bs
-
-  get = error "Binary get deprecated"
-
-buildOptionalParameters :: [Capability] -> ByteString
-buildOptionalParameters capabilities
-  | not $ null capabilities =
-    let caps = L.concat $ map encode capabilities
-     in L.toStrict $ toLazyByteString $ word8 2 <> word8 (fromIntegral $ L.length caps) <> lazyByteString caps
-  | otherwise = B.empty
-
--- need to parse multiple parameter blocks to cater for case whwere each capability is sent in a  singleton parameter
---
-parseOptionalParameters' :: L.ByteString -> [Capability]
-parseOptionalParameters' bs = concatMap (decode . value) capabilityParameters
-  where
-    parameters = decode bs :: [TLV]
-    capabilityParameters = filter ((2 ==) . typeCode) parameters
-
-data TLV = TLV {typeCode :: Word8, value :: L.ByteString}
-
-instance Binary TLV where
-  put TLV {..} = putWord8 typeCode <> putWord8 (fromIntegral (L.length value)) <> putLazyByteString value
-
-  get = error "Binary get deprecated"
-  
-instance {-# OVERLAPPING #-} Binary [TLV] where
-  put = putn
-  get = error "Binary get deprecated"
-  
--- ###############################
+buildOptionalParameters :: [Capability] -> B.ByteString
+buildOptionalParameters = L.toStrict . capsEncode 
 {-
-  this is another instance of a parser which should consume a defined length fragment of a larger string,
-  with a possibility that the content is mal-structured.
-  The most general solution takes a specific parser which takes the available buffer length and returns its remaining buffer length.
-  However, where a TLV structure is given then we can separate the specifics of encoding from the surraoung scaffold.
-  An elegant solution would allow the differing requirements (fixed or variable length to be encoded in the specilaisations,
-  so that exceptions can be raised in the framework rather than the implmentation.
+  Builder: the envelope for a capability list is an 'optional parameter TLV', holding a 'capability TLV'.
+  Both TLVs are limited to 255 byte payloads, but the scope to enode multiple parameters upto the BGP message size limit is available for very long sequences.
+  Absent this need, a single nested structure is sufficient.
+  The inner TLV is built by folding over each capability.
+  A builder for each capability shoudl return the encoded length to allow the TLV to be correctly built. 
 -}
 
-parseOptionalParameters :: Word8 -> Parser [Capability]
+
+parameterBuilder ::[Capability] -> ( Word8, Builder)
+parameterBuilder caps = let (length,b) = capabilitiesBuilder caps in (length+2, word8 2 <> word8 length <> b)
+
+capabilitiesBuilder ::[Capability] -> ( Word8, Builder)
+capabilitiesBuilder = foldr acc (0,mempty) where
+  acc cap (w,b) = let (w',b') = capabilityBuilder cap in (w+w'+2, b' <> b)
+
+capabilityBuilder ::Capability -> ( Word8, Builder)
+
+capabilityBuilder CapRouteRefresh = (0, word8 _CapCodeRouteRefresh)
+capabilityBuilder CapCiscoRefresh = ( 0 , word8 _CapCodeCiscoRefresh <> word8 0)
+capabilityBuilder CapEnhancedRouteRefresh = ( 0 , word8 _CapCodeEnhancedRouteRefresh <> word8 0)
+capabilityBuilder (CapAS4 as4) = ( 4 , word8 _CapCodeAS4 <> word8 4 <> word32BE as4)
+capabilityBuilder (CapAddPath afi safi bits) = ( 4 , word8 _CapCodeAddPath <> word8 4 <> word16BE afi <> word8 safi <> word8 bits)
+capabilityBuilder (CapGracefulRestart rFlag restartTime) = ( 2 , word8 _CapCodeGracefulRestart <> word8 2 <> word16BE (if rFlag then setBit restartTime 15 else restartTime))
+capabilityBuilder (CapMultiprotocol afi safi) = ( 4 , word8 _CapCodeMultiprotocol <> word8 4 <> word16BE afi <> word8 0 <> word8 safi)
+capabilityBuilder CapExtendedLength = ( 0 , word8 _CapCodeExtendedLength <> word8 0)
+capabilityBuilder (CapUnknown t bs) = ( fromIntegral (B.length bs), word8 t <> (word8 $ fromIntegral (B.length bs)) <> byteString bs)
+
+
+parseOptionalParameters :: Word8 -> A.Parser [Capability]
 parseOptionalParameters n
   | n == 0 = return []
   | n == 1 = error "parseOptionalParameters: invalid length: 1"
@@ -238,7 +165,7 @@ parseOptionalParameters n
         px <- parseOptionalParameters (n -2 - l)
         return (p ++ px)
   where
-    parseCaps :: Word8 -> Parser [Capability]
+    parseCaps :: Word8 -> A.Parser [Capability]
     parseCaps 0 = return []
     parseCaps n
       | n == 1 = error "parseCaps: invalid length: 1"
@@ -251,7 +178,7 @@ parseOptionalParameters n
             cap <- parseCapability t l
             caps <- parseCaps (n -2 - l)
             return $ cap : caps
-    parseCapability :: Word8 -> Word8 -> Parser Capability
+    parseCapability :: Word8 -> Word8 -> A.Parser Capability
     parseCapability t l =
       if  | t == _CapCodeMultiprotocol -> do
             afi <- A.anyWord16be

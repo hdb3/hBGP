@@ -5,7 +5,6 @@
 module BGPlib.Prefixes(Prefix,chunkPrefixes,toAddrRange,mkPrefix,toPrefix,fromPrefix,fromAddrRange,lengthPrefix) where
 import Data.Binary
 import Data.Hashable
-import Data.Binary.Get
 import Data.Binary.Put
 import Data.Int
 import Data.Bits

@@ -1,5 +1,3 @@
-{-# LANGUAGE FlexibleInstances #-}
-
 module BGPlib.AttoBGP where
 
 import BGPlib.BGPMessage
@@ -9,8 +7,8 @@ import BGPlib.Prefixes
 import Control.Applicative ((<|>), Alternative, liftA2)
 import Control.Monad (unless)
 import qualified Data.Attoparsec.Binary as A
-import Data.Attoparsec.ByteString (Parser)
 import qualified Data.Attoparsec.ByteString as A
+import Data.Attoparsec.ByteString (Parser)
 import Data.Bits
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
