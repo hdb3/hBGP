@@ -12,14 +12,12 @@ import qualified Data.Attoparsec.Binary as A
 import Data.Attoparsec.ByteString (Parser)
 import qualified Data.Attoparsec.ByteString as A
 import Data.Binary
-import Data.Binary.Get
 import Data.Binary.Put
 import Data.Bits
 import qualified Data.ByteString as B
 import Data.ByteString (ByteString)
 import Data.ByteString.Builder
 import qualified Data.ByteString.Lazy as L
-import Debug.Trace
 
 type CapCode = Word8
 
@@ -136,15 +134,15 @@ putCap :: Capability -> Put
 putCap = put
 
 getCap :: Get Capability
-getCap = get
-
+getCap = error "Binary get deprecated"
+  
 capsEncode :: [Capability] -> L.ByteString
 capsEncode = encode
 
 instance {-# OVERLAPPING #-} Binary [Capability] where
   put = putn
-  get = getn
-
+  get = error "Binary get deprecated"
+  
 instance Binary Capability where
   put CapRouteRefresh = do
     putWord8 _CapCodeRouteRefresh
@@ -183,30 +181,7 @@ instance Binary Capability where
     putWord8 $ fromIntegral (B.length bs)
     putByteString bs
 
-  get = label "Capability" $ do
-    t <- getWord8
-    l <- getWord8
-    -- this is not very fail safe, e.g. length should allow passing over unknown codes
-    -- and also validating known ones for their length (which could be variable in more than one case!!!!
-    if  | t == _CapCodeMultiprotocol -> do
-          afi <- getWord16be
-          _ <- getWord8
-          CapMultiprotocol afi <$> getWord8
-        | t == _CapCodeGracefulRestart -> do
-          word0 <- getWord16be
-          let rFlag = testBit word0 15
-              restartTime = word0 .&. 0x0fff
-          return (CapGracefulRestart rFlag restartTime)
-        | t == _CapCodeAS4 -> CapAS4 <$> getWord32be
-        | t == _CapCodeAddPath -> do
-          afi <- getWord16be
-          safi <- getWord8
-          CapAddPath afi safi <$> getWord8
-        | t == _CapCodeRouteRefresh -> return CapRouteRefresh
-        | t == _CapCodeEnhancedRouteRefresh -> return CapEnhancedRouteRefresh
-        | t == _CapCodeCiscoRefresh -> return CapCiscoRefresh
-        | t == _CapCodeLLGR -> if l == 0 then return CapLLGR else error "LLGR with non null payload not handled"
-        | otherwise -> CapUnknown t <$> getByteString (fromIntegral l)
+  get = error "Binary get deprecated"
 
 buildOptionalParameters :: [Capability] -> ByteString
 buildOptionalParameters capabilities
@@ -228,16 +203,12 @@ data TLV = TLV {typeCode :: Word8, value :: L.ByteString}
 instance Binary TLV where
   put TLV {..} = putWord8 typeCode <> putWord8 (fromIntegral (L.length value)) <> putLazyByteString value
 
-  get = label "TLV" $ do
-    typeCode <- get
-    n <- get :: Get Word8
-    bs <- getLazyByteString (fromIntegral n)
-    return $ TLV typeCode bs
-
+  get = error "Binary get deprecated"
+  
 instance {-# OVERLAPPING #-} Binary [TLV] where
   put = putn
-  get = getn
-
+  get = error "Binary get deprecated"
+  
 -- ###############################
 {-
   this is another instance of a parser which should consume a defined length fragment of a larger string,

@@ -2,7 +2,6 @@
 
 module BGPlib.AttoBGP where
 
--- import Debug.Trace
 import BGPlib.BGPMessage
 import BGPlib.Capabilities (parseOptionalParameters)
 import BGPlib.LibCommon (decode8, fromHostAddress)
@@ -74,11 +73,8 @@ bgpParser1 = do
               holdTime <- A.anyWord16be
               bgpID <- A.anyWord32le
               optionalParametersLength <- A.anyWord8
-              capabilities <- parseOptionalParameters optionalParametersLength -- don't care how long buffer left as this is the end of the message anwyay
+              capabilities <- parseOptionalParameters optionalParametersLength
               return $ BGPOpen myAutonomousSystem holdTime (fromHostAddress bgpID) capabilities
-            -- optionalParameters <- L.fromStrict <$> A.take optionalParametersLength
-            -- -- TODO implement a native parser for optional parameters
-            -- return $ BGPOpen myAutonomousSystem holdTime (fromHostAddress bgpID) (parseOptionalParameters optionalParameters)
             2 -> do
               withdrawnLength <- fromIntegral <$> A.anyWord16be
               withdrawn <- parsePrefixes withdrawnLength
