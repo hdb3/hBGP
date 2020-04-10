@@ -36,11 +36,11 @@ parseUpdate BGPUpdate{..} = ParsedUpdate { puPathAttributes = decodePathAttribut
 
 originateWithdraw prefixes = ParsedUpdate [] [] prefixes 0
 
-originateUpdate :: Word8 -> [ASSegment Word32] -> IPv4 -> [Prefix] -> ParsedUpdate
+originateUpdate :: Word8 -> [ASSegment] -> IPv4 -> [Prefix] -> ParsedUpdate
 originateUpdate origin path nextHop prefixes =
      head $ makeUpdate prefixes
                        []
-                       [PathAttributeOrigin origin, PathAttributeASPath (ASPath4 path), PathAttributeNextHop nextHop]
+                       [PathAttributeOrigin origin, PathAttributeASPath path, PathAttributeNextHop nextHop]
 
 makeUpdateSimple :: [PathAttribute] -> [Prefix] -> [Prefix] -> ParsedUpdate
 makeUpdateSimple p n w = head $ makeUpdate n w p

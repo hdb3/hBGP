@@ -25,7 +25,7 @@ xBGPUpdate isExternal aspath prefixes nextHop varpar = makeUpdate
                     ( map fromAddrRange prefixes )
                     []
                     [ PathAttributeOrigin _BGP_ORIGIN_IGP
-                    , PathAttributeASPath $ ASPath4 [ASSequence aspath]
+                    , PathAttributeASPath [ASSequence aspath]
                     , PathAttributeNextHop nextHop
                     , if isExternal then PathAttributeMultiExitDisc varpar else PathAttributeLocalPref varpar
                     ]
