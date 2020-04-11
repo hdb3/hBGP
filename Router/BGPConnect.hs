@@ -40,9 +40,9 @@ clientConnect port peer local = do
         (NS.connect sock (NS.SockAddrInet port (toHostAddress peer)))
         ( \e -> do
             Errno errno <- getErrno
-            if  | elem errno [2, 103] -> do
-                  putStrLn $ ioe_description e ++ "(" ++ show errno ++ ") retrying in 3 seconds"
-                  threadDelay 3000000 -- 3 seconds
+            if  | elem errno [2, 103,115] -> do
+                  putStrLn $ ioe_description e ++ "(" ++ show errno ++ ") retrying in 10 seconds"
+                  threadDelay 10000000 -- 10 seconds
                   connect' sock port peer
                 | otherwise -> unknownSocketErrorHandler e errno
         )
@@ -94,7 +94,6 @@ unknownSocketErrorHandler e errno =
   die $
     unlines
       [ "*** UNKNOWN exception, please record this",
-        "error " ++ ioeGetErrorString e,
         "errno " ++ show errno,
         "description " ++ ioe_description e
       ]
