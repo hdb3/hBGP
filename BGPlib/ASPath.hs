@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE Strict #-}
 
 module BGPlib.ASPath where
 
@@ -7,21 +8,13 @@ module BGPlib.ASPath where
 
 import BGPlib.Codes
 import BGPlib.LibCommon
-import Data.Binary
-import Data.Binary.Get
+import Control.Monad (when)
+import qualified Data.Attoparsec.Binary as A
+import qualified Data.Attoparsec.ByteString as A
 import Data.ByteString.Builder
 import Data.Hashable
 import Data.List (foldl')
-
--- binary format for AS path is a sequence of AS path segments
--- AS path segments are TLVs, however the 'length' is not a byte count
--- it is the number of included AS numbers
--- the type is 1 or two which codes either a Set or Sequence
--- note: 4 byte AS numbers may be used inthe AS PATH as well as in the AS4_PATH
--- therefore decoding AS_PATH requires to know whether 2 or 4 byte AS numbers are in use.
-
-buildASPath :: ASPath -> (Word16, Builder)
-buildASPath = error "undefined"
+import Data.Word
 
 type ASNumber = Word32
 
@@ -40,6 +33,7 @@ isSingletonASSet :: ASSegment -> Bool
 isSingletonASSet (ASSet [_]) = True
 isSingletonASSet _ = False
 
+{-# INLINE asPrePend #-}
 asPrePend :: ASNumber -> ASPath -> ASPath
 asPrePend asn [] = [ASSequence [asn]]
 asPrePend asn (ASSet sets : segs) = ASSequence [asn] : ASSet sets : segs
@@ -47,35 +41,47 @@ asPrePend asn (ASSequence seqs : segs)
   | length seqs < 255 = ASSequence (asn : seqs) : segs
   | otherwise = ASSequence [asn] : ASSequence seqs : segs
 
+{-# INLINE asPathLength #-}
 asPathLength :: ASPath -> Int
 asPathLength = foldl' addSegLength 0
   where
     addSegLength acc (ASSet _) = acc + 1
     addSegLength acc (ASSequence ax) = acc + length ax
 
-putASSegmentElement :: ASSegmentElementTypeCode -> [Word32] -> Put
-putASSegmentElement code asns = do
-  putWord8 (encode8 code)
-  putWord8 (fromIntegral $ length asns)
-  putn asns
+{-# INLINE parseASPath #-}
+parseASPath :: Word16 -> A.Parser ASPath
+parseASPath 0 = return []
+parseASPath n
+  | n < 2 = error $ "parseASPath: invalid length: " ++ show n
+  | otherwise = do
+    t <- A.anyWord8
+    l <- A.anyWord8
+    let calculatedByteCount = fromIntegral $ 2 + 4 * l
+    when (n < calculatedByteCount) (error $ "parseASPath: invalid length n=" ++ show n ++ " l=" ++ show l ++ " t=" ++ show t)
+    segment <-
+      if  | t == enumASSequence -> ASSequence <$> A.count (fromIntegral l) A.anyWord32be
+          | t == enumASSet -> ASSet <$> A.count (fromIntegral l) A.anyWord32be
+          | otherwise -> error $ "parseASPath: invalid type = " ++ show t
+    segments <- parseASPath (n - calculatedByteCount)
+    return $ segment : segments
 
-instance Binary ASSegment where
-  put (ASSet asns) = putASSegmentElement EnumASSet asns
-  put (ASSequence asns) = putASSegmentElement EnumASSequence asns
+-- binary format for AS path is a sequence of AS path segments
+-- AS path segments are TLVs, however the 'length' is not a byte count
+-- it is the number of included AS numbers
+-- the type is 1 or two which codes either a Set or Sequence
+-- note: 4 byte AS numbers may be used inthe AS PATH as well as in the AS4_PATH
+-- therefore decoding AS_PATH requires to know whether 2 or 4 byte AS numbers are in use.
 
-  get = label "ASSegment" $ do
-    code' <- getWord8
-    let code = decode8 code'
-    len <- getWord8
-    asns <- getNasns len
-    if  | code == EnumASSet -> return $ ASSet asns
-        | code == EnumASSequence -> return $ ASSequence asns
-        | otherwise -> fail "invalid code in ASpath"
-    where
-      getNasns :: (Binary asn) => Word8 -> Get [asn]
-      getNasns n
-        | n == 0 = return []
-        | otherwise = do
-          asn <- get
-          asns <- getNasns (n -1)
-          return (asn : asns)
+-- this function only encodes the path and returns the bytelength of the generated Builder
+-- this length is easily calculated as sums over the number of segments and number of ASNs:
+-- each segment envelope contributes 2 bytes - each ASN contributes 4 bytes
+{-# INLINE buildASPath #-}
+buildASPath :: ASPath -> (Word16, Builder)
+buildASPath segments = (fromIntegral $ builderLength segments, foldMap segBuilder segments)
+  where
+    builderLength [] = 0
+    builderLength (seg : segx) = 2 * (1 + segLength seg) + builderLength segx
+    segLength (ASSequence asnx) = length asnx
+    segLength (ASSet asnx) = length asnx
+    segBuilder (ASSequence asnx) = word8 1 <> word8 (fromIntegral $ length asnx) <> foldMap word32BE asnx
+    segBuilder (ASSet asnx) = word8 2 <> word8 (fromIntegral $ length asnx) <> foldMap word32BE asnx

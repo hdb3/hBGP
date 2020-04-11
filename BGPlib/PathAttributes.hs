@@ -1,7 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE OverloadedStrings #-}
 
 module BGPlib.PathAttributes
   ( module BGPlib.Codes,
@@ -13,33 +12,27 @@ where
 import BGPlib.ASPath
 import BGPlib.Codes
 import BGPlib.LibCommon
-import Control.Monad
-import Data.Binary (Binary (..), decode, encode)
-import Data.Binary.Get
-import Data.Binary.Put
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as L
 import Data.Hashable
-import Data.IP
 import Data.List (deleteBy, find, sortOn)
 import Data.Word
 
 -- for some this function may be all that is ever wanted....
-decodeAttributes :: L.ByteString -> [PathAttribute]
-decodeAttributes = runGet (get :: Get [PathAttribute])
+-- decodeAttributes :: L.ByteString -> [PathAttribute]
+-- decodeAttributes = runGet (get :: Get [PathAttribute])
 
-decodePathAttributes :: B.ByteString -> [PathAttribute]
-decodePathAttributes = decodeAttributes . L.fromStrict
+-- decodePathAttributes :: B.ByteString -> [PathAttribute]
+-- decodePathAttributes = decodeAttributes . L.fromStrict
 
-encodePathAttributes :: [PathAttribute] -> B.ByteString
-encodePathAttributes = L.toStrict . encode
+-- encodePathAttributes :: [PathAttribute] -> B.ByteString
+-- encodePathAttributes = L.toStrict . encode
 
 data ExtendedCommunities = ExtendedCommunities deriving (Show, Eq)
 
 type LargeCommunity = (Word32, Word32, Word32)
 
 getPathAttribute :: PathAttributeTypeCode -> [PathAttribute] -> Maybe PathAttribute
-getPathAttribute code pas = find ((code ==) . identify) pas
+getPathAttribute code = find ((code ==) . identify)
 
 deletePathAttributeType :: PathAttributeTypeCode -> [PathAttribute] -> [PathAttribute]
 deletePathAttributeType t = filter ((t /=) . identify)
@@ -69,14 +62,13 @@ updatePathAttribute t f = map f'
       | otherwise = a
 
 data PathAttribute
-  = PathAttributeOrigin Word8 -- toDo = make the parameter an enum
+  = PathAttributeOrigin Word8
   | PathAttributeASPath ASPath
   | PathAttributeNextHop IPv4
   | PathAttributeMultiExitDisc Word32
   | PathAttributeLocalPref Word32
-  | PathAttributeAtomicAggregate -- a null attribute
-  | PathAttributeAggregator (Word32, IPv4) -- the first parameter is an AS number - in AS4 world is 4 bytes not two.....
-      -- so the parser checks the length field and always returns 32 bits even after reading just 16
+  | PathAttributeAtomicAggregate
+  | PathAttributeAggregator (Word32, IPv4)
   | PathAttributeCommunities [Word32]
   | PathAttributeMPREachNLRI B.ByteString
   | PathAttributeMPUnreachNLRI B.ByteString
@@ -93,183 +85,6 @@ data PathAttribute
 instance Hashable PathAttribute
 
 instance Hashable IPv4
-
--- binary format for attributes is 1 byte flags, 1 byte type code, 1 or 2 byte length value depending on a flag bit, then payload
-
-putAttributeNull :: PathAttributeTypeCode -> Put
-putAttributeNull code = do
-  putWord8 (flagsOf code)
-  putWord8 (encode8 code)
-  putWord8 0 -- length of payload
-
-putAttributeWord8 :: PathAttributeTypeCode -> Word8 -> Put
-putAttributeWord8 code v = do
-  putWord8 (flagsOf code)
-  putWord8 (encode8 code)
-  putWord8 1 -- length of payload
-  putWord8 v
-
-putAttributeWord32 :: PathAttributeTypeCode -> Word32 -> Put
-putAttributeWord32 code v = do
-  putWord8 (flagsOf code)
-  putWord8 (encode8 code)
-  putWord8 4 -- length of payload
-  putWord32be v
-
-putAttributeWords32 :: PathAttributeTypeCode -> [Word32] -> Put
-putAttributeWords32 code ws | 63 > length ws = do
-  putWord8 (flagsOf code)
-  putWord8 (encode8 code)
-  putWord8 $ fromIntegral $ 4 * length ws -- length of payload
-  put ws
-
-putAttributeWord64 :: PathAttributeTypeCode -> Word64 -> Put
-putAttributeWord64 code v = do
-  putWord8 (flagsOf code)
-  putWord8 (encode8 code)
-  putWord8 8 -- length of payload
-  putWord64be v
-
-putAttributeAggregator :: Word32 -> Word32 -> Put
-putAttributeAggregator as bgpid = do
-  putWord8 (flagsOf TypeCodePathAttributeAggregator)
-  putWord8 (encode8 TypeCodePathAttributeAggregator)
-  putWord8 8 -- length of payload
-  putWord32be as
-  putWord32be bgpid
-
--- use for attributes upto permitted maximum of 65535 bytes in length
-putAttributeByteString :: PathAttributeTypeCode -> L.ByteString -> Put
-putAttributeByteString code b = do
-  putWord8 (setExtended $ flagsOf code)
-  putWord8 (encode8 code)
-  putWord16be (fromIntegral $ L.length b) -- length of payload
-  putLazyByteString b
-
--- use for attributes known to be less than 256 bytes in length
-putShortAttributeByteString :: PathAttributeTypeCode -> L.ByteString -> Put
-putShortAttributeByteString code b = do
-  putWord8 (flagsOf code)
-  putWord8 (encode8 code)
-  putWord8 (fromIntegral $ L.length b) -- length of payload
-  putLazyByteString b
-
--- use for attributes not known to be less than 256 bytes in length
-putFlexAttributeByteString :: PathAttributeTypeCode -> L.ByteString -> Put
-putFlexAttributeByteString code b
-  | L.length b > 255 = putAttributeByteString code b
-  | otherwise = putShortAttributeByteString code b
-
-instance Binary PathAttribute where
-  put (PathAttributeOrigin a) = putAttributeWord8 TypeCodePathAttributeOrigin a
-  put (PathAttributeNextHop a) = putAttributeWord32 TypeCodePathAttributeNextHop (byteSwap32 $ toHostAddress a)
-  put (PathAttributeMultiExitDisc a) = putAttributeWord32 TypeCodePathAttributeMultiExitDisc a
-  put (PathAttributeLocalPref a) = putAttributeWord32 TypeCodePathAttributeLocalPref a
-  put (PathAttributeASPath a) = putAttributeByteString TypeCodePathAttributeASPath (encode a)
-  put (PathAttributeAtomicAggregate) = putAttributeNull TypeCodePathAttributeAtomicAggregate
-  put (PathAttributeAggregator (as, bgpid)) = putAttributeAggregator as (toHostAddress bgpid)
-  put (PathAttributeCommunities a) = putAttributeByteString TypeCodePathAttributeCommunities (encode a)
-  put (PathAttributeExtendedCommunities a) = putAttributeByteString TypeCodePathAttributeExtendedCommunities (encode a)
-  put (PathAttributeAS4Path a) = putAttributeByteString TypeCodePathAttributeAS4Path (encode a)
-  put (PathAttributeLargeCommunity a) = putAttributeByteString TypeCodePathAttributeLargeCommunity (encode a)
-  put (PathAttributeAS4Aggregator a) = putAttributeByteString TypeCodePathAttributeAS4Aggregator (encode a)
-  put (PathAttributeASPathlimit a) = putAttributeByteString TypeCodePathAttributeASPathlimit (encode a)
-  put (PathAttributeAttrSet a) = putAttributeByteString TypeCodePathAttributeAttrSet (encode a)
-  put x = error $ "Unexpected type code: " ++ show x
-
-  get = label "PathAttribute" $ do
-    flags <- getWord8
-    code' <- getWord8
-    let code = decode8 code'
-    len <-
-      if extendedBitTest flags
-        then do
-          l <- getWord16be
-          return (fromIntegral l :: Int)
-        else do
-          l <- getWord8
-          return (fromIntegral l :: Int)
-    unless (flagCheck flags code) (fail $ "Bad Flags - flags=" ++ show flags ++ " code=" ++ show code' ++ " (" ++ show code ++ ")")
-    if  | TypeCodePathAttributeOrigin == code -> do
-          unless (len == 1) (fail "Bad Length")
-          v <- getWord8
-          unless (v < 3) (fail "Bad Origin Code")
-          return $ PathAttributeOrigin v
-        | TypeCodePathAttributeASPath == code -> do
-          bs <- getLazyByteString (fromIntegral len)
-          return $ PathAttributeASPath (decode bs)
-        | TypeCodePathAttributeNextHop == code ->
-          PathAttributeNextHop . fromHostAddress <$> getWord32le
-        | TypeCodePathAttributeMultiExitDisc == code ->
-          PathAttributeMultiExitDisc <$> getWord32be
-        | TypeCodePathAttributeLocalPref == code ->
-          PathAttributeLocalPref <$> getWord32be
-        | TypeCodePathAttributeAtomicAggregate == code -> return PathAttributeAtomicAggregate
-        | TypeCodePathAttributeAggregator == code -> do
-          as <-
-            if len == 6
-              then fromIntegral <$> getWord16be
-              else
-                if len == 8
-                  then getWord32be
-                  else fail $ "Bad length in PathAttributeAggregator: " ++ show len
-          bgpid <- getWord32le
-          return $ PathAttributeAggregator (as, fromHostAddress bgpid)
-        | TypeCodePathAttributeCommunities == code -> do
-          ws <- getMany (len `div` 4)
-          return $ PathAttributeCommunities ws
-        | TypeCodePathAttributeMPREachNLRI == code -> do
-          bs <- getByteString (fromIntegral len)
-          return $ PathAttributeMPREachNLRI bs
-        | TypeCodePathAttributeMPUnreachNLRI == code -> do
-          bs <- getByteString (fromIntegral len)
-          return $ PathAttributeMPUnreachNLRI bs
-        | TypeCodePathAttributeExtendedCommunities == code -> do
-          ws <- getMany (len `div` 8)
-          return $ PathAttributeExtendedCommunities ws
-        | TypeCodePathAttributeAS4Path == code -> do
-          bs <- getLazyByteString (fromIntegral len)
-          return $ PathAttributeAS4Path (decode bs)
-        | TypeCodePathAttributeAS4Aggregator == code -> do
-          v1 <- getWord32be
-          v2 <- getWord32be
-          return $ PathAttributeAS4Aggregator (v1, v2)
-        | TypeCodePathAttributeConnector == code -> do
-          bs <- getByteString (fromIntegral len)
-          return $ PathAttributeConnector bs
-        | TypeCodePathAttributeASPathlimit == code -> do
-          bs <- getByteString (fromIntegral len)
-          return $ PathAttributeASPathlimit bs
-        | TypeCodePathAttributeLargeCommunity == code -> do
-          ws <- getMany (len `div` 12)
-          return $ PathAttributeLargeCommunity ws
-        | TypeCodePathAttributeAttrSet == code -> do
-          bs <- getByteString (fromIntegral len)
-          return $ PathAttributeAttrSet bs
-        | TypeCodePathAttributeUnknown == code -> do
-          bs <- getByteString (fromIntegral len)
-          fail ("unknown type code: " ++ show code')
-          return $ PathAttributeUnknown bs
-
-instance {-# OVERLAPPING #-} Binary [PathAttribute] where
-  put = putn
-  get = getn
-
-instance {-# OVERLAPPING #-} Binary [Word64] where
-  put = putn
-  get = getn
-
-instance {-# OVERLAPPING #-} Binary [LargeCommunity] where
-  put = putn
-  get = getn
-
-getMany :: Binary a => Int -> Get [a]
-getMany n = go [] n
-  where
-    go xs 0 = return $! reverse xs
-    go xs i = do
-      x <- get
-      x `seq` go (x : xs) (i -1)
 
 identify :: PathAttribute -> PathAttributeTypeCode
 identify PathAttributeOrigin {} = TypeCodePathAttributeOrigin

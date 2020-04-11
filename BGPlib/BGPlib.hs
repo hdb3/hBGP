@@ -9,17 +9,19 @@ module BGPlib.BGPlib
     module BGPlib.LibCommon,
     module BGPlib.PathAttributes,
     module BGPlib.PathAttributeUtils,
+    module BGPlib.PathAttributeBuilder,
     module BGPlib.RFC4271,
   )
 where
-import BGPlib.PathAttributeBuilder
+
 import BGPlib.ASPath
-import BGPlib.BGPMessage
 import BGPlib.BGPHandle
+import BGPlib.BGPMessage
 import BGPlib.BGPparse
 import BGPlib.Capabilities
 import BGPlib.Codes
 import BGPlib.LibCommon
+import BGPlib.PathAttributeBuilder
 import BGPlib.PathAttributeUtils
 import BGPlib.PathAttributes
 import BGPlib.Prefixes
