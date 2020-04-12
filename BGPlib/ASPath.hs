@@ -11,7 +11,7 @@ import BGPlib.LibCommon
 import Control.Monad (when)
 import qualified Data.Attoparsec.Binary as A
 import qualified Data.Attoparsec.ByteString as A
-import Data.ByteString.Builder
+import ByteString.StrictBuilder
 import Data.Hashable
 import Data.List (foldl')
 import Data.Word

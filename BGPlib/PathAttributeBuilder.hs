@@ -13,18 +13,26 @@ import qualified Data.Attoparsec.Binary as A
 import qualified Data.Attoparsec.ByteString as A
 import Data.Attoparsec.ByteString (Parser)
 import qualified Data.ByteString as B
-import Data.ByteString.Builder
+import ByteString.StrictBuilder
 import qualified Data.ByteString.Lazy as L
 import Data.Word
+
+-- capsEncode :: [Capability] -> L.ByteString
+-- capsEncode = L.fromStrict . buildOptionalParameters
+
+-- buildOptionalParameters :: [Capability] -> B.ByteString
+-- -- buildOptionalParameters = builderBytes . capsEncode 
+-- buildOptionalParameters = builderBytes . snd . parameterBuilder
+
 
 decodePathAttributes :: B.ByteString -> [PathAttribute]
 decodePathAttributes bs = let Right msgs = A.parseOnly (attributesParser (fromIntegral $ B.length bs)) bs in msgs
 
 encodePathAttributes :: [PathAttribute] -> B.ByteString
-encodePathAttributes = L.toStrict . encodePathAttributes'
+encodePathAttributes = builderBytes .  buildPathAttributes
 
 encodePathAttributes' :: [PathAttribute] -> L.ByteString
-encodePathAttributes' = toLazyByteString . buildPathAttributes
+encodePathAttributes' = L.fromStrict . encodePathAttributes
 
 buildPathAttributes = foldMap buildPathAttribute
   where
@@ -64,8 +72,8 @@ buildPathAttributes = foldMap buildPathAttribute
     buildPathAttribute (PathAttributeAS4Path a) = buildPathCommon TypeCodePathAttributeASPath (buildASPath a)
     buildPathAttribute (PathAttributeLargeCommunity a) = buildLargeCommunities a -- PathAttributeLargeCommunity [LargeCommunity] ~ [(Word32,Word32,Word32)]
     buildPathAttribute (PathAttributeAS4Aggregator (a, b)) = buildAttributeAggregator TypeCodePathAttributeAS4Aggregator a b -- PathAttributeAS4Aggregator (Word32,Word32)
-    buildPathAttribute (PathAttributeASPathlimit a) = buildExtended TypeCodePathAttributeASPathlimit (fromIntegral $ B.length a) <> byteString a
-    buildPathAttribute (PathAttributeAttrSet a) = buildExtended TypeCodePathAttributeAttrSet (fromIntegral $ B.length a) <> byteString a
+    buildPathAttribute (PathAttributeASPathlimit a) = buildExtended TypeCodePathAttributeASPathlimit (fromIntegral $ B.length a) <> bytes a
+    buildPathAttribute (PathAttributeAttrSet a) = buildExtended TypeCodePathAttributeAttrSet (fromIntegral $ B.length a) <> bytes a
     buildPathAttribute x = error $ "Unexpected type code: " ++ show x
 
 attributesParser :: Word16 -> Parser [PathAttribute]

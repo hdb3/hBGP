@@ -8,8 +8,7 @@ import Data.Word
 import Data.Bits
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
-import Data.ByteString.Builder
-
+import ByteString.StrictBuilder
 
 type CapCode = Word8
 
@@ -113,10 +112,10 @@ capCode CapExtendedLength = _CapCodeExtendedLength
 capCodes = map capCode
   
 capsEncode :: [Capability] -> L.ByteString
-capsEncode = toLazyByteString . snd . parameterBuilder
+capsEncode = L.fromStrict . buildOptionalParameters
 
 buildOptionalParameters :: [Capability] -> B.ByteString
-buildOptionalParameters = L.toStrict . capsEncode 
+buildOptionalParameters = builderBytes . snd . parameterBuilder
 {-
   Builder: the envelope for a capability list is an 'optional parameter TLV', holding a 'capability TLV'.
   Both TLVs are limited to 255 byte payloads, but the scope to enode multiple parameters upto the BGP message size limit is available for very long sequences.
@@ -143,7 +142,7 @@ capabilityBuilder (CapAddPath afi safi bits) = ( 4 , word8 _CapCodeAddPath <> wo
 capabilityBuilder (CapGracefulRestart rFlag restartTime) = ( 2 , word8 _CapCodeGracefulRestart <> word8 2 <> word16BE (if rFlag then setBit restartTime 15 else restartTime))
 capabilityBuilder (CapMultiprotocol afi safi) = ( 4 , word8 _CapCodeMultiprotocol <> word8 4 <> word16BE afi <> word8 0 <> word8 safi)
 capabilityBuilder CapExtendedLength = ( 0 , word8 _CapCodeExtendedLength <> word8 0)
-capabilityBuilder (CapUnknown t bs) = ( fromIntegral (B.length bs), word8 t <> (word8 $ fromIntegral (B.length bs)) <> byteString bs)
+capabilityBuilder (CapUnknown t bs) = ( fromIntegral (B.length bs), word8 t <> (word8 $ fromIntegral (B.length bs)) <> bytes bs)
 
 
 parseOptionalParameters :: Word8 -> A.Parser [Capability]

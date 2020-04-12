@@ -2,16 +2,18 @@ module MRTBuilder (hPutUpdates) where
 
 import Data.Bits (unsafeShiftR)
 import qualified Data.ByteString as B
-import Data.ByteString.Builder
-import Data.ByteString.Builder.Extra (byteStringCopy)
+import ByteString.StrictBuilder
+import Data.ByteString.Builder(hPutBuilder)
 import Data.IP (toHostAddress)
-import Data.Monoid ((<>))
 import Data.Word
 import MRTlib
 import System.IO (Handle)
 
+byteStringCopy :: B.ByteString -> Builder
+byteStringCopy = bytes
+
 hPutUpdates :: Handle -> [(BGPAttributes, IP4PrefixList)] -> IO ()
-hPutUpdates handle routes = hPutBuilder handle $ updatesBuilder routes
+hPutUpdates handle routes = hPutBuilder handle $  builderChunksBuilder (updatesBuilder routes)
 
 updatesBuilder :: [(BGPAttributes, IP4PrefixList)] -> Builder
 updatesBuilder = foldr (\(a1, a2) b -> updateBuilder 4096 a1 a2 <> b) mempty
