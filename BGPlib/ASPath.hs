@@ -80,8 +80,8 @@ buildASPath :: ASPath -> (Word16, Builder)
 buildASPath segments = (fromIntegral $ builderLength segments, foldMap segBuilder segments)
   where
     builderLength [] = 0
-    builderLength (seg : segx) = 2 * (1 + segLength seg) + builderLength segx
+    builderLength (seg : segx) = 2 + 4 * (segLength seg) + builderLength segx
     segLength (ASSequence asnx) = length asnx
     segLength (ASSet asnx) = length asnx
-    segBuilder (ASSequence asnx) = word8 1 <> word8 (fromIntegral $ length asnx) <> foldMap word32BE asnx
-    segBuilder (ASSet asnx) = word8 2 <> word8 (fromIntegral $ length asnx) <> foldMap word32BE asnx
+    segBuilder (ASSequence asnx) = word8 2 <> word8 (fromIntegral $ length asnx) <> foldMap word32BE asnx
+    segBuilder (ASSet asnx) = word8 1 <> word8 (fromIntegral $ length asnx) <> foldMap word32BE asnx
