@@ -8,28 +8,20 @@ import BGPlib.Codes
 import BGPlib.LibCommon
 import BGPlib.PathAttributes
 import BGPlib.Prefixes ()
+import ByteString.StrictBuilder
 import Control.Monad (unless)
 import qualified Data.Attoparsec.Binary as A
 import qualified Data.Attoparsec.ByteString as A
 import Data.Attoparsec.ByteString (Parser)
 import qualified Data.ByteString as B
-import ByteString.StrictBuilder
 import qualified Data.ByteString.Lazy as L
 import Data.Word
-
--- capsEncode :: [Capability] -> L.ByteString
--- capsEncode = L.fromStrict . buildOptionalParameters
-
--- buildOptionalParameters :: [Capability] -> B.ByteString
--- -- buildOptionalParameters = builderBytes . capsEncode 
--- buildOptionalParameters = builderBytes . snd . parameterBuilder
-
 
 decodePathAttributes :: B.ByteString -> [PathAttribute]
 decodePathAttributes bs = let Right msgs = A.parseOnly (attributesParser (fromIntegral $ B.length bs)) bs in msgs
 
 encodePathAttributes :: [PathAttribute] -> B.ByteString
-encodePathAttributes = builderBytes .  buildPathAttributes
+encodePathAttributes = builderBytes . buildPathAttributes
 
 encodePathAttributes' :: [PathAttribute] -> L.ByteString
 encodePathAttributes' = L.fromStrict . encodePathAttributes

@@ -1,68 +1,120 @@
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE RecordWildCards #-}
-module BGPRib.Update(modifyPathAttributes,endOfRib,parseUpdate,deparseUpdate,ParsedUpdate(..),makeUpdate,makeUpdateSimple,igpUpdate,originateWithdraw,originateUpdate,myHash) where
-import qualified Data.ByteString.Lazy as L
-import qualified Data.ByteString as B
-import Data.Int
-import Data.Binary
-import Data.Either
-import FarmHash(hash64)
+
+module BGPRib.Update
+  ( ParsedUpdate (..),
+    parseUpdate,
+    iBGPUpdate,
+    bgpWithdraw,
+    BGPOutput,
+    makeUpdate,
+    deparseBGPOutputs,
+  )
+where
 
 import BGPlib.BGPlib
-import BGPRib.Common
+import BGPlib.PrefixBuilder
+import ByteString.StrictBuilder (builderBytes)
+import qualified Data.ByteString as B
+import Data.Word
+import FarmHash (hash64)
 
--- 'hash' will become 'routeId' when it is inserted into the RouteData record....
+-- TODO - consistent regular naming to distinguish the 'in' and 'out' formats
+
+{-
+  'input' message formats: -> ParsedUpdate
+-}
+
+data ParsedUpdate = ParsedUpdate {puPathAttributes :: [PathAttribute], nlri :: [Prefix], withdrawn :: [Prefix], hash :: Int} | NullUpdate -- NullUpdate is used as a proxy for Keepalive, however probably not for any good reason - TODO? remove
+
+instance Show ParsedUpdate where
+  show NullUpdate = "< - >"
+  show ParsedUpdate {..} =
+    "<"
+      ++ if null puPathAttributes
+        then "*"
+        else
+          show (getASPath puPathAttributes)
+            ++ " "
+            ++ show nlri
+            ++ "|"
+            ++ show withdrawn
+            ++ ">"
+
+modifyPathAttributes :: ([PathAttribute] -> [PathAttribute]) -> ParsedUpdate -> ParsedUpdate
+modifyPathAttributes f pu = pu {puPathAttributes = f $ puPathAttributes pu}
+
+bgpWithdraw :: [AddrRange IPv4] -> ParsedUpdate
+bgpWithdraw prefixes = makeBGPUpdate [] (map fromAddrRange prefixes) []
+
+eor :: ParsedUpdate
+eor = makeBGPUpdate [] [] []
+
+iBGPUpdate :: [Word32] -> [AddrRange IPv4] -> IPv4 -> Word32 -> ParsedUpdate
+iBGPUpdate = xBGPUpdate False
+
+eBGPUpdate :: [Word32] -> [AddrRange IPv4] -> IPv4 -> Word32 -> ParsedUpdate
+eBGPUpdate = xBGPUpdate True
+
+xBGPUpdate isExternal aspath prefixes nextHop varpar =
+  makeBGPUpdate
+    (map fromAddrRange prefixes)
+    []
+    [ PathAttributeOrigin _BGP_ORIGIN_IGP,
+      PathAttributeASPath [ASSequence aspath],
+      PathAttributeNextHop nextHop,
+      if isExternal then PathAttributeMultiExitDisc varpar else PathAttributeLocalPref varpar
+    ]
+
+-- eorBGPUpdate = makeBGPUpdate [] [] []
+-- Warning - makeBGPUpdate creates 'fake' input messages, not network outputs
+-- somewaht ineffeicient because the function encodes and decodes attributes on the way to building a hash - but a hash is certainly needed, though not neccesarily this one.....
+makeBGPUpdate nlri withdrawn attributes = parseUpdate $ BGPUpdate {withdrawn = withdrawn, attributes = encodePathAttributes attributes, nlri = nlri}
+
+{-# INLINE parseUpdate #-}
+parseUpdate :: BGPMessage -> ParsedUpdate
+parseUpdate BGPUpdate {..} = ParsedUpdate {puPathAttributes = decodePathAttributes attributes, nlri = nlri, withdrawn = withdrawn, hash = myHash attributes}
+
+{-# INLINE myHash #-}
 myHash :: B.ByteString -> Int
 myHash = fromIntegral . hash64
 
-data ParsedUpdate = ParsedUpdate { puPathAttributes :: [PathAttribute], nlri :: [Prefix], withdrawn :: [Prefix], hash :: Int } | NullUpdate -- deriving Show
-instance Show ParsedUpdate where
-      show ParsedUpdate{..} = "<" 
-                              ++ if null puPathAttributes then "*" else show (getASPath puPathAttributes)
-                              ++ " " ++ show nlri
-                              ++ "|" ++ show withdrawn
-                              ++ ">" 
+{-
+  'output' message formats: -> BGPOutput
+-}
 
-modifyPathAttributes :: ([PathAttribute] -> [PathAttribute]) -> ParsedUpdate -> ParsedUpdate
-modifyPathAttributes f pu = pu { puPathAttributes = f $ puPathAttributes pu }
+data BGPOutput = BGPOutput {withdrawn :: [Prefix], attributes :: [PathAttribute], nlri :: [Prefix]}
 
-deparseUpdate :: ParsedUpdate -> BGPMessage
-deparseUpdate ParsedUpdate{..} = BGPUpdate { withdrawn = withdrawn , attributes = encodePathAttributes puPathAttributes , nlri = nlri }
+-- newtype BGPOutputMsg = BGPOutputMsg B.ByteString
 
-endOfRib :: BGPMessage
-endOfRib = BGPUpdate { withdrawn = [] , attributes = B.empty , nlri = [] }
+-- deparseBGPOutput :: BGPOutput -> BGPOutputMsg
+-- deparseBGPOutput BGPOutput {..} = BGPOutputMsg $ builderBytes $ updateBuilder withdrawn (buildPathAttributes attributes) nlri
 
-parseUpdate :: BGPMessage -> ParsedUpdate
-parseUpdate BGPUpdate{..} = ParsedUpdate { puPathAttributes = decodePathAttributes attributes , nlri = nlri , withdrawn = withdrawn , hash = myHash attributes }
+-- deparseBGPOutputs :: [BGPOutput] -> BGPOutputMsg
+-- deparseBGPOutputs = BGPOutputMsg . builderBytes . foldMap builder
+--   where
+--     builder BGPOutput {..} = updateBuilder withdrawn (buildPathAttributes attributes) nlri
 
-originateWithdraw prefixes = ParsedUpdate [] [] prefixes 0
+deparseBGPOutputs :: [BGPOutput] -> B.ByteString
+deparseBGPOutputs = builderBytes . foldMap builder
+  where
+    builder BGPOutput {..} = updateBuilder withdrawn (buildPathAttributes attributes) nlri
 
-originateUpdate :: Word8 -> [ASSegment] -> IPv4 -> [Prefix] -> ParsedUpdate
+endOfRib :: BGPOutput
+endOfRib = makeUpdate [] [] []
+
+originateWithdraw :: [Prefix] -> BGPOutput
+originateWithdraw prefixes = makeUpdate [] prefixes []
+
+originateUpdate :: Word8 -> [ASSegment] -> IPv4 -> [Prefix] -> BGPOutput
 originateUpdate origin path nextHop prefixes =
-     head $ makeUpdate prefixes
-                       []
-                       [PathAttributeOrigin origin, PathAttributeASPath path, PathAttributeNextHop nextHop]
+  makeUpdate prefixes [] [PathAttributeOrigin origin, PathAttributeASPath path, PathAttributeNextHop nextHop]
 
-makeUpdateSimple :: [PathAttribute] -> [Prefix] -> [Prefix] -> ParsedUpdate
-makeUpdateSimple p n w = head $ makeUpdate n w p
+makeUpdateSimple :: [PathAttribute] -> [Prefix] -> [Prefix] -> BGPOutput
+makeUpdateSimple p n w = makeUpdate n w p
 
-makeUpdate :: [Prefix] -> [Prefix] -> [PathAttribute] -> [ParsedUpdate]
-makeUpdate = makeSegmentedUpdate
-makeUpdate' nlri withdrawn attributes = ParsedUpdate attributes nlri withdrawn ( myHash $ encodePathAttributes attributes)
-
-makeSegmentedUpdate :: [Prefix] -> [Prefix] -> [PathAttribute] -> [ParsedUpdate]
-makeSegmentedUpdate nlri withdrawn attributes = result where
-                                                    pathAttributesLength = B.length (encodePathAttributes attributes)
-                                                    nonPrefixLength = 16 + 2 + 1 + 2 + 2 + pathAttributesLength
-                                                    availablePrefixSpace = fromIntegral (4096 - nonPrefixLength) :: Int64
-                                                    chunkedNlri = chunkPrefixes availablePrefixSpace nlri
-                                                    chunkedWithdrawn = chunkPrefixes availablePrefixSpace withdrawn
-                                                    updates = map (\pfxs -> makeUpdate' pfxs [] attributes) (tail chunkedNlri)
-                                                    withdraws = map (\pfxs -> makeUpdate' [] pfxs attributes) (tail chunkedWithdrawn)
-                                                    result = if availablePrefixSpace >= L.length (encode (head chunkedNlri))
-                                                                                        + L.length (encode (head chunkedWithdrawn))
-                                                             then [makeUpdate' (head chunkedNlri) (head chunkedWithdrawn) attributes] ++ withdraws ++ updates
-                                                             else [makeUpdate' [] (head chunkedWithdrawn) attributes,
-                                                                   makeUpdate' (head chunkedNlri) [] attributes] ++ withdraws ++ updates
-
+{-# INLINE makeUpdate #-}
+makeUpdate :: [Prefix] -> [Prefix] -> [PathAttribute] -> BGPOutput
+makeUpdate nlri withdrawn attributes = BGPOutput withdrawn attributes nlri
 
 igpUpdate = originateUpdate _BGP_ORIGIN_IGP []

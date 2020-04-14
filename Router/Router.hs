@@ -61,7 +61,7 @@ getConfig = do
     
     configString <- readFile configPath
     let rawConfig = read configString :: Config
-    return $ (buildPeerConfigs rawConfig,configName)
+    return (buildPeerConfigs rawConfig,configName)
 
 buildGlobal :: Config -> String -> IO Global
 buildGlobal c@Config{..} configName = do

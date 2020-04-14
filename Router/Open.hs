@@ -1,9 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 module Router.Open where
-import Data.Binary
 import qualified Data.ByteString.Lazy as L
 import Data.Maybe(isJust,fromJust)
-import Data.IP(fromHostAddress)
 
 import BGPlib.BGPlib
 

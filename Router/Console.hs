@@ -17,8 +17,6 @@ import BGPlib.BGPlib
 import BGPRib.BGPRib
 
 import Router.Global
-import Router.Log
-import Router.CreateUpdate
 
 startConsole :: Global -> IO ()
 startConsole global = do
@@ -48,8 +46,8 @@ query cs s = do
               (parsePrefix $ head s)
     console cs
 
-updateFrom CState{..} = mapM_ push $ iBGPUpdate csPath csNlri csNextHop csLocalPref
-withdrawFrom CState{..} = mapM_ push ( bgpWithdraw csNlri )
+updateFrom CState{..} = push $ iBGPUpdate csPath csNlri csNextHop csLocalPref
+withdrawFrom CState{..} = push ( bgpWithdraw csNlri )
 
 console :: CState -> InputT IO ()
 console cstate@CState{..} = do

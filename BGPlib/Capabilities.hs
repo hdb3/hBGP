@@ -2,13 +2,13 @@
 
 module BGPlib.Capabilities where
 
+import ByteString.StrictBuilder
 import qualified Data.Attoparsec.Binary as A
 import qualified Data.Attoparsec.ByteString as A
-import Data.Word
 import Data.Bits
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
-import ByteString.StrictBuilder
+import Data.Word
 
 type CapCode = Word8
 
@@ -110,40 +110,37 @@ capCode CapEnhancedRouteRefresh = _CapCodeEnhancedRouteRefresh
 capCode CapExtendedLength = _CapCodeExtendedLength
 
 capCodes = map capCode
-  
+
 capsEncode :: [Capability] -> L.ByteString
 capsEncode = L.fromStrict . buildOptionalParameters
 
 buildOptionalParameters :: [Capability] -> B.ByteString
-buildOptionalParameters = builderBytes . snd . parameterBuilder
+buildOptionalParameters = builderBytes . parameterBuilder
+
 {-
   Builder: the envelope for a capability list is an 'optional parameter TLV', holding a 'capability TLV'.
   Both TLVs are limited to 255 byte payloads, but the scope to enode multiple parameters upto the BGP message size limit is available for very long sequences.
   Absent this need, a single nested structure is sufficient.
   The inner TLV is built by folding over each capability.
-  A builder for each capability shoudl return the encoded length to allow the TLV to be correctly built. 
+  A builder for each capability shoudl return the encoded length to allow the TLV to be correctly built.
 -}
 
+parameterBuilder :: [Capability] -> Builder
+parameterBuilder caps = let b = capabilitiesBuilder caps in word8 2 <> word8 (fromIntegral $ builderLength b) <> b
 
-parameterBuilder ::[Capability] -> ( Word8, Builder)
-parameterBuilder caps = let (length,b) = capabilitiesBuilder caps in (length+2, word8 2 <> word8 length <> b)
+capabilitiesBuilder :: [Capability] -> Builder
+capabilitiesBuilder = foldMap capabilityBuilder
 
-capabilitiesBuilder ::[Capability] -> ( Word8, Builder)
-capabilitiesBuilder = foldr acc (0,mempty) where
-  acc cap (w,b) = let (w',b') = capabilityBuilder cap in (w+w'+2, b' <> b)
-
-capabilityBuilder ::Capability -> ( Word8, Builder)
-
-capabilityBuilder CapRouteRefresh = (0, word8 _CapCodeRouteRefresh)
-capabilityBuilder CapCiscoRefresh = ( 0 , word8 _CapCodeCiscoRefresh <> word8 0)
-capabilityBuilder CapEnhancedRouteRefresh = ( 0 , word8 _CapCodeEnhancedRouteRefresh <> word8 0)
-capabilityBuilder (CapAS4 as4) = ( 4 , word8 _CapCodeAS4 <> word8 4 <> word32BE as4)
-capabilityBuilder (CapAddPath afi safi bits) = ( 4 , word8 _CapCodeAddPath <> word8 4 <> word16BE afi <> word8 safi <> word8 bits)
-capabilityBuilder (CapGracefulRestart rFlag restartTime) = ( 2 , word8 _CapCodeGracefulRestart <> word8 2 <> word16BE (if rFlag then setBit restartTime 15 else restartTime))
-capabilityBuilder (CapMultiprotocol afi safi) = ( 4 , word8 _CapCodeMultiprotocol <> word8 4 <> word16BE afi <> word8 0 <> word8 safi)
-capabilityBuilder CapExtendedLength = ( 0 , word8 _CapCodeExtendedLength <> word8 0)
-capabilityBuilder (CapUnknown t bs) = ( fromIntegral (B.length bs), word8 t <> (word8 $ fromIntegral (B.length bs)) <> bytes bs)
-
+capabilityBuilder :: Capability -> Builder
+capabilityBuilder CapRouteRefresh = word8 _CapCodeRouteRefresh
+capabilityBuilder CapCiscoRefresh = word8 _CapCodeCiscoRefresh <> word8 0
+capabilityBuilder CapEnhancedRouteRefresh = word8 _CapCodeEnhancedRouteRefresh <> word8 0
+capabilityBuilder (CapAS4 as4) = word8 _CapCodeAS4 <> word8 4 <> word32BE as4
+capabilityBuilder (CapAddPath afi safi bits) = word8 _CapCodeAddPath <> word8 4 <> word16BE afi <> word8 safi <> word8 bits
+capabilityBuilder (CapGracefulRestart rFlag restartTime) = word8 _CapCodeGracefulRestart <> word8 2 <> word16BE (if rFlag then setBit restartTime 15 else restartTime)
+capabilityBuilder (CapMultiprotocol afi safi) = word8 _CapCodeMultiprotocol <> word8 4 <> word16BE afi <> word8 0 <> word8 safi
+capabilityBuilder CapExtendedLength = word8 _CapCodeExtendedLength <> word8 0
+capabilityBuilder (CapUnknown t bs) = word8 t <> word8 (fromIntegral (B.length bs)) <> bytes bs
 
 parseOptionalParameters :: Word8 -> A.Parser [Capability]
 parseOptionalParameters n

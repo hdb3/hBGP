@@ -8,7 +8,6 @@ import Control.Monad(void,when)
 
 import BGPlib.BGPlib
 import BGPRib.BGPRib
-import BGPRib.BGPReader(pathReadRib)
 -- ************* VERY DANGEROUS - should re-export from BGPfsm to avoid conflict!!!!
 --import qualified CustomRib as Rib
 import qualified Router.StdRib as Rib
@@ -20,7 +19,6 @@ import Router.Log
 
 redistribute :: Global -> IO ()
 redistribute global@Global{..} = do
-    insertTestRoutes global (configTestRoutePath config) (configTestRouteCount config)
     when (configEnableDataPlane config )
          ( do   threadId <- myThreadId
                 trace $ "Thread " ++ show threadId ++ " starting redistributor"
@@ -80,15 +78,3 @@ zservReader Global{..} peer ( zStreamIn, zStreamOut ) = do
                                     ( getZRoute zMsg )
                               loop stream )
               msg
-
-
-insertTestRoutes _ "" _ = debug "no test route data specified"
-insertTestRoutes Global{..} path count = do
-    info $ "test route set requested: " ++ path
-    updates <- pathReadRib path
-    let count' = if count == 0 then length updates else count
-    info $ "inserting " ++ show count' ++ " routes"
-    let updates' = concatMap (\((_,pas),pfxs) -> makeUpdate pfxs [] pas) updates
-        updates'' = if 0 == count then updates' else take count updates'
-    mapM_ (ribPush rib ( localPeer gd )) updates''
-    info "done"

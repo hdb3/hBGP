@@ -2,7 +2,6 @@ module BGPlib.BGPlib
   ( module BGPlib.BGPMessage,
     module BGPlib.BGPHandle,
     module BGPlib.ASPath,
-    module BGPlib.BGPparse,
     module BGPlib.Capabilities,
     module BGPlib.Prefixes,
     module BGPlib.Codes,
@@ -17,7 +16,6 @@ where
 import BGPlib.ASPath
 import BGPlib.BGPHandle
 import BGPlib.BGPMessage
-import BGPlib.BGPparse
 import BGPlib.Capabilities
 import BGPlib.Codes
 import BGPlib.LibCommon

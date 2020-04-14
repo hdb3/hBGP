@@ -3,8 +3,6 @@ module BGPRib.BGPReader( updateRib, readMsgs, readRib, bgpMsgReader, bgpReader, 
 import System.Exit(die)
 import System.Environment(getArgs)
 import qualified Data.ByteString.Lazy as L
--- import Data.Binary.Get(runGet)
-
 import BGPlib.BGPlib
 import BGPRib.BGPRib
 import qualified BGPRib.BGPRib as BGPRib

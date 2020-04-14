@@ -14,7 +14,7 @@ import qualified Data.IntMap.Strict as Map
 import FarmHash(hash64)
 import Data.Array.IArray
 import Data.Maybe(fromMaybe)
-import Data.List(foldl',reverse,sortOn)
+import Data.List(foldl',sortOn)
 
 import MRTlib
 

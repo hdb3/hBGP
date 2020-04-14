@@ -18,22 +18,22 @@ hPutUpdates handle routes = hPutBuilder handle $  builderChunksBuilder (updatesB
 updatesBuilder :: [(BGPAttributes, IP4PrefixList)] -> Builder
 updatesBuilder = foldr (\(a1, a2) b -> updateBuilder 4096 a1 a2 <> b) mempty
 
-simpleUpdateBuilder :: BGPAttributes -> IP4PrefixList -> Builder
-simpleUpdateBuilder attrs pfxs =
-  if 4096 < payloadLength
-    then error "can't build such an update simply"
-    else
-      marker
-        <> word16BE (fromIntegral payloadLength)
-        <> word8 2
-        <> word16BE 0
-        <> word16BE (fromIntegral attributeLength)
-        <> byteStringCopy (fromBGPAttributes attrs)
-        <> prefixesBuilder pfxs
-  where
-    payloadLength = 16 + 1 + 2 + 2 + 2 + attributeLength + nlriLength
-    nlriLength = encodedPrefixesLength pfxs
-    attributeLength = fromIntegral $ B.length $ fromBGPAttributes attrs
+-- simpleUpdateBuilder :: BGPAttributes -> IP4PrefixList -> Builder
+-- simpleUpdateBuilder attrs pfxs =
+--   if 4096 < payloadLength
+--     then error "can't build such an update simply"
+--     else
+--       marker
+--         <> word16BE (fromIntegral payloadLength)
+--         <> word8 2
+--         <> word16BE 0
+--         <> word16BE (fromIntegral attributeLength)
+--         <> byteStringCopy (fromBGPAttributes attrs)
+--         <> prefixesBuilder pfxs
+--   where
+--     payloadLength = 16 + 1 + 2 + 2 + 2 + attributeLength + nlriLength
+--     nlriLength = encodedPrefixesLength pfxs
+--     attributeLength = fromIntegral $ B.length $ fromBGPAttributes attrs
 
 {-
 the fly in the simple ointment is this: a few updates are too large to fit in one message.  A very few.

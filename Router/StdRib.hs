@@ -1,11 +1,10 @@
 {-# LANGUAGE RecordWildCards #-}
 module Router.StdRib (ribPull,msgTimeout,addRouteRib,delRouteRib,updateFromAdjRibEntrys,delPeerByAddress,Router.StdRib.addPeer,Router.StdRib.ribPush,RibHandle) where
-import Control.Monad.Extra(when,concatMapM)
+-- module Router.StdRib (ribPull,msgTimeout,addRouteRib,delRouteRib,updateFromAdjRibEntrys,delPeerByAddress,Router.StdRib.addPeer,Router.StdRib.ribPush,RibHandle) where
+import Control.Monad.Extra(when)
 import System.Timeout(timeout)
-import Data.Maybe(fromMaybe)
+import Data.Maybe(fromMaybe,catMaybes)
 import Data.Word
-import Data.List(foldl')
-
 import BGPlib.BGPlib hiding (nlri,withdrawn)
 import BGPRib.BGPRib
 import qualified BGPRib.BGPRib as BGPRib
@@ -38,19 +37,21 @@ delPeerByAddress rib port ip = do
         when ( length peers > 1 ) $ warn $ "delPeerByAddress failed for (multiplepeers!) " ++ show ip ++ ":" ++ show port
         mapM_ (delPeer rib) peers
 
-ribPull :: RibHandle -> IO [BGPMessage]
-ribPull (rib,peer) = map deparseUpdate <$> (pullAllUpdates peer rib >>= updateFromAdjRibEntrys rib peer)
+ribPull :: RibHandle -> IO [BGPOutput]
+ribPull (rib,peer) = pullAllUpdates peer rib >>= updateFromAdjRibEntrys rib peer
 
 msgTimeout :: Int -> IO [a] -> IO [a]
 msgTimeout t f = fromMaybe [] <$> timeout (1000000 * t) f
 
 addRouteRib :: Rib -> PeerData -> AddrRange IPv4 -> IPv4 -> IO()
-addRouteRib rib peer prefix nextHop = BGPRib.ribPush rib peer (igpUpdate nextHop [fromAddrRange prefix])
+addRouteRib = error "addRouteRib: undefined"
+-- addRouteRib rib peer prefix nextHop = BGPRib.ribPush rib peer (igpUpdate nextHop [fromAddrRange prefix])
 
 delRouteRib :: Rib -> PeerData -> AddrRange IPv4 -> IO()
-delRouteRib rib peer prefix = BGPRib.ribPush rib peer (originateWithdraw [fromAddrRange prefix])
+delRouteRib = error "delRouteRib: undefined"
+-- delRouteRib rib peer prefix = BGPRib.ribPush rib peer (bgpWithdraw [fromAddrRange prefix])
 
-buildUpdate :: PeerData -> [Prefix] -> RouteData -> [ParsedUpdate]
+buildUpdate :: PeerData -> [Prefix] -> RouteData -> BGPOutput
 -- there are three distinct 'peers' and associated PeerData potentially in scope here
 --     the peer which originated the route
 --     the peer which will receive this update ('target')
@@ -88,14 +89,9 @@ buildUpdate target prefixes RouteData{..} = if isExternal target then egpUpdate 
                            delLocalPref pathAttributes
                            )
 
-updateFromAdjRibEntrys :: Rib -> PeerData -> [AdjRIBEntry] -> IO [ParsedUpdate]
-updateFromAdjRibEntrys rib target = concatMapM (updateFromAdjRibEntry rib target)
+updateFromAdjRibEntrys :: Rib -> PeerData -> [AdjRIBEntry] -> IO [BGPOutput]
+updateFromAdjRibEntrys rib target xs = catMaybes <$> mapM updateFromAdjRibEntry xs 
     where
-
-    updateFromAdjRibEntry :: Rib -> PeerData -> AdjRIBEntry -> IO [ParsedUpdate]
-    updateFromAdjRibEntry rib target (prefixes,routeHash) = 
-        -- do mlookup <- lookupRoutes rib (prefixes,routeHash)
-        --    return $ maybe []
-        --                   (\(route,prefixes') -> buildUpdate target prefixes' route)
-        --                   mlookup
-        maybe [] (\(route,prefixes') -> buildUpdate target prefixes' route) <$> lookupRoutes rib (prefixes,routeHash)
+    updateFromAdjRibEntry :: AdjRIBEntry -> IO (Maybe BGPOutput)
+    updateFromAdjRibEntry (prefixes,routeHash) = 
+        fmap (\(route,prefixes') -> buildUpdate target prefixes' route) <$> lookupRoutes rib (prefixes,routeHash)

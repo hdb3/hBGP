@@ -15,8 +15,6 @@ module BGPRib.PrefixTable where
 -}
 
 import qualified Data.List
-import Data.Maybe(fromMaybe)
-
 import BGPRib.BGPData
 import BGPlib.BGPlib (Prefix,toPrefix,fromPrefix)
 import qualified BGPRib.PT as PT
