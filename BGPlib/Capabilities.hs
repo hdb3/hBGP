@@ -122,7 +122,6 @@ buildOptionalParameters = builderBytes . parameterBuilder
   Both TLVs are limited to 255 byte payloads, but the scope to enode multiple parameters upto the BGP message size limit is available for very long sequences.
   Absent this need, a single nested structure is sufficient.
   The inner TLV is built by folding over each capability.
-  A builder for each capability shoudl return the encoded length to allow the TLV to be correctly built.
 -}
 
 parameterBuilder :: [Capability] -> Builder

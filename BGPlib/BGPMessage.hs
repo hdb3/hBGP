@@ -77,7 +77,7 @@ data RcvStatus = Timeout | EndOfStream | Error String deriving (Eq, Show)
 newtype BGPByteString = BGPByteString (Either RcvStatus L.ByteString) deriving (Eq)
 
 wireFormat :: Builder -> Builder
-wireFormat bldr = marker <> word16BE (fromIntegral $ builderLength bldr) <> bldr where marker = bytes $ B.replicate 16 0xff
+wireFormat bldr = marker <> word16BE (fromIntegral (builderLength bldr) + 18) <> bldr where marker = bytes $ B.replicate 16 0xff
 
 builder :: BGPMessage -> Builder
 builder BGPTimeout {} = error "should not try to send an input condition"
@@ -87,13 +87,15 @@ builder BGPKeepalive =
   wireFormat $
     word8 _BGPKeepalive
 builder (BGPOpen myAutonomousSystem holdTime bgpID caps) =
-  wireFormat $
-    word8 _BGPOpen
-      <> word8 _BGPVersion
-      <> word16BE myAutonomousSystem
-      <> word16BE holdTime
-      <> word32BE (byteSwap32 $ toHostAddress bgpID)
-      <> parameterBuilder caps
+  let optionalParameters = parameterBuilder caps
+   in wireFormat $
+        word8 _BGPOpen
+          <> word8 _BGPVersion
+          <> word16BE myAutonomousSystem
+          <> word16BE holdTime
+          <> word32BE (byteSwap32 $ toHostAddress bgpID)
+          <> word16BE (fromIntegral $ builderLength optionalParameters)
+          <> optionalParameters
 builder (BGPNotify code subCode errData) =
   wireFormat $
     word8 _BGPNotify
