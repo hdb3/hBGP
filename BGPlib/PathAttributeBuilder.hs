@@ -1,5 +1,6 @@
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE Strict #-}
+{-# LANGUAGE TupleSections #-}
 
 module BGPlib.PathAttributeBuilder where
 
@@ -14,7 +15,6 @@ import qualified Data.Attoparsec.Binary as A
 import qualified Data.Attoparsec.ByteString as A
 import Data.Attoparsec.ByteString (Parser)
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as L
 import Data.Word
 
 decodePathAttributes :: B.ByteString -> [PathAttribute]
@@ -23,17 +23,14 @@ decodePathAttributes bs = let Right msgs = A.parseOnly (attributesParser (fromIn
 encodePathAttributes :: [PathAttribute] -> B.ByteString
 encodePathAttributes = builderBytes . buildPathAttributes
 
-encodePathAttributes' :: [PathAttribute] -> L.ByteString
-encodePathAttributes' = L.fromStrict . encodePathAttributes
-
 buildPathAttributes = foldMap buildPathAttribute
   where
     buildCommon :: PathAttributeTypeCode -> Word8 -> Builder
     buildCommon code length = word8 (flagsOf code) <> word8 (encode8 code) <> word8 length
     buildExtended :: PathAttributeTypeCode -> Word16 -> Builder
     buildExtended code length = word8 (setExtended $ flagsOf code) <> word8 (encode8 code) <> word16BE length
-    buildPathCommon :: PathAttributeTypeCode -> (Word16, Builder) -> Builder
-    buildPathCommon code (length, b) = word8 (setExtended $ flagsOf code) <> word8 (encode8 code) <> word16BE length <> b
+    buildBuilder :: PathAttributeTypeCode -> Builder -> Builder
+    buildBuilder code b = word8 (setExtended $ flagsOf code) <> word8 (encode8 code) <> word16BE (fromIntegral $ builderLength b) <> b
     buildAttributeNull :: PathAttributeTypeCode -> Builder
     buildAttributeNull code = buildCommon code 0
     buildAttributeWord8 :: PathAttributeTypeCode -> Word8 -> Builder
@@ -56,12 +53,12 @@ buildPathAttributes = foldMap buildPathAttribute
     buildPathAttribute (PathAttributeNextHop a) = buildAttributeWord32 TypeCodePathAttributeNextHop (byteSwap32 $ toHostAddress a)
     buildPathAttribute (PathAttributeMultiExitDisc a) = buildAttributeWord32 TypeCodePathAttributeMultiExitDisc a
     buildPathAttribute (PathAttributeLocalPref a) = buildAttributeWord32 TypeCodePathAttributeLocalPref a
-    buildPathAttribute (PathAttributeASPath a) = buildPathCommon TypeCodePathAttributeASPath (buildASPath a)
+    buildPathAttribute (PathAttributeASPath a) = buildBuilder TypeCodePathAttributeASPath (buildASPath a)
     buildPathAttribute (PathAttributeAtomicAggregate) = buildAttributeNull TypeCodePathAttributeAtomicAggregate
     buildPathAttribute (PathAttributeAggregator (as, bgpid)) = buildAttributeAggregator TypeCodePathAttributeAggregator as (toHostAddress bgpid)
     buildPathAttribute (PathAttributeCommunities a) = buildAttributeWords32 TypeCodePathAttributeCommunities a -- PathAttributeCommunities [Word32]
     buildPathAttribute (PathAttributeExtendedCommunities a) = buildAttributeWords64 TypeCodePathAttributeExtendedCommunities a -- PathAttributeExtendedCommunities [Word64]
-    buildPathAttribute (PathAttributeAS4Path a) = buildPathCommon TypeCodePathAttributeASPath (buildASPath a)
+    buildPathAttribute (PathAttributeAS4Path a) = buildBuilder TypeCodePathAttributeASPath (buildASPath a)
     buildPathAttribute (PathAttributeLargeCommunity a) = buildLargeCommunities a -- PathAttributeLargeCommunity [LargeCommunity] ~ [(Word32,Word32,Word32)]
     buildPathAttribute (PathAttributeAS4Aggregator (a, b)) = buildAttributeAggregator TypeCodePathAttributeAS4Aggregator a b -- PathAttributeAS4Aggregator (Word32,Word32)
     buildPathAttribute (PathAttributeASPathlimit a) = buildExtended TypeCodePathAttributeASPathlimit (fromIntegral $ B.length a) <> bytes a
@@ -76,16 +73,16 @@ attributesParser n
     flags <- A.anyWord8
     code' <- A.anyWord8
     let code = decode8 code'
-    len <-
+    (hdrLen, len) <-
       if extendedBitTest flags
-        then A.anyWord16be
-        else fromIntegral <$> A.anyWord8
+        then (4,) <$> A.anyWord16be
+        else (3,) . fromIntegral <$> A.anyWord8
     unless (flagCheck flags code) (error $ "Bad Flags - flags=" ++ show flags ++ " code=" ++ show code' ++ " (" ++ show code ++ ")")
-    if n < len + 3
+    if n < len + hdrLen
       then error $ "attributesParser: invalid length n=" ++ show n ++ " len=" ++ show len ++ " code=" ++ show code
       else do
         attr <- attributeParser len code
-        attrs <- attributesParser (n -3 - len)
+        attrs <- attributesParser (n - hdrLen - len)
         return $ attr : attrs
   where
     {-# INLINE attributeParser #-}

@@ -3,6 +3,7 @@ module BGPlib.BGPlib
     module BGPlib.BGPHandle,
     module BGPlib.ASPath,
     module BGPlib.Capabilities,
+    module BGPlib.Update,
     module BGPlib.Prefixes,
     module BGPlib.Codes,
     module BGPlib.LibCommon,
@@ -17,6 +18,7 @@ import BGPlib.ASPath
 import BGPlib.BGPHandle
 import BGPlib.BGPMessage
 import BGPlib.Capabilities
+import BGPlib.Update
 import BGPlib.Codes
 import BGPlib.LibCommon
 import BGPlib.PathAttributeBuilder

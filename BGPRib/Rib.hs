@@ -11,7 +11,6 @@ import BGPlib.BGPlib
 import BGPRib.BGPData
 import BGPRib.PrefixTable
 import qualified BGPRib.PrefixTableUtils as PrefixTableUtils
-import BGPRib.Update
 import BGPRib.AdjRIBOut
 import BGPRib.Common(groupBySecond)
 

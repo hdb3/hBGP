@@ -16,11 +16,11 @@ common base
   default-language:   Haskell2010
 
 common bgprib
-  other-modules:      BGPRib.PT, BGPRib.AdjRIBOut , BGPRib.BGPData , BGPRib.BGPReader , BGPRib.BGPRib , BGPRib.BogonFilter , BGPRib.Common , BGPRib.Fifo , BGPRib.PathFilter , BGPRib.PrefixTable , BGPRib.PrefixTableUtils , BGPRib.Rib , BGPRib.Update
+  other-modules:      BGPRib.PT, BGPRib.AdjRIBOut , BGPRib.BGPData , BGPRib.BGPReader , BGPRib.BGPRib , BGPRib.BogonFilter , BGPRib.Common , BGPRib.Fifo , BGPRib.PathFilter , BGPRib.PrefixTable , BGPRib.PrefixTableUtils , BGPRib.Rib
 
 common bgplib
-  build-depends:	    base, binary, deepseq, iproute, network, bytestring, attoparsec, attoparsec-binary, hashable, base16-bytestring, bytestring-strict-builder
-  other-modules:      BGPlib.PrefixBuilder, BGPlib.BGPHandle, BGPlib.AttoBGP , BGPlib.BGPMessage, BGPlib.ASPath, BGPlib.AttoBGP, BGPlib.BGPlib, BGPlib.Capabilities, BGPlib.Codes, BGPlib.LibCommon, BGPlib.PathAttributeUtils, BGPlib.PathAttributes, BGPlib.Prefixes, BGPlib.RFC4271, BGPlib.PathAttributeBuilder
+  build-depends:	    base, binary, deepseq, iproute, network, bytestring, attoparsec, attoparsec-binary, hashable, base16-bytestring, bytestring-strict-builder, farmhash
+  other-modules:      BGPlib.Update, BGPlib.PrefixBuilder, BGPlib.BGPHandle, BGPlib.AttoBGP , BGPlib.BGPMessage, BGPlib.ASPath, BGPlib.AttoBGP, BGPlib.BGPlib, BGPlib.Capabilities, BGPlib.Codes, BGPlib.LibCommon, BGPlib.PathAttributeUtils, BGPlib.PathAttributes, BGPlib.Prefixes, BGPlib.RFC4271, BGPlib.PathAttributeBuilder
   default-language:   Haskell2010
 
 common hbgp

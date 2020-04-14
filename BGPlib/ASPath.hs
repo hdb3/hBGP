@@ -8,10 +8,10 @@ module BGPlib.ASPath where
 
 import BGPlib.Codes
 import BGPlib.LibCommon
+import ByteString.StrictBuilder
 import Control.Monad (when)
 import qualified Data.Attoparsec.Binary as A
 import qualified Data.Attoparsec.ByteString as A
-import ByteString.StrictBuilder
 import Data.Hashable
 import Data.List (foldl')
 import Data.Word
@@ -76,12 +76,8 @@ parseASPath n
 -- this length is easily calculated as sums over the number of segments and number of ASNs:
 -- each segment envelope contributes 2 bytes - each ASN contributes 4 bytes
 {-# INLINE buildASPath #-}
-buildASPath :: ASPath -> (Word16, Builder)
-buildASPath segments = (fromIntegral $ builderLength segments, foldMap segBuilder segments)
+buildASPath :: ASPath -> Builder
+buildASPath = foldMap segBuilder
   where
-    builderLength [] = 0
-    builderLength (seg : segx) = 2 + 4 * segLength seg + builderLength segx
-    segLength (ASSequence asnx) = length asnx
-    segLength (ASSet asnx) = length asnx
     segBuilder (ASSequence asnx) = word8 2 <> word8 (fromIntegral $ length asnx) <> foldMap word32BE asnx
     segBuilder (ASSet asnx) = word8 1 <> word8 (fromIntegral $ length asnx) <> foldMap word32BE asnx

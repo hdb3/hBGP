@@ -1,7 +1,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module BGPRib.Update
+module BGPlib.Update
   ( ParsedUpdate (..),
     parseUpdate,
     iBGPUpdate,
@@ -9,13 +9,21 @@ module BGPRib.Update
     BGPOutput,
     makeUpdate,
     deparseBGPOutputs,
+    endOfRib,
+    originateUpdate,
   )
 where
 
-import BGPlib.BGPlib
+import BGPlib.BGPMessage
+import BGPlib.PathAttributeBuilder
+import BGPlib.PathAttributeUtils
+import BGPlib.PathAttributes
 import BGPlib.PrefixBuilder
+import BGPlib.Prefixes
+import BGPlib.RFC4271
 import ByteString.StrictBuilder (builderBytes)
 import qualified Data.ByteString as B
+import Data.IP
 import Data.Word
 import FarmHash (hash64)
 
@@ -66,7 +74,6 @@ xBGPUpdate isExternal aspath prefixes nextHop varpar =
       if isExternal then PathAttributeMultiExitDisc varpar else PathAttributeLocalPref varpar
     ]
 
--- eorBGPUpdate = makeBGPUpdate [] [] []
 -- Warning - makeBGPUpdate creates 'fake' input messages, not network outputs
 -- somewaht ineffeicient because the function encodes and decodes attributes on the way to building a hash - but a hash is certainly needed, though not neccesarily this one.....
 makeBGPUpdate nlri withdrawn attributes = parseUpdate $ BGPUpdate {withdrawn = withdrawn, attributes = encodePathAttributes attributes, nlri = nlri}
@@ -83,17 +90,7 @@ myHash = fromIntegral . hash64
   'output' message formats: -> BGPOutput
 -}
 
-data BGPOutput = BGPOutput {withdrawn :: [Prefix], attributes :: [PathAttribute], nlri :: [Prefix]}
-
--- newtype BGPOutputMsg = BGPOutputMsg B.ByteString
-
--- deparseBGPOutput :: BGPOutput -> BGPOutputMsg
--- deparseBGPOutput BGPOutput {..} = BGPOutputMsg $ builderBytes $ updateBuilder withdrawn (buildPathAttributes attributes) nlri
-
--- deparseBGPOutputs :: [BGPOutput] -> BGPOutputMsg
--- deparseBGPOutputs = BGPOutputMsg . builderBytes . foldMap builder
---   where
---     builder BGPOutput {..} = updateBuilder withdrawn (buildPathAttributes attributes) nlri
+data BGPOutput = BGPOutput {withdrawn :: [Prefix], attributes :: [PathAttribute], nlri :: [Prefix]} deriving (Show)
 
 deparseBGPOutputs :: [BGPOutput] -> B.ByteString
 deparseBGPOutputs = builderBytes . foldMap builder
@@ -106,9 +103,9 @@ endOfRib = makeUpdate [] [] []
 originateWithdraw :: [Prefix] -> BGPOutput
 originateWithdraw prefixes = makeUpdate [] prefixes []
 
-originateUpdate :: Word8 -> [ASSegment] -> IPv4 -> [Prefix] -> BGPOutput
+originateUpdate :: Word8 -> [Word32] -> IPv4 -> [Prefix] -> BGPOutput
 originateUpdate origin path nextHop prefixes =
-  makeUpdate prefixes [] [PathAttributeOrigin origin, PathAttributeASPath path, PathAttributeNextHop nextHop]
+  makeUpdate prefixes [] [PathAttributeOrigin origin, PathAttributeASPath [ASSequence path], PathAttributeNextHop nextHop]
 
 makeUpdateSimple :: [PathAttribute] -> [Prefix] -> [Prefix] -> BGPOutput
 makeUpdateSimple p n w = makeUpdate n w p
@@ -116,5 +113,3 @@ makeUpdateSimple p n w = makeUpdate n w p
 {-# INLINE makeUpdate #-}
 makeUpdate :: [Prefix] -> [Prefix] -> [PathAttribute] -> BGPOutput
 makeUpdate nlri withdrawn attributes = BGPOutput withdrawn attributes nlri
-
-igpUpdate = originateUpdate _BGP_ORIGIN_IGP []

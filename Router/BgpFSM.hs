@@ -12,11 +12,8 @@ import Control.Applicative ((<|>))
 import Control.Monad(void)
 import ByteString.StrictBuilder
 import BGPlib.BGPlib
-import BGPRib.BGPRib(ParsedUpdate(NullUpdate),parseUpdate,PeerData(..),myBGPid,myAS,BGPOutput,deparseBGPOutputs)
--- TODO = move Update.hs, and ppssibly some or all of BGPData, from bgprib to bgplib, so that bgprib does not need to be imported here.....
---        the needed thing in BGPData is PeerData, but what else should move to is less obvious
---        there are some things which any BGP application needs.....
-
+import BGPRib.BGPRib(PeerData(..),myBGPid,myAS)
+-- TODO = move some or all of BGPData, from bgprib to bgplib, so that bgprib does not need to be imported here.....
 --import qualified Router.CustomRib as Rib
 import qualified Router.StdRib as Rib
 

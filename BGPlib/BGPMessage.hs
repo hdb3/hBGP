@@ -94,7 +94,7 @@ builder (BGPOpen myAutonomousSystem holdTime bgpID caps) =
           <> word16BE myAutonomousSystem
           <> word16BE holdTime
           <> word32BE (byteSwap32 $ toHostAddress bgpID)
-          <> word16BE (fromIntegral $ builderLength optionalParameters)
+          <> word8 (fromIntegral $ builderLength optionalParameters)
           <> optionalParameters
 builder (BGPNotify code subCode errData) =
   wireFormat $
@@ -102,6 +102,3 @@ builder (BGPNotify code subCode errData) =
       <> word8 (encode8 code)
       <> word8 subCode
       <> lazyBytes errData
-  where
-    wireFormat :: Builder -> Builder
-    wireFormat bldr = marker <> word16BE (fromIntegral $ builderLength bldr) <> bldr where marker = bytes $ B.replicate 16 0xff

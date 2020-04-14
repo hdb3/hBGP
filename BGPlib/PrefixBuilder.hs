@@ -61,7 +61,7 @@ prefixBuilder limit prefixes = go mempty limit prefixes
     go acc freespace prefixes
       | null prefixes = [acc]
       | byteLength (head prefixes) > freespace = acc : go mempty limit prefixes -- note, never calls go with empty prefix list AND mempty accumulator!
-      | otherwise = go (acc <> encode (head prefixes)) (freespace - byteLength (head prefixes)) prefixes
+      | otherwise = go (acc <> encode (head prefixes)) (freespace - byteLength (head prefixes)) (tail prefixes)
     encode = encodeIntPrefix
     byteLength = byteLengthIntPrefix
 
@@ -113,7 +113,7 @@ encode ip subnet
     error "unreasonable subnet length > 32"
 
 {-
- 
+
   updateBuilder - use subsidiary strict builders to assemble one or more complete, wire-format, Update messages
   the function accepts witdrawn and advertsied nlri which may be assembled into a common or discrete messages depending on circumstances
 
@@ -157,7 +157,7 @@ extUpdateBuilder limit withdrawn attributeBuilder nlri =
           marker
             <> word16BE (fromIntegral (baseSize + attributeLength + withdrawnLength + nlriLength))
             <> word8 2
-            <> word16BE (fromIntegral withdrawnLength)
+            -- <> word16BE (fromIntegral withdrawnLength)
             <> ( if null withdrawnBuilders
                    then word16BE 0
                    else

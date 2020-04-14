@@ -17,16 +17,6 @@ import Data.Hashable
 import Data.List (deleteBy, find, sortOn)
 import Data.Word
 
--- for some this function may be all that is ever wanted....
--- decodeAttributes :: L.ByteString -> [PathAttribute]
--- decodeAttributes = runGet (get :: Get [PathAttribute])
-
--- decodePathAttributes :: B.ByteString -> [PathAttribute]
--- decodePathAttributes = decodeAttributes . L.fromStrict
-
--- encodePathAttributes :: [PathAttribute] -> B.ByteString
--- encodePathAttributes = L.toStrict . encode
-
 data ExtendedCommunities = ExtendedCommunities deriving (Show, Eq)
 
 type LargeCommunity = (Word32, Word32, Word32)
