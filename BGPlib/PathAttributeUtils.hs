@@ -37,21 +37,24 @@ getASPathList :: [PathAttribute] -> String
 getASPathList = list . getASPathContent where
     list [] = "[]"
     list [ASSequence seq] = show seq
-    list _ = error "AS Set and multi Sequence detail not written yet"
+    list [ASSet set] = show set
+    list _ = error "AS Set and multi Set/Sequence detail not written yet"
 
 getASPathDetail :: [PathAttribute] -> (Int, Word32, Word32)
 getASPathDetail = detail . getASPathContent where
     detail [] = (0,0,0)
     detail [ASSequence seq] = (length seq, last seq, head seq)
+    detail [ASSet set] = (length set, last set, head set)
     detail _ = error "AS Set and multi Sequence detail not written yet"
     
 elemASPath :: Word32 -> [PathAttribute] -> Bool
 elemASPath asn = go . getASPathContent where
     go [] = False
-    go [ASSequence seq] = go2 seq
-    go _ = error "AS Set and multi Sequence elemASPath not written yet"
-    go2 [] = False
-    go2 (a:ax) = a == asn || go2 ax
+    go (a:ax) = go' a || go ax
+    go' (ASSet set) = go'' set
+    go' (ASSequence seq) = go'' seq
+    go'' [] = False
+    go'' (a:ax) = a == asn || go'' ax
 
 getASPath :: [PathAttribute] -> ASPath
 getASPath = unwrapASPath . getASPathAttribute where
