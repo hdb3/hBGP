@@ -7,7 +7,6 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as L
 import Data.IP
 import Data.Bits
-import Data.Monoid((<>))
 import Data.Maybe(isJust)
 import Control.Monad(unless)
 import Data.Foldable(forM_)

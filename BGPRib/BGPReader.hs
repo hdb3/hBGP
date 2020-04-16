@@ -3,8 +3,6 @@ module BGPRib.BGPReader( updateRib, readMsgs, readRib, bgpMsgReader, bgpReader, 
 import System.Exit(die)
 import System.Environment(getArgs)
 import qualified Data.ByteString.Lazy as L
-import Data.Binary.Get(runGet)
-
 import BGPlib.BGPlib
 import BGPRib.BGPRib
 import qualified BGPRib.BGPRib as BGPRib
@@ -14,9 +12,10 @@ import BGPRib.PathFilter
 bgpMsgReader :: FilePath -> IO [BGPMessage]
 bgpMsgReader path = do
     stream <- L.readFile path
-    let bgpByteStrings = runGet getBGPByteStrings stream
-        bgpMessages = map decodeBGPByteString bgpByteStrings
-    return bgpMessages
+    -- let bgpByteStrings = runGet getBGPByteStrings stream
+    --     bgpMessages = map decodeBGPByteString bgpByteStrings
+
+    return $ byteStreamToBGPMessages $ L.toStrict stream
 
 bgpUpdateMsgReader :: FilePath -> IO [ParsedUpdate]
 bgpUpdateMsgReader = fmap ( map parseUpdate . filter isUpdate ) . bgpMsgReader

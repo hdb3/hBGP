@@ -5,7 +5,7 @@ module BGPRib.BGPRib ( module BGPRib.AdjRIBOut
               , module BGPRib.PrefixTable
               , module BGPRib.PrefixTableUtils
               , module BGPRib.Rib
-              , module BGPRib.Update) where
+               ) where
 import BGPRib.AdjRIBOut
 import BGPRib.BGPData
 import BGPRib.Common
@@ -13,4 +13,3 @@ import BGPRib.Fifo
 import BGPRib.PrefixTable
 import BGPRib.PrefixTableUtils
 import BGPRib.Rib
-import BGPRib.Update

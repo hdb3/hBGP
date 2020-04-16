@@ -6,7 +6,6 @@ module BGPRib.BGPData where
 -}
 
 import Data.Word
-import Data.IP(IPv4)
 import Data.Hashable
 
 import BGPlib.BGPlib

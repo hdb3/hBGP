@@ -16,8 +16,6 @@ module BGPRib.PrefixTableUtils where
 --import Data.IntMap.Strict(toList)
 import qualified Data.List
 import Data.IP
-import Data.Maybe(fromJust)
-
 import BGPlib.BGPlib (Prefix,toPrefix)
 import BGPRib.Common
 import BGPRib.BGPData

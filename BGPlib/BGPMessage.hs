@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -7,16 +5,12 @@ module BGPlib.BGPMessage where
 
 import BGPlib.Capabilities
 import BGPlib.LibCommon
--- import BGPlib.PathAttributes
 import BGPlib.Prefixes
 import BGPlib.RFC4271
--- import Control.Monad (unless)
-import Data.Binary
--- import Data.Binary.Get
--- import Data.Binary.Put
+import ByteString.StrictBuilder
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
--- import Data.IP
+import Data.Word
 
 _BGPOpen = 1 :: Word8
 
@@ -28,6 +22,10 @@ _BGPKeepalive = 4 :: Word8
 
 _BGPVersion = 4 :: Word8
 
+-- BGPMessage encodes network received inouts only, not messages which are intended for output
+-- this is beceause a) it wraps input exceptions as record variants and b) it carries partially deparsed messages
+-- TODO - consider whether preserving the bytestring format for undecoded attributes is the best approach,
+-- rather than simply decoding at point of reception (and potentially improving parallelisation)
 data BGPMessage
   = BGPOpen {myAutonomousSystem :: Word16, holdTime :: Word16, bgpID :: IPv4, caps :: [Capability]}
   | BGPKeepalive
@@ -36,7 +34,7 @@ data BGPMessage
   | BGPTimeout
   | BGPError String
   | BGPEndOfStream
-  deriving (Eq, Generic)
+  deriving (Eq)
 
 instance Show BGPMessage where
   show BGPOpen {..} = "Open {AS: " ++ show myAutonomousSystem ++ " Hold-time: " ++ show holdTime ++ " BGPID: " ++ show bgpID ++ " Caps: " ++ show caps ++ "}"
@@ -50,11 +48,6 @@ instance Show BGPMessage where
   show BGPTimeout = "Timeout"
   show BGPEndOfStream = "BGPEndOfStream"
   show (BGPError s) = "Error: " ++ s
-
-toAS2 :: Word32 -> Word16
-toAS2 as
-  | as < 0x10000 = fromIntegral as
-  | otherwise = 23456
 
 display :: BGPMessage -> String
 display BGPOpen {} = "BGPOpen"
@@ -78,7 +71,34 @@ isUpdate BGPUpdate {} = True
 isUpdate _ = False
 
 -- level 0 objects
-
+-- TODO - why defined _here_?
 data RcvStatus = Timeout | EndOfStream | Error String deriving (Eq, Show)
 
 newtype BGPByteString = BGPByteString (Either RcvStatus L.ByteString) deriving (Eq)
+
+wireFormat :: Builder -> Builder
+wireFormat bldr = marker <> word16BE (fromIntegral (builderLength bldr) + 18) <> bldr where marker = bytes $ B.replicate 16 0xff
+
+builder :: BGPMessage -> Builder
+builder BGPTimeout {} = error "should not try to send an input condition"
+builder BGPError {} = error "should not try to send an input condition"
+builder BGPEndOfStream {} = error "should not try to send an input condition"
+builder BGPKeepalive =
+  wireFormat $
+    word8 _BGPKeepalive
+builder (BGPOpen myAutonomousSystem holdTime bgpID caps) =
+  let optionalParameters = parameterBuilder caps
+   in wireFormat $
+        word8 _BGPOpen
+          <> word8 _BGPVersion
+          <> word16BE myAutonomousSystem
+          <> word16BE holdTime
+          <> word32BE (byteSwap32 $ toHostAddress bgpID)
+          <> word8 (fromIntegral $ builderLength optionalParameters)
+          <> optionalParameters
+builder (BGPNotify code subCode errData) =
+  wireFormat $
+    word8 _BGPNotify
+      <> word8 (encode8 code)
+      <> word8 subCode
+      <> lazyBytes errData

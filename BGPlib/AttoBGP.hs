@@ -1,5 +1,3 @@
-{-# LANGUAGE FlexibleInstances #-}
-
 module BGPlib.AttoBGP where
 
 import BGPlib.BGPMessage
@@ -9,8 +7,8 @@ import BGPlib.Prefixes
 import Control.Applicative ((<|>), Alternative, liftA2)
 import Control.Monad (unless)
 import qualified Data.Attoparsec.Binary as A
-import Data.Attoparsec.ByteString (Parser)
 import qualified Data.Attoparsec.ByteString as A
+import Data.Attoparsec.ByteString (Parser)
 import Data.Bits
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
@@ -72,10 +70,9 @@ bgpParser1 = do
               myAutonomousSystem <- A.anyWord16be
               holdTime <- A.anyWord16be
               bgpID <- A.anyWord32le
-              optionalParametersLength <- fromIntegral <$> A.anyWord8
-              optionalParameters <- L.fromStrict <$> A.take optionalParametersLength
-              -- TODO implement a native parser for optional parameters
-              return $ BGPOpen myAutonomousSystem holdTime (fromHostAddress bgpID) (parseOptionalParameters optionalParameters)
+              optionalParametersLength <- A.anyWord8
+              capabilities <- parseOptionalParameters optionalParametersLength
+              return $ BGPOpen myAutonomousSystem holdTime (fromHostAddress bgpID) capabilities
             2 -> do
               withdrawnLength <- fromIntegral <$> A.anyWord16be
               withdrawn <- parsePrefixes withdrawnLength

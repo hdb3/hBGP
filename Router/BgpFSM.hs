@@ -3,20 +3,17 @@ module Router.BgpFSM(bgpFSM) where
 import Network.Socket
 import qualified Data.ByteString.Lazy as L
 import Data.IP
+import Data.Word
 import Control.Concurrent
 import Control.Exception
 import Data.Maybe(fromJust,isJust,fromMaybe)
 import qualified Data.Map.Strict as Data.Map
 import Control.Applicative ((<|>))
 import Control.Monad(void)
-
+import ByteString.StrictBuilder
 import BGPlib.BGPlib
-import BGPlib.BGPHandle
-import BGPRib.BGPRib(ParsedUpdate(NullUpdate),parseUpdate,PeerData(..),myBGPid,myAS)
--- TODO = move Update.hs, and ppssibly some or all of BGPData, from bgprib to bgplib, so that bgprib does not need to be imported here.....
---        the needed thing in BGPData is PeerData, but what else should move to is less obvious
---        there are some things which any BGP application needs.....
-
+import BGPRib.BGPRib(PeerData(..),myBGPid,myAS)
+-- TODO = move some or all of BGPData, from bgprib to bgplib, so that bgprib does not need to be imported here.....
 --import qualified Router.CustomRib as Rib
 import qualified Router.StdRib as Rib
 
@@ -72,8 +69,11 @@ bgpFSM global@Global{..} ( sock , peerName ) =
 
 
 initialiseOSM :: Global -> PeerConfig -> OpenStateMachine
-initialiseOSM Global{..} PeerConfig{..} =
-    makeOpenStateMachine BGPOpen { myAutonomousSystem = toAS2 $ fromMaybe ( myAS gd ) peerConfigLocalAS
+initialiseOSM Global{..} PeerConfig{..} = let toAS2 :: Word32 -> Word16
+                                              toAS2 as
+                                                | as < 0x10000 = fromIntegral as
+                                                | otherwise = 23456
+ in makeOpenStateMachine BGPOpen { myAutonomousSystem = toAS2 $ fromMaybe ( myAS gd ) peerConfigLocalAS
                                    , holdTime = configOfferedHoldTime config
                                    , bgpID = fromMaybe ( myBGPid gd) peerConfigLocalBGPID
                                    , caps = peerConfigOfferedCapabilities}
@@ -81,6 +81,16 @@ initialiseOSM Global{..} PeerConfig{..} =
                                    , holdTime = 0
                                    , bgpID = fromMaybe (fromHostAddress 0) peerConfigBGPID
                                    , caps = peerConfigRequiredCapabilities}
+
+
+bgpSnd :: BGPHandle -> BGPMessage -> IO ()
+bgpSnd bgph bgpmsg = bgpSendHandle bgph (builderBytes $ builder bgpmsg)
+
+bgpSndOutput :: BGPHandle -> BGPOutput -> IO ()
+bgpSndOutput h m = bgpSndAll h [m]
+
+bgpSndAll :: BGPHandle -> [BGPOutput] -> IO ()
+bgpSndAll bgph msgs = bgpSendHandle bgph (deparseBGPOutputs msgs)
 
 runFSM :: Global -> SockAddr -> SockAddr -> BGPHandle -> Maybe PeerConfig -> IO (Either String String)
 runFSM g@Global{..} socketName peerName handle =

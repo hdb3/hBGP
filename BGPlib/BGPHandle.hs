@@ -1,20 +1,14 @@
-module BGPlib.BGPHandle (BGPIOException (..), BGPHandle, getBGPHandle, bgpSnd, bgpRcv, bgpSndAll, bgpClose) where
+module BGPlib.BGPHandle where
 
 import BGPlib.AttoBGP
 import BGPlib.BGPMessage (BGPMessage (..))
-import BGPlib.BGPparse (encodeBGPMessage)
 import Control.Exception (Exception, evaluate, throw)
-import Control.Monad (void)
 import Data.Attoparsec.ByteString
 import qualified Data.ByteString as B
-import Data.ByteString.Builder
-import qualified Data.ByteString.Lazy as L
 import Data.IORef
 import Data.Maybe (fromMaybe)
-import Network.Socket (Socket, close)
-import Network.Socket.ByteString (recv)
-import qualified Network.Socket.ByteString.Lazy as L
-import System.IO (hPutStrLn, stderr)
+import Network.Socket (Socket, socketToHandle)
+import System.IO (Handle, IOMode (ReadWriteMode), hClose, hPutStrLn, stderr)
 import System.IO.Error (catchIOError)
 import qualified System.Timeout
 
@@ -22,12 +16,16 @@ newtype BGPIOException = BGPIOException String deriving (Show)
 
 instance Exception BGPIOException
 
-data BGPHandle = BGPHandle Socket (IORef B.ByteString)
+data BGPHandle = BGPHandle Handle (IORef B.ByteString)
+
+byteStreamToBGPMessages :: B.ByteString -> [BGPMessage]
+byteStreamToBGPMessages bs = let Right msgs = parseOnly bgpParser bs in msgs
 
 getBGPHandle :: Socket -> IO BGPHandle
-getBGPHandle s = do
+getBGPHandle sock = do
   ior <- newIORef B.empty
-  return $ BGPHandle s ior
+  handle <- socketToHandle sock System.IO.ReadWriteMode
+  return $ BGPHandle handle ior
 
 bgpRcv :: BGPHandle -> Int -> IO BGPMessage
 bgpRcv bgpHandle t = fromMaybe BGPTimeout <$> System.Timeout.timeout (1000000 * t) (bgpRcv' bgpHandle)
@@ -55,7 +53,7 @@ bgpRcv' (BGPHandle stream ioref) = do
       hPutStrLn stderr $ "parse fail in getNext" ++ show (s, sx)
       return $ BGPError $ show (s, sx)
   where
-    getBuf = recv stream 4096
+    getBuf = B.hGetSome stream 4096
     complete :: Result BGPMessage -> IO (Result BGPMessage)
     complete (Partial cont) = do
       bs <- getBuf
@@ -63,20 +61,10 @@ bgpRcv' (BGPHandle stream ioref) = do
     complete result = return result
 
 bgpClose :: BGPHandle -> IO ()
-bgpClose (BGPHandle h _) = close h
+bgpClose (BGPHandle h _) = hClose h
 
-wireFormat :: L.ByteString -> L.ByteString
-wireFormat bs = toLazyByteString $ lazyByteString (L.replicate 16 0xff) <> word16BE (fromIntegral $ 18 + L.length bs) <> lazyByteString bs
-
-bgpSnd :: BGPHandle -> BGPMessage -> IO ()
-bgpSnd h m = bgpSndAll h [m]
-
-bgpSndAll :: BGPHandle -> [BGPMessage] -> IO ()
-bgpSndAll (BGPHandle h _) msgs =
+bgpSendHandle :: BGPHandle -> B.ByteString -> IO ()
+bgpSendHandle (BGPHandle h _) bs =
   catchIOError
-    (sndRawMessages $ map encodeBGPMessage msgs)
+    (B.hPut h bs)
     (\e -> throw $ BGPIOException (show (e :: IOError)))
-  where
-    sndRawMessages bgpMsgs = do
-      let msg = L.concat $ map wireFormat bgpMsgs
-      void $ L.sendAll h msg
