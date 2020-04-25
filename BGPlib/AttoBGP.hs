@@ -3,6 +3,7 @@ module BGPlib.AttoBGP where
 import BGPlib.BGPMessage
 import BGPlib.Capabilities (parseOptionalParameters)
 import BGPlib.LibCommon (decode8, fromHostAddress)
+import BGPlib.PathAttributeBuilder (attributesParser)
 import BGPlib.Prefixes
 import Control.Applicative ((<|>), Alternative, liftA2)
 import Control.Monad (unless)
@@ -76,11 +77,11 @@ bgpParser1 = do
             2 -> do
               withdrawnLength <- fromIntegral <$> A.anyWord16be
               withdrawn <- parsePrefixes withdrawnLength
-              pathLength <- fromIntegral <$> A.anyWord16be
-              rawPath <- A.take pathLength
-              let nlriLength = length - withdrawnLength - pathLength - 23
+              pathLength <- A.anyWord16be
+              attributes <- attributesParser pathLength
+              let nlriLength = length - withdrawnLength - fromIntegral pathLength - 23
               nlri <- parsePrefixes nlriLength
-              return $ BGPUpdate withdrawn rawPath nlri
+              return $ BGPUpdate withdrawn attributes nlri
             3 -> do
               errorCode <- A.anyWord8
               errorSubcode <- A.anyWord8

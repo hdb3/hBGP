@@ -76,11 +76,11 @@ xBGPUpdate isExternal aspath prefixes nextHop varpar =
 
 -- Warning - makeBGPUpdate creates 'fake' input messages, not network outputs
 -- somewaht ineffeicient because the function encodes and decodes attributes on the way to building a hash - but a hash is certainly needed, though not neccesarily this one.....
-makeBGPUpdate nlri withdrawn attributes = parseUpdate $ BGPUpdate {withdrawn = withdrawn, attributes = encodePathAttributes attributes, nlri = nlri}
+makeBGPUpdate nlri withdrawn attributes = parseUpdate $ BGPUpdate {withdrawn = withdrawn, attributes = attributes, nlri = nlri}
 
 {-# INLINE parseUpdate #-}
 parseUpdate :: BGPMessage -> ParsedUpdate
-parseUpdate BGPUpdate {..} = ParsedUpdate {puPathAttributes = decodePathAttributes attributes, nlri = nlri, withdrawn = withdrawn, hash = myHash attributes}
+parseUpdate BGPUpdate {..} = ParsedUpdate {puPathAttributes = attributes, nlri = nlri, withdrawn = withdrawn, hash = pathHash attributes}
 
 {-# INLINE myHash #-}
 myHash :: B.ByteString -> Int

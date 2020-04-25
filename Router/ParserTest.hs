@@ -64,7 +64,7 @@ parser = bgpParser
 
 display m = putChar $ case m of
   BGPUpdate {..} ->
-    if  | ByteString.null attributes -> 'E'
+    if  | null attributes -> 'E'
         | null nlri -> 'A'
         | null withdrawn -> 'u'
         | otherwise -> 'U'

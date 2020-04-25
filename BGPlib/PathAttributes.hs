@@ -74,6 +74,9 @@ data PathAttribute
 
 instance Hashable PathAttribute
 
+pathHash :: [PathAttribute] -> Int
+pathHash = hash
+
 instance Hashable IPv4
 
 identify :: PathAttribute -> PathAttributeTypeCode

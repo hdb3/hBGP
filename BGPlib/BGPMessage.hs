@@ -5,6 +5,7 @@ module BGPlib.BGPMessage where
 
 import BGPlib.Capabilities
 import BGPlib.LibCommon
+import BGPlib.PathAttributes
 import BGPlib.Prefixes
 import BGPlib.RFC4271
 import ByteString.StrictBuilder
@@ -30,7 +31,7 @@ data BGPMessage
   = BGPOpen {myAutonomousSystem :: Word16, holdTime :: Word16, bgpID :: IPv4, caps :: [Capability]}
   | BGPKeepalive
   | BGPNotify {code :: EnumNotificationCode, subCode :: NotificationSubcode, errorData :: L.ByteString}
-  | BGPUpdate {withdrawn :: [Prefix], attributes :: B.ByteString, nlri :: [Prefix]}
+  | BGPUpdate {withdrawn :: [Prefix], attributes :: [PathAttribute], nlri :: [Prefix]}
   | BGPTimeout
   | BGPError String
   | BGPEndOfStream
@@ -39,10 +40,10 @@ data BGPMessage
 instance Show BGPMessage where
   show BGPOpen {..} = "Open {AS: " ++ show myAutonomousSystem ++ " Hold-time: " ++ show holdTime ++ " BGPID: " ++ show bgpID ++ " Caps: " ++ show caps ++ "}"
   show BGPUpdate {..} =
-    if  | B.null attributes -> "Update {}"
-        | null nlri -> "Update {attributes = " ++ toHex attributes ++ "}"
-        | null withdrawn -> "Update {nlri = " ++ show nlri ++ ", attributes = " ++ toHex attributes ++ "}"
-        | otherwise -> "Update {withdrawn = " ++ show withdrawn ++ ", nlri = " ++ show nlri ++ ", attributes = " ++ toHex attributes ++ "}"
+    if  | null attributes -> "Update {}"
+        | null nlri -> "Update {attributes = " ++ show attributes ++ "}"
+        | null withdrawn -> "Update {nlri = " ++ show nlri ++ ", attributes = " ++ show attributes ++ "}"
+        | otherwise -> "Update {withdrawn = " ++ show withdrawn ++ ", nlri = " ++ show nlri ++ ", attributes = " ++ show attributes ++ "}"
   show BGPNotify {..} = "Notify: " ++ show code ++ " / " ++ show subCode ++ " errorData " ++ toHex' errorData ++ "}"
   show BGPKeepalive = "Keepalive"
   show BGPTimeout = "Timeout"
