@@ -25,7 +25,7 @@ import ByteString.StrictBuilder (builderBytes)
 import qualified Data.ByteString as B
 import Data.IP
 import Data.Word
-import FarmHash (hash64)
+import Data.Digest.Murmur64
 
 -- TODO - consistent regular naming to distinguish the 'in' and 'out' formats
 
@@ -84,7 +84,7 @@ parseUpdate BGPUpdate {..} = ParsedUpdate {puPathAttributes = attributes, nlri =
 
 {-# INLINE myHash #-}
 myHash :: B.ByteString -> Int
-myHash = fromIntegral . hash64
+myHash = fromIntegral . asWord64 . hash64
 
 {-
   'output' message formats: -> BGPOutput

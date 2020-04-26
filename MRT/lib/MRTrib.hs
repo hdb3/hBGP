@@ -11,7 +11,7 @@ module MRTrib ( module MRTlib
               ) where
 
 import qualified Data.IntMap.Strict as Map
-import FarmHash(hash64)
+import Data.Digest.Murmur64
 import Data.Array.IArray
 import Data.Maybe(fromMaybe)
 import Data.List(foldl',sortOn)
@@ -61,7 +61,7 @@ mrtToPeerMap = buildPeerMap . mrtToPeerMapInput
     extractRIBrecords RIBIPV4Unicast{..} = map (\RIBEntry{..} -> RIBrecord { rrPrefix = IP4Prefix (re4Address,re4Length), rrPeerIndex = rePeerIndex, rrOriginatedTime = reOriginatedTime, rrAttributes = reAttributes, rrAttributeHash = myHash reAttributes }) re4RIB
     extractRIBrecords RIBIPV6Unicast{..} = map (\RIBEntry{..} -> RIBrecord { rrPrefix = IP6Prefix (re6Address,re6Length), rrPeerIndex = rePeerIndex, rrOriginatedTime = reOriginatedTime, rrAttributes = reAttributes, rrAttributeHash = myHash reAttributes }) re6RIB
     extractRIBrecords _ = []
-    myHash (BGPAttributes bs) = fromIntegral $ FarmHash.hash64 bs
+    myHash (BGPAttributes bs) = fromIntegral $ asWord64 $ hash64 bs
 
     ribRecordToPeerMapInput :: RIBrecord -> PeerMapInput
     ribRecordToPeerMapInput RIBrecord{..} = (rrPeerIndex,rrAttributeHash,rrAttributes,rrPrefix)
