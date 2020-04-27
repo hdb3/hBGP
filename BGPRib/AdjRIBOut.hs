@@ -35,6 +35,9 @@ newAdjRIBTable = emptyFifo
 insertAdjRIBTable :: AdjRIBEntry -> AdjRIBTable -> IO ()
 insertAdjRIBTable are table = enqueue table are
 
+insertNAdjRIBTable :: [AdjRIBEntry] -> AdjRIBTable -> IO ()
+insertNAdjRIBTable arex table = enqueueN table arex
+
 getAllAdjRIBTable :: AdjRIBTable -> IO [AdjRIBEntry]
 getAllAdjRIBTable = dequeueAll
 

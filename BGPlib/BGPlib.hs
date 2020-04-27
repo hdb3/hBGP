@@ -1,20 +1,28 @@
-module BGPlib.BGPlib ( module BGPlib.ASPath
-                     , module BGPlib.BGPparse
-                     , module BGPlib.Capabilities
-                     , module BGPlib.Prefixes
-                     , module BGPlib.Codes
-                     , module BGPlib.GetBGPMsg
-                     , module BGPlib.LibCommon
-                     , module BGPlib.PathAttributes
-                     , module BGPlib.PathAttributeUtils
-                     , module BGPlib.RFC4271 ) where
+module BGPlib.BGPlib
+  ( module BGPlib.BGPMessage,
+    module BGPlib.BGPHandle,
+    module BGPlib.ASPath,
+    module BGPlib.Capabilities,
+    module BGPlib.Update,
+    module BGPlib.Prefixes,
+    module BGPlib.Codes,
+    module BGPlib.LibCommon,
+    module BGPlib.PathAttributes,
+    module BGPlib.PathAttributeUtils,
+    module BGPlib.PathAttributeBuilder,
+    module BGPlib.RFC4271,
+  )
+where
+
 import BGPlib.ASPath
-import BGPlib.BGPparse
+import BGPlib.BGPHandle
+import BGPlib.BGPMessage
 import BGPlib.Capabilities
-import BGPlib.Prefixes
+import BGPlib.Update
 import BGPlib.Codes
-import BGPlib.GetBGPMsg
 import BGPlib.LibCommon
-import BGPlib.PathAttributes
+import BGPlib.PathAttributeBuilder
 import BGPlib.PathAttributeUtils
+import BGPlib.PathAttributes
+import BGPlib.Prefixes
 import BGPlib.RFC4271

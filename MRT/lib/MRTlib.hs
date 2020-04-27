@@ -15,9 +15,10 @@ import GHC.Generics (Generic)
 import qualified Data.Hashable
 import MRTformat
 
-
 data IPPrefix = IP4Prefix IP4Prefix | IP6Prefix IP6Prefix deriving (Show,Generic)
 instance Data.Hashable.Hashable IPPrefix
+instance Data.Hashable.Hashable IPv4
+instance Data.Hashable.Hashable IPv6
 
 type IP4PrefixHash = Int
 type IP6PrefixHash = Int

@@ -14,31 +14,21 @@ module BGPRib.PrefixTable(PrefixTable,update,newPrefixTable,queryPrefixTable,get
  - hence a fast implementation is essential
 -}
 
-import qualified Debug.Trace
-import qualified Data.IntMap.Strict as IntMap
-import qualified Data.Map.Strict as Map
-import Data.List ((\\),foldl')
 import qualified Data.List
-import Data.Maybe(fromMaybe)
-import Data.Word(Word32) 
-
 import BGPRib.BGPData
-import BGPlib.BGPlib (Prefix(..),toPrefix,fromPrefix)
+import BGPlib.BGPlib (Prefix,toPrefix,fromPrefix)
+import qualified BGPRib.PT as PT
 
-trace _ = id
--- trace = Debug.Trace.trace
-
-type PrefixTableEntry = [RouteData]
-type PrefixTable = IntMap.IntMap PrefixTableEntry
+type PrefixTableEntry = PT.PTE
+type PrefixTable = PT.PT
 
 instance {-# OVERLAPPING #-} Show PrefixTable where
-    show = show . map (\(k,v) -> (toPrefix k,v)) . IntMap.toList
+    show = unlines . map showPTE . PT.ptList where
+        showPTE (k,v) = show (toPrefix k,v)
 
-newPrefixTable :: PrefixTable
-newPrefixTable = IntMap.empty
 
-update:: PrefixTable -> [Prefix] -> PeerData -> Maybe RouteData -> (PrefixTable, [(PeerData, Int, [Prefix])])
-update pt pfxs sourcePeer routeM = (pt', trace (show updates) updates) where
+updateC:: PrefixTable -> [Prefix] -> PeerData -> Maybe RouteData -> (PrefixTable, [(PeerData, Int, [Prefix])])
+updateC pt pfxs sourcePeer routeM = (pt', trace (show updates) updates) where
 
     (pt', updateList) = foldl' kf (pt,[]) pfxs 
     kf :: (PrefixTable, [(PeerData,Int,Prefix)]) -> Prefix -> (PrefixTable, [(PeerData,Int, Prefix)])
@@ -104,20 +94,20 @@ updatePrefixTable sourcePeer routeM pt pfx = (pt', rval) where
 
 
 -- this function returns the best route for a specific prefix
-queryPrefixTable :: PrefixTable -> Prefix -> Maybe RouteData
-queryPrefixTable table pfx = let
+queryPrefixTableC :: PrefixTable -> Prefix -> Maybe RouteData
+queryPrefixTableC table pfx = let
     rawRouteList = fromMaybe [] $ IntMap.lookup (fromPrefix pfx) table
     safeHead ax = if null ax then Nothing else Just (head ax)
     in safeHead $ (Data.List.dropWhile poisoned) rawRouteList
 
-showRibAt :: PrefixTable -> Prefix -> String
-showRibAt table pfx = show (IntMap.lookup (fromPrefix pfx) table)
+showRibAtC :: PrefixTable -> Prefix -> String
+showRibAtC table pfx = show (IntMap.lookup (fromPrefix pfx) table)
 
-withdrawPeer :: PrefixTable -> PeerData -> (PrefixTable,[Prefix])
+withdrawPeerC :: PrefixTable -> PeerData -> (PrefixTable,[Prefix])
 -- core function is mapAccumWithKey
 -- which acts on the prefix table, returning a modified prefix table and also the list of prefixes which have been modifed
 -- in a way which REQUIRES an update
-withdrawPeer prefixTable peerData = swapNgroom $ IntMap.mapAccumWithKey (updateFunction peerData) [] prefixTable where
+withdrawPeerC prefixTable peerData = swapNgroom $ IntMap.mapAccumWithKey (updateFunction peerData) [] prefixTable where
     swapNgroom (pfxs,pt) = (groomPrefixTable pt,pfxs)
     updateFunction = activeUpdateFunction
 -- the inner function has the shape: PeerData -> [Prefix] -> Int -> PrefixTableEntry -> ([Prefix], PrefixTableEntry)
@@ -148,18 +138,44 @@ withdrawPeer prefixTable peerData = swapNgroom $ IntMap.mapAccumWithKey (updateF
             p = (peer /=) .  BGPRib.BGPData.peerData
             prefixList' = toPrefix prefix : prefixList
 
-groomPrefixTable :: PrefixTable -> PrefixTable
-groomPrefixTable = IntMap.filter ( not . null )
+-- groomPrefixTable :: PrefixTable -> PrefixTable
+-- groomPrefixTable = IntMap.filter ( not . null )
 
--- ADDPATH changes
--- this function must return full prefixes (inclusidnng pathID)
--- because it determines which withdraws must be generated after delPeer
--- this reasoning may be questioned if the subsequent function call did noot simply use 'update' to do its work....
+-- -- ADDPATH changes
+-- -- this function must return full prefixes (inclusidnng pathID)
+-- -- because it determines which withdraws must be generated after delPeer
+-- -- this reasoning may be questioned if the subsequent function call did noot simply use 'update' to do its work....
 
-getPeerPrefixes :: PrefixTable -> PeerData -> [Prefix]
-getPeerPrefixes pt peer = IntMap.foldlWithKey' f [] pt where 
+-- getPeerPrefixes :: PrefixTable -> PeerData -> [Prefix]
+-- getPeerPrefixes pt peer = IntMap.foldlWithKey' f [] pt where 
     
-    -- base code - assumes that only one prefix can be returned per prefix table entry....
-    f acc key val = if p val then (toPrefix key:acc) else acc
-    p = Data.List.any p'
-    p' = ( peer == ) . peerData
+--     -- base code - assumes that only one prefix can be returned per prefix table entry....
+--     f acc key val = if p val then (toPrefix key:acc) else acc
+--     p = Data.List.any p'
+--     p' = ( peer == ) . peerData
+
+newPrefixTable :: PrefixTable
+newPrefixTable = PT.ptNew
+
+update:: PrefixTable -> [Prefix] -> RouteData -> (PrefixTable,[(Prefix,RouteData)])
+update pt pfxs route = Data.List.foldl' f (pt,[]) pfxs where
+    f (pt',acc) pfx = (pt'',acc') where
+        acc' = if PT.pteBest new == PT.pteBest old then acc else (pfx,PT.pteBest new):acc
+        (old,new,pt'') = PT.ptUpdate (fromPrefix pfx) route pt
+
+queryPrefixTable :: PrefixTable -> Prefix -> RouteData
+queryPrefixTable table pfx = PT.pteBest $ PT.ptQuery (fromPrefix pfx) table
+
+showRibAt :: PrefixTable -> Prefix -> String
+showRibAt table pfx = show (PT.ptQuery (fromPrefix pfx) table)
+
+-- TODO merge update and withdraw by using a route value of Withdraw {..}
+withdraw :: PrefixTable -> [Prefix] -> PeerData -> (PrefixTable,[(Prefix,RouteData)])
+withdraw pt pfxs pd = update pt pfxs (Withdraw pd)
+-- withdraw pt pfxs pd = Data.List.foldl' f (pt,[]) pfxs where
+--     f (pt',acc) pfx = let acc' = if (PT.pteBest new) == (PT.pteBest old) then acc else (pfx,PT.pteBest new):acc
+--                           (old,new,pt'') = PT.ptUpdate (fromPrefix pfx) (Withdraw pd) pt'
+--                       in (pt'',acc')
+
+withdrawPeer :: PrefixTable -> PeerData -> (PrefixTable,[(Prefix,RouteData)])
+withdrawPeer pt = withdraw pt (map toPrefix $ PT.ptKeys pt)

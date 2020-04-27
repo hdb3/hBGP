@@ -10,7 +10,7 @@ import Data.List(delete)
 
 import BGPlib.PathAttributes
 
-prePendAS :: ASNumber a => a -> [PathAttribute] -> [PathAttribute]
+prePendAS :: ASNumber -> [PathAttribute] -> [PathAttribute]
 prePendAS asn = updatePathAttribute TypeCodePathAttributeASPath (asPrePend' asn) where
     asPrePend' asn ( PathAttributeASPath p) = PathAttributeASPath (asPrePend asn p)
 
@@ -20,10 +20,10 @@ getASPathLength = error "deprecated - use get ASPathDetail or write a wrapper fo
 -- normaliseASPath:  eliminate as4 path by replacing the original as2 path with the contens of the as4 path
 -- should be a lossless conversion
 -- the reverse would be needed if talking to an as2 only peer...
-normaliseASPath pas = let toASPath4' (PathAttributeASPath p) = PathAttributeASPath (toASPath4 p)
+normaliseASPath pas = let toASPath4' (PathAttributeASPath p) = PathAttributeASPath p
                           pas' = updatePathAttribute TypeCodePathAttributeASPath toASPath4' pas in
     maybe pas'
-          (\(PathAttributeAS4Path path) -> deletePathAttributeType TypeCodePathAttributeAS4Path $ insertPathAttribute (PathAttributeASPath (toASPath4 path)) pas)
+          (\(PathAttributeAS4Path path) -> deletePathAttributeType TypeCodePathAttributeAS4Path $ insertPathAttribute (PathAttributeASPath path) pas)
           (getPathAttribute TypeCodePathAttributeAS4Path pas)
 
 getAS2Path = fromJust . getPathAttribute TypeCodePathAttributeASPath
@@ -31,28 +31,39 @@ getAS4Path = fromJust . getPathAttribute TypeCodePathAttributeAS4Path
 
 getASPathAttribute pax = fromMaybe (getAS2Path pax) (getPathAttribute TypeCodePathAttributeAS4Path pax)
 
+getASPathList :: [PathAttribute] -> String
+getASPathList = list . getASPathContent where
+    list [] = "[]"
+    list [ASSequence seq] = show seq
+    list [ASSet set] = show set
+    list _ = error "AS Set and multi Set/Sequence detail not written yet"
+
 getASPathDetail :: [PathAttribute] -> (Int, Word32, Word32)
 getASPathDetail = detail . getASPathContent where
     detail [] = (0,0,0)
     detail [ASSequence seq] = (length seq, last seq, head seq)
+    detail [ASSet set] = (length set, last set, head set)
     detail _ = error "AS Set and multi Sequence detail not written yet"
     
 elemASPath :: Word32 -> [PathAttribute] -> Bool
 elemASPath asn = go . getASPathContent where
     go [] = False
-    go [ASSequence seq] = go2 seq
-    go _ = error "AS Set and multi Sequence elemASPath not written yet"
-    go2 [] = False
-    go2 (a:ax) = a == asn || go2 ax
+    go (a:ax) = go' a || go ax
+    go' (ASSet set) = go'' set
+    go' (ASSequence seq) = go'' seq
+    go'' [] = False
+    go'' (a:ax) = a == asn || go'' ax
 
 getASPath :: [PathAttribute] -> ASPath
 getASPath = unwrapASPath . getASPathAttribute where
     unwrapASPath (PathAttributeASPath asPath) = asPath
     unwrapASPath (PathAttributeAS4Path asPath) = asPath
 
-getASPathContent :: [PathAttribute] -> [ASSegment Word32]
-getASPathContent = unwrapSegments . toASPath4 . getASPath where
-    unwrapSegments (ASPath4 segments) = segments
+getASPathContent :: [PathAttribute] -> [ASSegment]
+getASPathContent = getASPath
+
+getASPathSegmentCount = length . getASPathContent
+getASPathOrigin = getLastASN . last . getASPathContent
 
 flattenPath :: [ASSegment Word32] -> [Word32]
 flattenPath [] = []
@@ -73,8 +84,8 @@ getLocalPref pas = maybe 0 (\(PathAttributeLocalPref x) -> x) (getPathAttribute 
 setMED :: Word32 -> [PathAttribute] -> [PathAttribute]
 setMED = insertPathAttribute . PathAttributeMultiExitDisc
 
-getMED :: [PathAttribute] -> Word32
-getMED pas = maybe 0 (\(PathAttributeMultiExitDisc x) -> x) (getPathAttribute TypeCodePathAttributeMultiExitDisc pas)
+getMED :: [PathAttribute] -> Maybe Word32
+getMED pas = fmap (\(PathAttributeMultiExitDisc x) -> x) (getPathAttribute TypeCodePathAttributeMultiExitDisc pas)
 
 setOrigin :: Word8 -> [PathAttribute] -> [PathAttribute]
 setOrigin = insertPathAttribute . PathAttributeOrigin

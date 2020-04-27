@@ -1,23 +1,20 @@
-{-# LANGUAGE RecordWildCards, TupleSections #-}
+{-# LANGUAGE RecordWildCards, TupleSections, BangPatterns #-}
 module BGPRib.Rib(Rib,ribPush,newRib,getLocRib,addPeer,delPeer,getPeersInRib,lookupRoutes,pullAllUpdates,getNextHops) where
 import Control.Concurrent
 import qualified Data.Map.Strict as Data.Map
-import Control.Monad(unless,when,void)
-import Data.List(intercalate,nub)
--- TODO replace Data.List with Data.List.EXtra and use nubOrd not nub
-import Data.Maybe(fromJust)
-
 import Data.Word(Word32)
 import Data.IP
-
+import Control.Arrow(second)
+--import Debug.Trace
 import BGPlib.BGPlib
 
 import BGPRib.BGPData
 import BGPRib.PrefixTable
 import qualified BGPRib.PrefixTableUtils as PrefixTableUtils
-import BGPRib.Update
 import BGPRib.AdjRIBOut
-import BGPRib.Common(group)
+import BGPRib.Common(groupBySecond)
+
+trace _ x = x
 
 type Rib = MVar Rib'
 -- TODO rename AdjRIB -> AdjRIBMap
@@ -48,15 +45,10 @@ delPeer rib peer = modifyMVar_ rib ( delPeer' peer )
         -- # let (prefixTable',prefixes) = withdrawPeer prefixTable peer
         -- schedule the withdraw dissemination
         -- NOTE - this does not change the AdjRIBMap
-        -- # unless (null prefixes)
-        -- #     ( updateRibOutWithPeerData peer nullRoute prefixes adjRib)
-        let prefixes = getPeerPrefixes prefixTable peer
-            (prefixTable',withdraws) = BGPRib.PrefixTable.update prefixTable prefixes peer Nothing
-        putStrLn "*** delPeer UNIT TEST remove when confirmed! ***"
-        print (peer,prefixes)
-        putStrLn "*** delPeer UNIT TEST remove when confirmed! ***"
-
-        mapM_ (updatePeer adjRib) withdraws
+        updateRibOutWithPeerData peer prefixes adjRib
+        -- now remove this peer completely from the AdjRIBMap
+        -- it is liekly that this could be done before the previous action.....
+        -- but the semantics should be identical as long as we didn't try to send withdraw messages to the peer which has gone away...
         return $ Rib' prefixTable' ( Data.Map.delete peer adjRib )
 
 addPeer :: Rib -> PeerData -> IO ()
@@ -76,45 +68,53 @@ addPeer rib peer = modifyMVar_ rib ( addPeer' peer )
         return $ Rib' prefixTable adjRib'
 {-
     delayed route look-up logic
-    After an update/withdraw is scheduled the best route may change, or be removed, leaving no route at all.
-    This raises two issues: firstly, the original route may no longer be available, so the immediate update cannot be sent.
-    Secondly, even if the route is still valid, or a withdraw was requested, the optimal behaviour may not be to send the originally selected route.
-    The simple course of action is to discard tbe immediate update, safe in the knowledge that another update for the specific peer is in the pipeline.
-    However, the logic fails when the request is withdraw, since it is possible that the replacement route would be filtered for the specific target peer.
-    Therefore scheduled withdraw should not be discarded.  A similar problem arises when the current route is null, in which case a withdraw is in the pipeline,
-    but if we discard the earlier route and it was also the first route selected for this prefix/peer then a withdraw will be generated without a matching update.
-    This outcome is likely to be rare, and does not compromise route integrity, although a peer may detect the anomaly.
-    A full resoultion is not possible in this design - it motivates a change from use of route hashes to actual route referneces in ARO entries.
 
-    Summary: withdrawals are never discarded, changed non-null routes are...
+    This function performs three functions:
+       takes routeIDs and returns full RouteData objects
+       checks that the route did not change since the update was originally scheduled
+       drops the update for the case where it has changed.
 
-    New design
 
-    lookupRoutes should return [(Maybe RouteData,[Prefix])] rather than [(RouteData,[Prefix])],
-    where Maybe RouteData allows a withdraw to be represented.  The prescribed filter logic is implemented after initial lookup and before function return.
-    The initial lookup function returns an ARE record (tuple) augmented with the lookup outcome.
-    Before grouping on the lookup outcome the list is filtered according to the description above. 
+    redux - 
+    
+    regrading filters - optimal correct behaviour requires either preserved state from last sent route or recalculated equivalent.
+    unsolicited withdraw would allow safe behaviour - but this is only needed in the context of export filter capability, and can easily be implmented
+    when that capability is built.
+    
+    an alternate implementation might simply return the latest route, and mark that prefix/route combination as sent using a sequence number
+    then later queued updates can be ignored.  Whether that is better is unclear, but it is more complex, and so not taken up for now.
+    A superficial analysis argues tgat defrred transmission is sensible, because updates for churning prefixes would thereby be deferred in favour of stable ones.
 -}
 
-lookupRoutes :: Rib -> AdjRIBEntry -> IO [(Maybe RouteData,[Prefix])]
-lookupRoutes rib (prefixes,routeHash) = if 0 == routeHash
-    then return [(Nothing,prefixes)] 
-    else do
+lookupRoutes :: Rib -> AdjRIBEntry -> IO (Maybe (RouteData,[Prefix]))
+lookupRoutes rib (prefixes,routeHash) = do
         rib' <- readMVar rib
-        let pxrs = map (\prefix -> (queryPrefixTable (prefixTable rib') prefix, prefix)) prefixes
-            discardChanged (mrd,_) = maybe True (\rd -> routeHash == routeId rd) mrd
-        return $ group $ filter discardChanged pxrs
+        let 
+            myLookup = map (\pfx -> ( queryPrefixTable (prefixTable rib') pfx, pfx))
+            -- myFilter = filter ((routeHash ==) . routeId .fst )
+            -- the following line removes the suppress changed routes check
+            -- which is essential for filters to work correctly
+            myFilter = id
+            unchangedPrefixes = myFilter $ myLookup prefixes
+            route = fst $ head unchangedPrefixes  -- safe becuase only called after test for null
+        return $ if null unchangedPrefixes then Nothing else Just (route,map snd unchangedPrefixes) 
 
 getNextHops :: Rib -> [Prefix] -> IO [(Prefix,Maybe IPv4)]
 getNextHops rib prefixes = do
     rib' <- readMVar rib
-    let getNextHop prefix = (prefix,) $ nextHop <$> queryPrefixTable (prefixTable rib') prefix
-    return $ map getNextHop prefixes
+    return $ map
+             (\prefix -> (prefix,) $ getRouteNextHop $ queryPrefixTable (prefixTable rib') prefix)
+             prefixes
+
 
 pullAllUpdates :: PeerData -> Rib -> IO [AdjRIBEntry]
+-- TODO - look into why this is sometimes called with a peer not in the map...
+-- this happens at peer down and the suspicion is that it implies that
+-- there may be some withdrawals which are improperly dropped
 pullAllUpdates peer rib = do
     (Rib' _ arot) <- readMVar rib
-    dequeueAll (arot Data.Map.! peer)
+    -- dequeueAll (arot Data.Map.! peer) -- from Controller
+    maybe (return []) dequeueAll (arot Data.Map.!? peer)
 
 -- TODO write and use the function 'getAdjRibForPeer'
 
@@ -132,56 +132,116 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
     where
 
     ribPush' :: PeerData -> ParsedUpdate -> Rib' -> IO Rib'
-    ribPush' peerData ParsedUpdate{..} rib0 =
+    -- ribPush' peerData ParsedUpdate{..} rib0 =
 
-        ribUpdateMany peerData puPathAttributes hash nlri rib0 >>= ribWithdrawMany peerData withdrawn
+    --     ribUpdateMany peerData puPathAttributes hash nlri rib0 >>= ribWithdrawMany peerData withdrawn
 
-    reduce :: [(PeerData, Int, [Prefix])] -> [(Int, [Prefix])]
-    -- generally there is a 1:1 relation between in and out for this function, however we can't assume that
-    reduce = nub . map (\(_,a,b) -> (a,b))
+    -- reduce :: [(PeerData, Int, [Prefix])] -> [(Int, [Prefix])]
+    -- -- generally there is a 1:1 relation between in and out for this function, however we can't assume that
+    -- reduce = nub . map (\(_,a,b) -> (a,b))
 
 -- TODO - merge ribUpdateMany and ribWithdrawMany?
+    ribPush' peerData ParsedUpdate{..} rib = ribUpdateMany peerData puPathAttributes hash nlri rib >>= ribWithdrawMany peerData withdrawn
 
     ribUpdateMany :: PeerData -> [PathAttribute] -> Int -> [Prefix] -> Rib' -> IO Rib'
     ribUpdateMany peerData pathAttributes routeId pfxs (Rib' prefixTable adjRibOutTables )
         | null pfxs = return (Rib' prefixTable adjRibOutTables )
         | otherwise = do
-              poisoned <- checkPoison peerData pathAttributes pfxs
-              when poisoned ( putStrLn ( "poisoned route detected " ++ show peerData ++ " " ++ show pfxs))
-              let routeData = makeRouteData peerData pathAttributes routeId 100 poisoned
-                  ( prefixTable' , updates ) = BGPRib.PrefixTable.update prefixTable pfxs peerData (Just routeData)
-                  reducedUpdates = reduce updates
+            -- CONTROLLER
+            --   poisoned <- checkPoison peerData pathAttributes pfxs
+            --   when poisoned ( putStrLn ( "poisoned route detected " ++ show peerData ++ " " ++ show pfxs))
+            --   let routeData = makeRouteData peerData pathAttributes routeId 100 poisoned
+            --       ( prefixTable' , updates ) = BGPRib.PrefixTable.update prefixTable pfxs peerData (Just routeData)
+            --       reducedUpdates = reduce updates
 
-              -- this version is the minimal update applicable in the ADDPATH case
-              -- mapM_ (updatePeer adjRibOutTables) updates
+            --   -- this version is the minimal update applicable in the ADDPATH case
+            --   -- mapM_ (updatePeer adjRibOutTables) updates
 
-              -- this version is the promicuous update applicable in the best-external case
-              mapM_ (updateAllPeers adjRibOutTables) reducedUpdates 
+            --   -- this version is the promicuous update applicable in the best-external case
+            --   mapM_ (updateAllPeers adjRibOutTables) reducedUpdates 
               
+              localPref <- evalLocalPref peerData pathAttributes pfxs
+              let routeData = makeRouteData peerData pathAttributes routeId localPref
+                  routeData' = if importFilter routeData then trace "importFilter: filtered" $ Withdraw peerData else routeData
+                  ( !prefixTable' , !updates ) = BGPRib.PrefixTable.update prefixTable pfxs routeData'
+              updateRibOutWithPeerData peerData updates adjRibOutTables
               return $ Rib' prefixTable' adjRibOutTables
 
     ribWithdrawMany :: PeerData -> [Prefix] -> Rib' -> IO Rib'
     ribWithdrawMany peerData pfxs (Rib' prefixTable adjRibOutTables)
         | null pfxs = return (Rib' prefixTable adjRibOutTables )
         | otherwise = do
-            let ( prefixTable' , withdraws ) = BGPRib.PrefixTable.update prefixTable pfxs peerData Nothing
-            mapM_ (updatePeer adjRibOutTables) withdraws
+    -- CONTROLLER
+    --         let ( prefixTable' , withdraws ) = BGPRib.PrefixTable.update prefixTable pfxs peerData Nothing
+    --         mapM_ (updatePeer adjRibOutTables) withdraws
+    --         return $ Rib' prefixTable' adjRibOutTables
+
+    -- makeRouteData :: PeerData -> [PathAttribute] -> Int -> Word32 -> Bool -> RouteData
+    -- makeRouteData peerData pathAttributes routeId overrideLocalPref poisoned = RouteData {..}
+            let ( !prefixTable' , !withdraws ) = BGPRib.PrefixTable.update prefixTable pfxs (Withdraw peerData)
+            updateRibOutWithPeerData peerData withdraws adjRibOutTables
             return $ Rib' prefixTable' adjRibOutTables
 
-    makeRouteData :: PeerData -> [PathAttribute] -> Int -> Word32 -> Bool -> RouteData
-    makeRouteData peerData pathAttributes routeId overrideLocalPref poisoned = RouteData {..}
+    makeRouteData :: PeerData -> [PathAttribute] -> Int -> Word32 -> RouteData
+    makeRouteData peerData pathAttributes routeHash overrideLocalPref = RouteData {..}
         where
         (pathLength, originAS, lastAS) = getASPathDetail pathAttributes
         fromEBGP = isExternal peerData
-        med = if fromEBGP then 0 else getMED pathAttributes
+        med = getMED pathAttributes -- currently not used for tiebreak -- only present value is for forwarding on IBGP
         localPref = if fromEBGP then overrideLocalPref else getLocalPref pathAttributes
         nextHop = getNextHop pathAttributes
         origin = getOrigin pathAttributes
 
-updatePeer :: AdjRIB -> (PeerData, Int, [Prefix]) -> IO ()
-updatePeer adjRib (peer,routeHash,prefixes) = insertAdjRIBTable (prefixes, routeHash ) (fromJust $ Data.Map.lookup peer adjRib)
+-- CONTROLLER
+-- updatePeer :: AdjRIB -> (PeerData, Int, [Prefix]) -> IO ()
+-- updatePeer adjRib (peer,routeHash,prefixes) = insertAdjRIBTable (prefixes, routeHash ) (fromJust $ Data.Map.lookup peer adjRib)
 
--- insert the given route update into the update fifos of all peers
-updateAllPeers :: AdjRIB -> (Int, [Prefix]) -> IO ()
-updateAllPeers adjRib (routeID,prefixes) = mapM_ (insertAdjRIBTable (prefixes,routeID) ) fifos
-    where fifos = Data.Map.elems adjRib
+-- -- insert the given route update into the update fifos of all peers
+-- updateAllPeers :: AdjRIB -> (Int, [Prefix]) -> IO ()
+-- updateAllPeers adjRib (routeID,prefixes) = mapM_ (insertAdjRIBTable (prefixes,routeID) ) fifos
+--     where fifos = Data.Map.elems adjRib
+
+updateRibOutWithPeerData :: PeerData -> [(Prefix,RouteData)] -> AdjRIB -> IO ()
+updateRibOutWithPeerData triggerPeer updates adjRIB = 
+    sequence_ $ Data.Map.mapWithKey action adjRIB
+
+-- reminder: type AdjRIB = Data.Map.Map PeerData AdjRIBTable
+--         : insertNAdjRIBTable :: [([Prefix],Int)] -> AdjRIBTable -> IO ()
+--
+--         - applying an action to every AdjRIBTable in an 'AdjRIB' is achived by
+--         -    sequence_ $ Data.Map.map action
+--         - where 'action' is  AdjRIBTable -> IO ()
+--         - If the requirement is to execute an action which is sependent upon the peer context then
+--         -    sequence_ $ Data.Map.mapWithKey action'
+--         - is required, where 'action'' is PeerData -> AdjRIBTable -> IO ()
+
+    where 
+        action :: PeerData -> AdjRIBTable -> IO ()
+        action targetPeer = insertNAdjRIBTable (f updates) where
+            f0 :: [(Prefix,RouteData)] -> [(Prefix,Int)]
+            f0 = map (second routeId)
+            f1 :: [(Prefix,Int)] -> [([Prefix],Int)]
+            f1 = groupBySecond
+            f :: [(Prefix,RouteData)] -> [([Prefix],Int)]
+            f = f1 . f0 . applyExportFilter exportFilter
+            applyExportFilter :: (PeerData -> PeerData -> RouteData -> RouteData) -> [(Prefix,RouteData)] -> [(Prefix,RouteData)]
+            applyExportFilter xf = map (\(pfx,rd) -> (pfx, xf triggerPeer targetPeer rd))
+            -- ## TODO - consider whether WIthdraw constructor should carry PeerData at all....
+            -- (the use is for input to RIB, not export (RIB never exports Withdraw, ony NullRoute))
+
+importFilter :: RouteData -> Bool
+importFilter route@RouteData{} = pathLoopCheck route where
+    pathLoopCheck r = elemASPath (myAS $ globalData $ peerData r) (pathAttributes r)
+importFilter _ = error "importFilter only defined for updates"
+
+exportFilter :: PeerData -> PeerData -> RouteData -> RouteData
+exportFilter trigger target route@RouteData{} = if checks then route else trace "export filtered" $ Withdraw undefined where
+    checks = iBGPRelayCheck && noReturnCheck
+    iBGPRelayCheck = fromEBGP route || isExternal target
+    noReturnCheck = target /= peerData route
+exportFilter trigger target NullRoute = trace "export filter applied to null route" NullRoute
+exportFilter trigger target Withdraw{} = if checks then trace "export withdraw allowed" $ Withdraw undefined
+                                                   else trace "export withdraw filtered" NullRoute where
+    checks = iBGPRelayCheck && noReturnCheck
+    iBGPRelayCheck = isExternal trigger || isExternal target
+    noReturnCheck = target /= trigger

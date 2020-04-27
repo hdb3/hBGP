@@ -4,16 +4,17 @@ module MRTrib ( module MRTlib
               , getMRTRibV4,getMRTRibV6,showMRTRibV4,showMRTRibV6
               , getMRTRibs
               , getMRTRibsV6
+              , sortRibsOnPrefixCount,sortRibsOnPathCount,fromRouteMapv4
               , Peer, MRTRib,Rib
               , RouteMapv4,RouteMapv6
               , MRTRibV4,MRTRibV6
               ) where
 
 import qualified Data.IntMap.Strict as Map
-import FarmHash(hash64)
+import Data.Digest.Murmur64
 import Data.Array.IArray
 import Data.Maybe(fromMaybe)
-import Data.List(foldl',reverse)
+import Data.List(foldl',sortOn)
 
 import MRTlib
 
@@ -60,7 +61,7 @@ mrtToPeerMap = buildPeerMap . mrtToPeerMapInput
     extractRIBrecords RIBIPV4Unicast{..} = map (\RIBEntry{..} -> RIBrecord { rrPrefix = IP4Prefix (re4Address,re4Length), rrPeerIndex = rePeerIndex, rrOriginatedTime = reOriginatedTime, rrAttributes = reAttributes, rrAttributeHash = myHash reAttributes }) re4RIB
     extractRIBrecords RIBIPV6Unicast{..} = map (\RIBEntry{..} -> RIBrecord { rrPrefix = IP6Prefix (re6Address,re6Length), rrPeerIndex = rePeerIndex, rrOriginatedTime = reOriginatedTime, rrAttributes = reAttributes, rrAttributeHash = myHash reAttributes }) re6RIB
     extractRIBrecords _ = []
-    myHash (BGPAttributes bs) = fromIntegral $ FarmHash.hash64 bs
+    myHash (BGPAttributes bs) = fromIntegral $ asWord64 $ hash64 bs
 
     ribRecordToPeerMapInput :: RIBrecord -> PeerMapInput
     ribRecordToPeerMapInput RIBrecord{..} = (rrPeerIndex,rrAttributeHash,rrAttributes,rrPrefix)
@@ -145,3 +146,12 @@ showMRTRibV6 a = "IPv6 peers ("
                       ++ unlines ( map showMRTRibV6Entry a)
     where
     showMRTRibV6Entry (i,p,r) = show i ++ " " ++ show p ++ " " ++ showStatsRouteMap r
+
+sortRibsOnPathCount :: MRTRibV4 -> MRTRibV4
+sortRibsOnPathCount = sortOn ( (\(_,_,a) -> pathCountRouteMap a))
+
+sortRibsOnPrefixCount :: MRTRibV4 -> MRTRibV4
+sortRibsOnPrefixCount = sortOn ( (\(_,_,a) -> prefixCountRouteMap a))
+
+fromRouteMapv4 :: Map.IntMap (BGPAttributes,IP4PrefixList) -> [(BGPAttributes,IP4PrefixList)]
+fromRouteMapv4 = Map.elems

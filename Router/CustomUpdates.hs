@@ -5,14 +5,6 @@ import Prelude hiding (putStrLn,print)
 import System.IO(stderr,stdout)
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString.Char8 as BS
-import Data.Binary(encode)
-
---import qualified Data.ByteString as BS
---import Data.IP
---import Data.Maybe(fromMaybe)
---import Data.Word
---import System.IO(IOMode( ReadWriteMode ),Handle, hClose,stdout)
-
 import BGPlib
 import BGPRib hiding ( group,update,ribPush, addPeer)
 import UpdateSource hiding (main)
@@ -38,7 +30,6 @@ main = do
         repeatDelay = getVal dict 0 "repeatDelay"
         idleDetect = fromRational $ getVal dict 5.0 "idleDetect"
         oneShotMode = testMode == OneShot
-        --peer = dummyPeerData { localIPv4 = "192.168.122.1" }
         peer = dummyPeerData { localIPv4 = getVal dict "192.168.122.1" "nextHop" }
 
     updateSource <- initSource peer startPrefix tableSize groupSize burstSize burstDelay oneShotMode repeatDelay

@@ -1,9 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 module Router.Open where
-import Data.Binary
 import qualified Data.ByteString.Lazy as L
 import Data.Maybe(isJust,fromJust)
-import Data.IP(fromHostAddress)
 
 import BGPlib.BGPlib
 
@@ -126,7 +124,7 @@ getResponse osm@OpenStateMachine {..} | isJust remoteOffer = firstMaybe [checkmy
 -- this is the mentioned check for presecnce in remote offer of required parameters
 -- return a list of capabilities required but not found in the offer
         checkOptionalCapabilities :: Maybe BGPMessage
-        checkOptionalCapabilities = if null missingCapabilities then Nothing else Just (BGPNotify NotificationOPENMessageError (encode8 UnsupportedOptionalParameter) (encode missingCapabilities)) where
+        checkOptionalCapabilities = if null missingCapabilities then Nothing else Just (BGPNotify NotificationOPENMessageError (encode8 UnsupportedOptionalParameter) (capsEncode missingCapabilities)) where
             offered  = caps remoteOffer'
             missingCapabilities = check (caps required)
             check [] = []

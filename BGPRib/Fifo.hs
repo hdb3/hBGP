@@ -26,6 +26,18 @@ enqueue mvar item = do
     -- note this will not block as long the calling thread is the only producer
     putMVar mvar (item:h,t)
 
+-- extended from enqueue
+enqueueN :: MVar ([a],[a] ) -> [a] -> IO ()
+enqueueN mvar items = do
+    maybeFifo <- tryTakeMVar mvar
+    let (h,t) = fromMaybe ([],[]) maybeFifo
+        cat [] bx = bx
+        cat (a:[]) bx = a:bx
+        cat (a:ax) bx = cat ax (a:ax)
+    putMVar mvar (cat items h,t)
+    -- putMVar mvar (items ++ h,t) -- made more efficient by not using '++'?
+
+
 -- this is a blocking call
 dequeue  :: MVar ([a],[a] ) -> IO [a]
 dequeue mvar = do
