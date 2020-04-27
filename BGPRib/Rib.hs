@@ -5,6 +5,8 @@ import qualified Data.Map.Strict as Data.Map
 import Data.Word(Word32)
 import Data.IP
 import Data.Maybe(fromJust)
+import Data.List(nub)
+import Control.Monad(when)
 import Control.Arrow(second)
 --import Debug.Trace
 import BGPlib.BGPlib
@@ -142,70 +144,82 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
 
     --     ribUpdateMany peerData puPathAttributes hash nlri rib0 >>= ribWithdrawMany peerData withdrawn
 
-    -- reduce :: [(PeerData, Int, [Prefix])] -> [(Int, [Prefix])]
-    -- -- generally there is a 1:1 relation between in and out for this function, however we can't assume that
-    -- reduce = nub . map (\(_,a,b) -> (a,b))
-
--- TODO - merge ribUpdateMany and ribWithdrawMany?
     ribPush' peerData ParsedUpdate{..} rib = ribUpdateMany peerData puPathAttributes hash nlri rib >>= ribWithdrawMany peerData withdrawn
 
     ribUpdateMany :: PeerData -> [PathAttribute] -> Int -> [Prefix] -> Rib' -> IO Rib'
     ribUpdateMany peerData pathAttributes routeId pfxs (Rib' prefixTable adjRibOutTables )
         | null pfxs = return (Rib' prefixTable adjRibOutTables )
         | otherwise = do
-            -- CONTROLLER
-            --   poisoned <- checkPoison peerData pathAttributes pfxs
-            --   when poisoned ( putStrLn ( "poisoned route detected " ++ show peerData ++ " " ++ show pfxs))
-            --   let routeData = makeRouteData peerData pathAttributes routeId 100 poisoned
-            --       ( prefixTable' , updates ) = BGPRib.PrefixTable.update prefixTable pfxs peerData (Just routeData)
-            --       reducedUpdates = reduce updates
-
-            --   -- this version is the minimal update applicable in the ADDPATH case
-            --   -- mapM_ (updatePeer adjRibOutTables) updates
-
-            --   -- this version is the promicuous update applicable in the best-external case
-            --   mapM_ (updateAllPeers adjRibOutTables) reducedUpdates 
-              
               localPref <- evalLocalPref peerData pathAttributes pfxs
               let routeData = makeRouteData peerData pathAttributes routeId localPref
                   routeData' = if importFilter routeData then trace "importFilter: filtered" $ Withdraw peerData else routeData
                   ( !prefixTable' , !updates ) = BGPRib.PrefixTable.update prefixTable pfxs routeData'
               updateRibOutWithPeerData peerData updates adjRibOutTables
               return $ Rib' prefixTable' adjRibOutTables
+        where
+            makeRouteData :: PeerData -> [PathAttribute] -> Int -> Word32 -> RouteData
+            makeRouteData peerData pathAttributes routeHash overrideLocalPref = RouteData {..}
+                where
+                (pathLength, originAS, lastAS) = getASPathDetail pathAttributes
+                fromEBGP = isExternal peerData
+                med = getMED pathAttributes -- currently not used for tiebreak -- only present value is for forwarding on IBGP
+                localPref = if fromEBGP then overrideLocalPref else getLocalPref pathAttributes
+                nextHop = getNextHop pathAttributes
+                origin = getOrigin pathAttributes
+    --
+    ribUpdateManyC :: PeerData -> [PathAttribute] -> Int -> [Prefix] -> Rib' -> IO Rib'
+    ribUpdateManyC peerData pathAttributes routeId pfxs (Rib' prefixTable adjRibOutTables )
+        | null pfxs = return (Rib' prefixTable adjRibOutTables )
+        | otherwise = do
+              localPref <- evalLocalPref peerData pathAttributes pfxs
+              poisoned <- checkPoison peerData pathAttributes pfxs
+              when poisoned ( putStrLn ( "poisoned route detected " ++ show peerData ++ " " ++ show pfxs))
+              let routeData = makeRouteData peerData pathAttributes routeId 100 poisoned
+                  routeData' = if importFilter routeData then trace "importFilter: filtered" $ Withdraw peerData else routeData
+                  ( !prefixTable' , !updates ) = BGPRib.PrefixTable.updateC prefixTable pfxs peerData (Just routeData)
+                  reducedUpdates = reduce updates
+
+              -- this version is the minimal update applicable in the ADDPATH case
+              -- mapM_ (updatePeer adjRibOutTables) updates
+
+              -- this version is the promicuous update applicable in the best-external case
+              mapM_ (updateAllPeers adjRibOutTables) reducedUpdates 
+              return $ Rib' prefixTable' adjRibOutTables
+        where
+              --    
+              reduce :: [(PeerData, Int, [Prefix])] -> [(Int, [Prefix])]
+              -- generally there is a 1:1 relation between in and out for this function, however we can't assume that
+              reduce = nub . map (\(_,a,b) -> (a,b))
+              --
+              makeRouteData :: PeerData -> [PathAttribute] -> Int -> Word32 -> Bool -> RouteData
+              makeRouteData peerData pathAttributes routeId overrideLocalPref poisoned = RouteData {..}    
+
 
     ribWithdrawMany :: PeerData -> [Prefix] -> Rib' -> IO Rib'
     ribWithdrawMany peerData pfxs (Rib' prefixTable adjRibOutTables)
         | null pfxs = return (Rib' prefixTable adjRibOutTables )
         | otherwise = do
-    -- CONTROLLER
-    --         let ( prefixTable' , withdraws ) = BGPRib.PrefixTable.update prefixTable pfxs peerData Nothing
-    --         mapM_ (updatePeer adjRibOutTables) withdraws
-    --         return $ Rib' prefixTable' adjRibOutTables
-
-    -- makeRouteData :: PeerData -> [PathAttribute] -> Int -> Word32 -> Bool -> RouteData
-    -- makeRouteData peerData pathAttributes routeId overrideLocalPref poisoned = RouteData {..}
             let ( !prefixTable' , !withdraws ) = BGPRib.PrefixTable.update prefixTable pfxs (Withdraw peerData)
             updateRibOutWithPeerData peerData withdraws adjRibOutTables
             return $ Rib' prefixTable' adjRibOutTables
 
-    makeRouteData :: PeerData -> [PathAttribute] -> Int -> Word32 -> RouteData
-    makeRouteData peerData pathAttributes routeHash overrideLocalPref = RouteData {..}
-        where
-        (pathLength, originAS, lastAS) = getASPathDetail pathAttributes
-        fromEBGP = isExternal peerData
-        med = getMED pathAttributes -- currently not used for tiebreak -- only present value is for forwarding on IBGP
-        localPref = if fromEBGP then overrideLocalPref else getLocalPref pathAttributes
-        nextHop = getNextHop pathAttributes
-        origin = getOrigin pathAttributes
+    ribWithdrawManyC :: PeerData -> [Prefix] -> Rib' -> IO Rib'
+    ribWithdrawManyC peerData pfxs (Rib' prefixTable adjRibOutTables)
+        | null pfxs = return (Rib' prefixTable adjRibOutTables )
+        | otherwise = do
+            let ( prefixTable' , withdraws ) = BGPRib.PrefixTable.updateC prefixTable pfxs peerData Nothing
+            mapM_ (updatePeer adjRibOutTables) withdraws
+            return $ Rib' prefixTable' adjRibOutTables
+    
 
 -- CONTROLLER
 updatePeer :: AdjRIB -> (PeerData, Int, [Prefix]) -> IO ()
 updatePeer adjRib (peer,routeHash,prefixes) = insertAdjRIBTable (prefixes, routeHash ) (fromJust $ Data.Map.lookup peer adjRib)
 
 -- -- insert the given route update into the update fifos of all peers
--- updateAllPeers :: AdjRIB -> (Int, [Prefix]) -> IO ()
--- updateAllPeers adjRib (routeID,prefixes) = mapM_ (insertAdjRIBTable (prefixes,routeID) ) fifos
---     where fifos = Data.Map.elems adjRib
+updateAllPeers :: AdjRIB -> (Int, [Prefix]) -> IO ()
+updateAllPeers adjRib (routeID,prefixes) = mapM_ (insertAdjRIBTable (prefixes,routeID) ) fifos
+    where fifos = Data.Map.elems adjRib
 
 updateRibOutWithPeerData :: PeerData -> [(Prefix,RouteData)] -> AdjRIB -> IO ()
 updateRibOutWithPeerData triggerPeer updates adjRIB = 
