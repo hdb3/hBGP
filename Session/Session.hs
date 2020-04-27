@@ -123,10 +123,6 @@ listener state@State{..} = do
     listenClient (sock, NS.SockAddrInet _ remoteHostAddress) = do
             ( NS.SockAddrInet _ localHostAddress ) <- NS.getSocketName sock
             let addressPair = ( fromHostAddress localHostAddress ,fromHostAddress remoteHostAddress)
-<<<<<<< HEAD
-            -- logger $ "listener - connect request (src/dst): " ++ show addressPair
-=======
->>>>>>> master
             unblocked <- raceCheckNonBlock addressPair
             if unblocked then do
                 wrap state defaultApp sock

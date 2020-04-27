@@ -4,6 +4,7 @@ import Control.Concurrent
 import qualified Data.Map.Strict as Data.Map
 import Data.Word(Word32)
 import Data.IP
+import Data.Maybe(fromJust)
 import Control.Arrow(second)
 --import Debug.Trace
 import BGPlib.BGPlib
@@ -14,7 +15,7 @@ import qualified BGPRib.PrefixTableUtils as PrefixTableUtils
 import BGPRib.AdjRIBOut
 import BGPRib.Common(groupBySecond)
 
-trace _ x = x
+-- trace _ x = x
 
 type Rib = MVar Rib'
 -- TODO rename AdjRIB -> AdjRIBMap
@@ -38,18 +39,20 @@ delPeer :: Rib -> PeerData -> IO ()
 delPeer rib peer = modifyMVar_ rib ( delPeer' peer )
 
     where
-
+    -- master
     delPeer' :: PeerData -> Rib' -> IO Rib'
     delPeer' peer Rib' {..} = do
-        -- drain the prefix table and save the resulting withdraws
-        -- # let (prefixTable',prefixes) = withdrawPeer prefixTable peer
-        -- schedule the withdraw dissemination
-        -- NOTE - this does not change the AdjRIBMap
+        let (prefixTable',prefixes) = withdrawPeer prefixTable peer
         updateRibOutWithPeerData peer prefixes adjRib
-        -- now remove this peer completely from the AdjRIBMap
-        -- it is liekly that this could be done before the previous action.....
-        -- but the semantics should be identical as long as we didn't try to send withdraw messages to the peer which has gone away...
         return $ Rib' prefixTable' ( Data.Map.delete peer adjRib )
+    -- from Controller
+    delPeer'' :: PeerData -> Rib' -> IO Rib'
+    delPeer'' peer Rib' {..} = do
+        let prefixes = getPeerPrefixes prefixTable peer
+            (prefixTable',withdraws) = BGPRib.PrefixTable.updateC prefixTable prefixes peer Nothing
+        mapM_ (updatePeer adjRib) withdraws
+        return $ Rib' prefixTable' ( Data.Map.delete peer adjRib )
+
 
 addPeer :: Rib -> PeerData -> IO ()
 addPeer rib peer = modifyMVar_ rib ( addPeer' peer )
@@ -123,6 +126,9 @@ getLocRib rib = do
     rib' <- readMVar rib
     return (prefixTable rib')
 
+evalLocalPref :: PeerData -> [PathAttribute] -> [Prefix] -> IO Word32
+evalLocalPref peerData pathAttributes pfxs = return (peerLocalPref peerData)
+
 checkPoison :: PeerData -> [PathAttribute] -> [Prefix] -> IO Bool
 checkPoison peerData pathAttributes _ = return $ elemASPath 666 pathAttributes
 
@@ -193,8 +199,8 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
         origin = getOrigin pathAttributes
 
 -- CONTROLLER
--- updatePeer :: AdjRIB -> (PeerData, Int, [Prefix]) -> IO ()
--- updatePeer adjRib (peer,routeHash,prefixes) = insertAdjRIBTable (prefixes, routeHash ) (fromJust $ Data.Map.lookup peer adjRib)
+updatePeer :: AdjRIB -> (PeerData, Int, [Prefix]) -> IO ()
+updatePeer adjRib (peer,routeHash,prefixes) = insertAdjRIBTable (prefixes, routeHash ) (fromJust $ Data.Map.lookup peer adjRib)
 
 -- -- insert the given route update into the update fifos of all peers
 -- updateAllPeers :: AdjRIB -> (Int, [Prefix]) -> IO ()

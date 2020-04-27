@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleInstances,TupleSections #-}
-module BGPRib.PrefixTable(PrefixTable,update,newPrefixTable,queryPrefixTable,getPeerPrefixes,showRibAt) where
+module BGPRib.PrefixTable where
 
 {- A single prefix table holds everything about a prefix we could care about
  - but, this is merely the prefix itself, and the associated path
@@ -14,10 +14,17 @@ module BGPRib.PrefixTable(PrefixTable,update,newPrefixTable,queryPrefixTable,get
  - hence a fast implementation is essential
 -}
 
+import qualified Data.IntMap.Strict as IntMap
+import qualified Data.Map.Strict as Map
+import Data.Maybe(fromMaybe)
+import Data.List ((\\),foldl')
 import qualified Data.List
 import BGPRib.BGPData
 import BGPlib.BGPlib (Prefix,toPrefix,fromPrefix)
 import qualified BGPRib.PT as PT
+
+trace _ = id
+-- trace = Debug.Trace.trace
 
 type PrefixTableEntry = PT.PTE
 type PrefixTable = PT.PT
@@ -138,21 +145,21 @@ withdrawPeerC prefixTable peerData = swapNgroom $ IntMap.mapAccumWithKey (update
             p = (peer /=) .  BGPRib.BGPData.peerData
             prefixList' = toPrefix prefix : prefixList
 
--- groomPrefixTable :: PrefixTable -> PrefixTable
--- groomPrefixTable = IntMap.filter ( not . null )
+groomPrefixTable :: PrefixTable -> PrefixTable
+groomPrefixTable = IntMap.filter ( not . null )
 
 -- -- ADDPATH changes
 -- -- this function must return full prefixes (inclusidnng pathID)
 -- -- because it determines which withdraws must be generated after delPeer
 -- -- this reasoning may be questioned if the subsequent function call did noot simply use 'update' to do its work....
 
--- getPeerPrefixes :: PrefixTable -> PeerData -> [Prefix]
--- getPeerPrefixes pt peer = IntMap.foldlWithKey' f [] pt where 
+getPeerPrefixes :: PrefixTable -> PeerData -> [Prefix]
+getPeerPrefixes pt peer = IntMap.foldlWithKey' f [] pt where 
     
---     -- base code - assumes that only one prefix can be returned per prefix table entry....
---     f acc key val = if p val then (toPrefix key:acc) else acc
---     p = Data.List.any p'
---     p' = ( peer == ) . peerData
+    -- base code - assumes that only one prefix can be returned per prefix table entry....
+    f acc key val = if p val then (toPrefix key:acc) else acc
+    p = Data.List.any p'
+    p' = ( peer == ) . peerData
 
 newPrefixTable :: PrefixTable
 newPrefixTable = PT.ptNew

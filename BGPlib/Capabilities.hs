@@ -11,8 +11,6 @@ import qualified Data.ByteString.Lazy as L
 import Data.Word
 
 type CapCode = Word8
-
-type CapCode = Word8
 --
 -- ref https://www.iana.org/assignments/capability-codes/capability-codes.xml
 --

@@ -7,7 +7,7 @@ import qualified System.IO.Streams as Streams
 import Control.Monad(void,when)
 
 import BGPlib.BGPlib
-import BGPRib.BGPRib
+import BGPRib.BGPRib hiding (trace)
 -- ************* VERY DANGEROUS - should re-export from BGPfsm to avoid conflict!!!!
 --import qualified CustomRib as Rib
 import qualified Router.StdRib as Rib
