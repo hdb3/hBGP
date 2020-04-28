@@ -42,7 +42,7 @@ query cs s = do
         lift $ print prefixTable
     else
         maybe (outputStrLn "couldn't parse prefix")
-              (\prefix -> outputStrLn $ "[" ++ show prefix ++ "] " ++ showRibAt prefixTable (fromAddrRange prefix))
+              (\prefix -> outputStrLn $ "[" ++ show prefix ++ "] " ++ showRibAtC prefixTable (fromAddrRange prefix))
               (parsePrefix $ head s)
     console cs
 

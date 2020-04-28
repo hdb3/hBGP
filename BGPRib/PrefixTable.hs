@@ -17,7 +17,7 @@ module BGPRib.PrefixTable where
 -}
 
 import BGPRib.BGPData
-import qualified BGPRib.PT as PT
+-- import qualified BGPRib.PT as PT
 import BGPlib.BGPlib (Prefix, fromPrefix, toPrefix)
 import qualified Data.IntMap.Strict as IntMap
 import Data.List ((\\), foldl')
@@ -29,14 +29,24 @@ trace _ = id
 
 -- trace = Debug.Trace.trace
 
-type PrefixTableEntry = PT.PTE
+-- type PrefixTableEntry = PT.PTE
 
-type PrefixTable = PT.PT
+-- type PrefixTable = PT.PT
+
+type PrefixTableEntry = [RouteData]
+type PrefixTable = IntMap.IntMap PrefixTableEntry
 
 instance {-# OVERLAPPING #-} Show PrefixTable where
-  show = unlines . map showPTE . PT.ptList
-    where
-      showPTE (k, v) = show (toPrefix k, v)
+    show = show . map (\(k,v) -> (toPrefix k,v)) . IntMap.toList
+
+newPrefixTable :: PrefixTable
+newPrefixTable = IntMap.empty
+
+
+-- instance {-# OVERLAPPING #-} Show PrefixTable where
+--   show = unlines . map showPTE . PT.ptList
+--     where
+--       showPTE (k, v) = show (toPrefix k, v)
 
 type LocalMap = Map.Map (PeerData, RouteData) [Prefix]
 
@@ -110,10 +120,10 @@ updateC pt pfxs route = (pt', trace (show updates) updates)
         rval = trace traceData (map (,NullRoute,pfx) withdrawTargets ++ map (,newBestRoute,pfx) updateTargets)
 
 -- this function returns the best route for a specific prefix
-queryPrefixTableC :: PrefixTable -> Prefix -> Maybe RouteData
+queryPrefixTableC :: PrefixTable -> Prefix -> RouteData
 queryPrefixTableC table pfx =
   let rawRouteList = fromMaybe [] $ IntMap.lookup (fromPrefix pfx) table
-      safeHead ax = if null ax then Nothing else Just (head ax)
+      safeHead ax = if null ax then NullRoute else head ax
    in safeHead $ Data.List.dropWhile poisoned rawRouteList
 
 showRibAtC :: PrefixTable -> Prefix -> String
@@ -169,25 +179,25 @@ getPeerPrefixes pt peer = IntMap.foldlWithKey' f [] pt
     p = Data.List.any p'
     p' = (peer ==) . peerData
 
-newPrefixTable :: PrefixTable
-newPrefixTable = PT.ptNew
+-- newPrefixTable :: PrefixTable
+-- newPrefixTable = PT.ptNew
 
-update :: PrefixTable -> [Prefix] -> RouteData -> (PrefixTable, [(Prefix, RouteData)])
-update pt pfxs route = Data.List.foldl' f (pt, []) pfxs
-  where
-    f (pt', acc) pfx = (pt'', acc')
-      where
-        acc' = if PT.pteBest new == PT.pteBest old then acc else (pfx, PT.pteBest new) : acc
-        (old, new, pt'') = PT.ptUpdate (fromPrefix pfx) route pt
+-- update :: PrefixTable -> [Prefix] -> RouteData -> (PrefixTable, [(Prefix, RouteData)])
+-- update pt pfxs route = Data.List.foldl' f (pt, []) pfxs
+--   where
+--     f (pt', acc) pfx = (pt'', acc')
+--       where
+--         acc' = if PT.pteBest new == PT.pteBest old then acc else (pfx, PT.pteBest new) : acc
+--         (old, new, pt'') = PT.ptUpdate (fromPrefix pfx) route pt
 
-queryPrefixTable :: PrefixTable -> Prefix -> RouteData
-queryPrefixTable table pfx = PT.pteBest $ PT.ptQuery (fromPrefix pfx) table
+-- queryPrefixTable :: PrefixTable -> Prefix -> RouteData
+-- queryPrefixTable table pfx = PT.pteBest $ PT.ptQuery (fromPrefix pfx) table
 
-showRibAt :: PrefixTable -> Prefix -> String
-showRibAt table pfx = show (PT.ptQuery (fromPrefix pfx) table)
+-- showRibAt :: PrefixTable -> Prefix -> String
+-- showRibAt table pfx = show (PT.ptQuery (fromPrefix pfx) table)
 
-withdraw :: PrefixTable -> [Prefix] -> PeerData -> (PrefixTable, [(Prefix, RouteData)])
-withdraw pt pfxs pd = update pt pfxs (Withdraw pd)
+-- withdraw :: PrefixTable -> [Prefix] -> PeerData -> (PrefixTable, [(Prefix, RouteData)])
+-- withdraw pt pfxs pd = update pt pfxs (Withdraw pd)
 
-withdrawPeer :: PrefixTable -> PeerData -> (PrefixTable, [(Prefix, RouteData)])
-withdrawPeer pt = withdraw pt (map toPrefix $ PT.ptKeys pt)
+-- withdrawPeer :: PrefixTable -> PeerData -> (PrefixTable, [(Prefix, RouteData)])
+-- withdrawPeer pt = withdraw pt (map toPrefix $ PT.ptKeys pt)

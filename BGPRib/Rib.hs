@@ -46,14 +46,14 @@ getPeersInRib rib = do
   return $ Data.Map.keys adjRib
 
 delPeer :: Rib -> PeerData -> IO ()
-delPeer rib peer = modifyMVar_ rib (delPeer' peer)
+delPeer rib peer = modifyMVar_ rib (delPeer'' peer)
   where
-    -- master
-    delPeer' :: PeerData -> Rib' -> IO Rib'
-    delPeer' peer Rib' {..} = do
-      let (prefixTable', prefixes) = withdrawPeer prefixTable peer
-      updateRibOutWithPeerData peer prefixes adjRib
-      return $ Rib' prefixTable' (Data.Map.delete peer adjRib)
+    -- -- master
+    -- delPeer' :: PeerData -> Rib' -> IO Rib'
+    -- delPeer' peer Rib' {..} = do
+    --   let (prefixTable', prefixes) = withdrawPeer prefixTable peer
+    --   updateRibOutWithPeerData peer prefixes adjRib
+    --   return $ Rib' prefixTable' (Data.Map.delete peer adjRib)
     -- from Controller
     delPeer'' :: PeerData -> Rib' -> IO Rib'
     delPeer'' peer Rib' {..} = do
@@ -99,7 +99,7 @@ addPeer rib peer = modifyMVar_ rib (addPeer' peer)
 lookupRoutes :: Rib -> AdjRIBEntry -> IO (Maybe (RouteData, [Prefix]))
 lookupRoutes rib (prefixes, routeHash) = do
   rib' <- readMVar rib
-  let myLookup = map (\pfx -> (queryPrefixTable (prefixTable rib') pfx, pfx))
+  let myLookup = map (\pfx -> (queryPrefixTableC (prefixTable rib') pfx, pfx))
       -- myFilter = filter ((routeHash ==) . routeId .fst )
       -- the following line removes the suppress changed routes check
       -- which is essential for filters to work correctly
@@ -113,7 +113,7 @@ getNextHops rib prefixes = do
   rib' <- readMVar rib
   return $
     map
-      (\prefix -> (prefix,) $ getRouteNextHop $ queryPrefixTable (prefixTable rib') prefix)
+      (\prefix -> (prefix,) $ getRouteNextHop $ queryPrefixTableC (prefixTable rib') prefix)
       prefixes
 
 pullAllUpdates :: PeerData -> Rib -> IO [AdjRIBEntry]
@@ -146,27 +146,27 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
 
     --     ribUpdateMany peerData puPathAttributes hash nlri rib0 >>= ribWithdrawMany peerData withdrawn
 
-    ribPush' peerData ParsedUpdate {..} rib = ribUpdateMany peerData puPathAttributes hash nlri rib >>= ribWithdrawMany peerData withdrawn
-    ribUpdateMany :: PeerData -> [PathAttribute] -> Int -> [Prefix] -> Rib' -> IO Rib'
-    ribUpdateMany peerData pathAttributes routeId pfxs (Rib' prefixTable adjRibOutTables)
-      | null pfxs = return (Rib' prefixTable adjRibOutTables)
-      | otherwise = do
-        localPref <- evalLocalPref peerData pathAttributes pfxs
-        let routeData = makeRouteData peerData pathAttributes routeId localPref
-            routeData' = if importFilter routeData then trace "importFilter: filtered" $ Withdraw peerData else routeData
-            (!prefixTable', !updates) = BGPRib.PrefixTable.update prefixTable pfxs routeData'
-        updateRibOutWithPeerData peerData updates adjRibOutTables
-        return $ Rib' prefixTable' adjRibOutTables
-      where
-        makeRouteData :: PeerData -> [PathAttribute] -> Int -> Word32 -> RouteData
-        makeRouteData peerData pathAttributes routeHash overrideLocalPref = RouteData {..}
-          where
-            (pathLength, originAS, lastAS) = getASPathDetail pathAttributes
-            fromEBGP = isExternal peerData
-            med = getMED pathAttributes -- currently not used for tiebreak -- only present value is for forwarding on IBGP
-            localPref = if fromEBGP then overrideLocalPref else getLocalPref pathAttributes
-            nextHop = getNextHop pathAttributes
-            origin = getOrigin pathAttributes
+    ribPush' peerData ParsedUpdate {..} rib = ribUpdateManyC peerData puPathAttributes hash nlri rib >>= ribWithdrawManyC peerData withdrawn
+    -- ribUpdateMany :: PeerData -> [PathAttribute] -> Int -> [Prefix] -> Rib' -> IO Rib'
+    -- ribUpdateMany peerData pathAttributes routeId pfxs (Rib' prefixTable adjRibOutTables)
+    --   | null pfxs = return (Rib' prefixTable adjRibOutTables)
+    --   | otherwise = do
+    --     localPref <- evalLocalPref peerData pathAttributes pfxs
+    --     let routeData = makeRouteData peerData pathAttributes routeId localPref
+    --         routeData' = if importFilter routeData then trace "importFilter: filtered" $ Withdraw peerData else routeData
+    --         (!prefixTable', !updates) = BGPRib.PrefixTable.update prefixTable pfxs routeData'
+    --     updateRibOutWithPeerData peerData updates adjRibOutTables
+    --     return $ Rib' prefixTable' adjRibOutTables
+    --   where
+    --     makeRouteData :: PeerData -> [PathAttribute] -> Int -> Word32 -> RouteData
+    --     makeRouteData peerData pathAttributes routeHash overrideLocalPref = RouteData {..}
+    --       where
+    --         (pathLength, originAS, lastAS) = getASPathDetail pathAttributes
+    --         fromEBGP = isExternal peerData
+    --         med = getMED pathAttributes -- currently not used for tiebreak -- only present value is for forwarding on IBGP
+    --         localPref = if fromEBGP then overrideLocalPref else getLocalPref pathAttributes
+    --         nextHop = getNextHop pathAttributes
+    --         origin = getOrigin pathAttributes
     --
     ribUpdateManyC :: PeerData -> [PathAttribute] -> Int -> [Prefix] -> Rib' -> IO Rib'
     ribUpdateManyC peerData pathAttributes routeId pfxs (Rib' prefixTable adjRibOutTables)
@@ -197,18 +197,18 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
         --
         makeRouteData :: PeerData -> [PathAttribute] -> Int -> Word32 -> Bool -> RouteData
         makeRouteData peerData pathAttributes routeId overrideLocalPref poisoned = RouteData {..}
-    ribWithdrawMany :: PeerData -> [Prefix] -> Rib' -> IO Rib'
-    ribWithdrawMany peerData pfxs (Rib' prefixTable adjRibOutTables)
-      | null pfxs = return (Rib' prefixTable adjRibOutTables)
-      | otherwise = do
-        let (!prefixTable', !withdraws) = BGPRib.PrefixTable.update prefixTable pfxs (Withdraw peerData)
-        updateRibOutWithPeerData peerData withdraws adjRibOutTables
-        return $ Rib' prefixTable' adjRibOutTables
+    -- ribWithdrawMany :: PeerData -> [Prefix] -> Rib' -> IO Rib'
+    -- ribWithdrawMany peerData pfxs (Rib' prefixTable adjRibOutTables)
+    --   | null pfxs = return (Rib' prefixTable adjRibOutTables)
+    --   | otherwise = do
+    --     let (!prefixTable', !withdraws) = BGPRib.PrefixTable.update prefixTable pfxs (Withdraw peerData)
+    --     updateRibOutWithPeerData peerData withdraws adjRibOutTables
+    --     return $ Rib' prefixTable' adjRibOutTables
     ribWithdrawManyC :: PeerData -> [Prefix] -> Rib' -> IO Rib'
     ribWithdrawManyC peerData pfxs (Rib' prefixTable adjRibOutTables)
       | null pfxs = return (Rib' prefixTable adjRibOutTables)
       | otherwise = do
-        let (prefixTable', withdraws) = BGPRib.PrefixTable.updateC prefixTable pfxs (Withdraw peerData)
+        let (!prefixTable', !withdraws) = BGPRib.PrefixTable.updateC prefixTable pfxs (Withdraw peerData)
         mapM_ (updatePeer adjRibOutTables) withdraws
         return $ Rib' prefixTable' adjRibOutTables
 
