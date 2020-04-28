@@ -38,36 +38,51 @@ instance {-# OVERLAPPING #-} Show PrefixTable where
     where
       showPTE (k, v) = show (toPrefix k, v)
 
-type LocalMap = Map.Map (PeerData, Int) [Prefix]
+type LocalMap = Map.Map (PeerData, RouteData) [Prefix]
 
-updateC :: PrefixTable -> [Prefix] -> PeerData -> Maybe RouteData -> (PrefixTable, [(PeerData, Int, [Prefix])])
-updateC pt pfxs sourcePeer routeM = (pt', trace (show updates) updates)
+updateC :: PrefixTable -> [Prefix] -> RouteData -> (PrefixTable, [(PeerData, RouteData, [Prefix])])
+{-
+    This function merges the output of multiple invocations of updatePrefixTable.
+    The output is bundled for direct consumption by updateRibOutWithPeerData in Rib.hs.
+    In many but not all cases there are 1:1 bundle:peers.
+    Each invocation of updatePrefixTable effectively returns lists of (peer, prefix, route).
+    The accumulator value is a map over (peer,route) containing a list of prefixes.
+-}
+updateC pt pfxs route = (pt', trace (show updates) updates)
   where
+    sourcePeer = peerData route
     (pt', updateList) = foldl' kf (pt, []) pfxs
-    kf :: (PrefixTable, [(PeerData, Int, Prefix)]) -> Prefix -> (PrefixTable, [(PeerData, Int, Prefix)])
-    kf (pt, acc) pfx = let (pt', ax) = updatePrefixTable sourcePeer routeM pt pfx in (pt', acc ++ ax)
+    kf :: (PrefixTable, [(PeerData, RouteData, Prefix)]) -> Prefix -> (PrefixTable, [(PeerData, RouteData, Prefix)])
+    kf (pt, acc) pfx = let (pt', ax) = updatePrefixTable route pt pfx in (pt', acc ++ ax)
+    --
+    -- now consolidate individual rows so that subsequqnt update messages are packed
     updates = extract $ foldl' f Map.empty updateList where f m (peer, route, pfx) = insert m peer route pfx
-    insert :: LocalMap -> PeerData -> Int -> Prefix -> LocalMap
+    insert :: LocalMap -> PeerData -> RouteData -> Prefix -> LocalMap
     insert map peer route prefix = Map.alter f (peer, route) map where f pre = Just $ prefix : fromMaybe [] pre
-    extract :: LocalMap -> [(PeerData, Int, [Prefix])]
+    extract :: LocalMap -> [(PeerData, RouteData, [Prefix])]
     extract m = map (\((a, b), c) -> (a, b, c)) $ Map.toList m
+    updatePrefixTable :: RouteData -> PrefixTable -> Prefix -> (PrefixTable, [(PeerData, RouteData, Prefix)])
     {-
-        This function merges the output of multiple invocations of updatePrefixTable.
-        The output is bundled for direct consumption by updateRibOutWithPeerData in Rib.hs.
-        In many but not all cases there are 1:1 bundle:peers.
-        Each invocation of updatePrefixTable effectively returns lists of (peer, prefix, route).
-        The accumulator value is a map over (peer,route) containing a list of prefixes.
+      This function processes a single prefix.
+      The input may be withdraw or update - the outcome is calculated identically after the different initial treatment based on whether
+      the input is Update and thus carries a new route which must be added to the list after any existing route for the peer is removed.
+      In either case the first action is to discard an existing route.
     -}
-
-    updatePrefixTable :: PeerData -> Maybe RouteData -> PrefixTable -> Prefix -> (PrefixTable, [(PeerData, Int, Prefix)])
-    updatePrefixTable sourcePeer routeM pt pfx = (pt', rval)
+    updatePrefixTable route pt pfx = (pt', rval)
       where
+        sourcePeer = peerData route
         -- NB - this function assumes that the list is sorted on entry!
+
         oldList = fromMaybe [] $ IntMap.lookup (fromPrefix pfx) pt
+        -- now remove any existing route from this peer from the table
         -- delete strategy uses the route origin as the basis for equality - in base case this is the peer, in ADDPATH it is (peer,PathID)
-        -- tmpList = filter p oldList where p r = (peerData r /= sourcePeer)
         tmpList = filter ((sourcePeer /=) . peerData) oldList
-        newList = maybe tmpList (\route -> Data.List.sort (route : tmpList)) routeM
+        -- now add in the new route, if present
+        newList = updatePT tmpList route
+          where
+            updatePT l r@RouteData {} = Data.List.sort (r : l)
+            updatePT l _ = l
+        -- insert the new PT, replacing if any the old PT for this prefix
         pt' = IntMap.insert (fromPrefix pfx) newList pt
         -- LOCRIB update complete, now calculate the impact....
         -- this section is BGPPROTECTION specific
@@ -79,7 +94,7 @@ updateC pt pfxs sourcePeer routeM = (pt', trace (show updates) updates)
 
         (initialRemediated, initialOther) = Data.List.span poisoned oldList
         (finalRemediable, finalOther) = Data.List.span poisoned newList
-        newBestRoute = (routeId . head) finalOther -- partial result guarded by use only when update list is not empty
+        newBestRoute = head finalOther -- partial result guarded by use only when update list is not empty
         (withdraw, update) = case (null initialRemediated || null initialOther, null finalRemediable || null finalOther) of
           (True, True) -> ([], [])
           (True, False) -> ([], finalRemediable)
@@ -92,7 +107,7 @@ updateC pt pfxs sourcePeer routeM = (pt', trace (show updates) updates)
             ++ show (finalRemediable, finalOther)
             ++ "\n(withdrawTargets, updateTargets) "
             ++ show (withdrawTargets, updateTargets)
-        rval = trace traceData (map (,0,pfx) withdrawTargets ++ map (,newBestRoute,pfx) updateTargets)
+        rval = trace traceData (map (,NullRoute,pfx) withdrawTargets ++ map (,newBestRoute,pfx) updateTargets)
 
 -- this function returns the best route for a specific prefix
 queryPrefixTableC :: PrefixTable -> Prefix -> Maybe RouteData

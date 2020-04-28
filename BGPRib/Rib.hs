@@ -58,7 +58,7 @@ delPeer rib peer = modifyMVar_ rib (delPeer' peer)
     delPeer'' :: PeerData -> Rib' -> IO Rib'
     delPeer'' peer Rib' {..} = do
       let prefixes = getPeerPrefixes prefixTable peer
-          (prefixTable', withdraws) = BGPRib.PrefixTable.updateC prefixTable prefixes peer Nothing
+          (prefixTable', withdraws) = BGPRib.PrefixTable.updateC prefixTable prefixes (Withdraw peer)
       mapM_ (updatePeer adjRib) withdraws
       return $ Rib' prefixTable' (Data.Map.delete peer adjRib)
 
@@ -177,7 +177,7 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
         when poisoned (putStrLn ("poisoned route detected " ++ show peerData ++ " " ++ show pfxs))
         let routeData = makeRouteData peerData pathAttributes routeId 100 poisoned
             routeData' = if importFilter routeData then trace "importFilter: filtered" $ Withdraw peerData else routeData
-            (!prefixTable', !updates) = BGPRib.PrefixTable.updateC prefixTable pfxs peerData (Just routeData)
+            (!prefixTable', !updates) = BGPRib.PrefixTable.updateC prefixTable pfxs routeData
             reducedUpdates = reduce updates
 
         -- this version is the minimal update applicable in the ADDPATH case
@@ -188,7 +188,10 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
         return $ Rib' prefixTable' adjRibOutTables
       where
         --
-        reduce :: [(PeerData, Int, [Prefix])] -> [(Int, [Prefix])]
+        -- reduce simply discards the per-peer updates
+        -- DANGER - if there were both withdraws and updates in this list for different peers then this would not work
+        -- CONCLUSION - best external model should not use this return value, rather it should use the default signature...
+        reduce :: [(PeerData, RouteData, [Prefix])] -> [(RouteData, [Prefix])]
         -- generally there is a 1:1 relation between in and out for this function, however we can't assume that
         reduce = nub . map (\(_, a, b) -> (a, b))
         --
@@ -205,17 +208,17 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
     ribWithdrawManyC peerData pfxs (Rib' prefixTable adjRibOutTables)
       | null pfxs = return (Rib' prefixTable adjRibOutTables)
       | otherwise = do
-        let (prefixTable', withdraws) = BGPRib.PrefixTable.updateC prefixTable pfxs peerData Nothing
+        let (prefixTable', withdraws) = BGPRib.PrefixTable.updateC prefixTable pfxs (Withdraw peerData)
         mapM_ (updatePeer adjRibOutTables) withdraws
         return $ Rib' prefixTable' adjRibOutTables
 
 -- CONTROLLER
-updatePeer :: AdjRIB -> (PeerData, Int, [Prefix]) -> IO ()
-updatePeer adjRib (peer, routeHash, prefixes) = insertAdjRIBTable (prefixes, routeHash) (fromJust $ Data.Map.lookup peer adjRib)
+updatePeer :: AdjRIB -> (PeerData, RouteData, [Prefix]) -> IO ()
+updatePeer adjRib (peer, route, prefixes) = insertAdjRIBTable (prefixes, routeHash route) (fromJust $ Data.Map.lookup peer adjRib)
 
 -- -- insert the given route update into the update fifos of all peers
-updateAllPeers :: AdjRIB -> (Int, [Prefix]) -> IO ()
-updateAllPeers adjRib (routeID, prefixes) = mapM_ (insertAdjRIBTable (prefixes, routeID)) fifos
+updateAllPeers :: AdjRIB -> (RouteData, [Prefix]) -> IO ()
+updateAllPeers adjRib (route, prefixes) = mapM_ (insertAdjRIBTable (prefixes, routeHash route)) fifos
   where
     fifos = Data.Map.elems adjRib
 
