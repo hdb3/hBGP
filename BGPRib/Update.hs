@@ -4,14 +4,14 @@ import qualified Data.ByteString.Lazy as L
 import Data.Int
 import Data.Binary
 import Data.Either
-import FarmHash(hash64)
+import Data.Digest.Murmur64
 
 import BGPlib.BGPlib
 import BGPRib.Common
 
 -- 'hash' will become 'routeId' when it is inserted into the RouteData record....
 myHash :: L.ByteString -> Int
-myHash = fromIntegral . hash64 . L.toStrict
+myHash = fromIntegral . asWord64 . hash64 . L.toStrict
 
 data ParsedUpdate = ParsedUpdate { puPathAttributes :: [PathAttribute], nlri :: [XPrefix], withdrawn :: [XPrefix], hash :: Int } | NullUpdate
 instance Show ParsedUpdate where
