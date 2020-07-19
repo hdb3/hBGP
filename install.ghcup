@@ -1,0 +1,17 @@
+# export PATH="$HOME/.local/bin:$HOME/.cabal/bin:$HOME/.ghcup/bin:$PATH"
+
+for d in .local/bin .cabal/bin .ghcup/bin
+ do
+   mkdir -p "$HOME/$d"
+   P="$HOME/$d:$P"
+done
+export PATH="${P}${PATH}"
+echo $PATH
+
+wget https://downloads.haskell.org/~ghcup/x86_64-linux-ghcup -O $HOME/.ghcup/bin/ghcup && \
+    chmod +x $HOME/.ghcup/bin/ghcup && \
+    ghcup install ghc latest && \
+    ghcup set ghc latest && \
+    ghcup install-cabal latest && \
+    cabal update && \
+    cabal configure --enable-optimization
