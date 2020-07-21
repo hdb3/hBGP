@@ -37,7 +37,7 @@ executable hbgp.event
 executable hbgp
   import:             hbgp
   main-is:            Router/Router.hs
-  cpp-options:        -DLOGMODE=Warn
+  cpp-options:        -DLOGMODE=Info
 
 executable mrtdump
   main-is:		        MRTrib-dump.hs
