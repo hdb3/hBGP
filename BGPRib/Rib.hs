@@ -196,7 +196,15 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
         reduce = nub . map (\(_, a, b) -> (a, b))
         --
         makeRouteData :: PeerData -> [PathAttribute] -> Int -> Word32 -> Bool -> RouteData
-        makeRouteData peerData pathAttributes routeId overrideLocalPref poisoned = RouteData {..}
+        makeRouteData peerData pathAttributes routeHash overrideLocalPref poisoned = RouteData {..}
+            where
+            (pathLength, originAS, lastAS) = getASPathDetail pathAttributes
+            fromEBGP = isExternal peerData
+            med = getMED pathAttributes -- currently not used for tiebreak -- only present value is for forwarding on IBGP
+            localPref = if fromEBGP then overrideLocalPref else getLocalPref pathAttributes
+            nextHop = getNextHop pathAttributes
+            origin = getOrigin pathAttributes
+
     -- ribWithdrawMany :: PeerData -> [Prefix] -> Rib' -> IO Rib'
     -- ribWithdrawMany peerData pfxs (Rib' prefixTable adjRibOutTables)
     --   | null pfxs = return (Rib' prefixTable adjRibOutTables)
