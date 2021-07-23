@@ -37,7 +37,7 @@ bogonFilter pfx
                 | "203.0.113.0/24" >:> ip = False
                 | "240.0.0.0/4" >:> ip = False
                 | "224.0.0.0/4" >:> ip = False
-                -- | 25 < s = False
+                --- | 25 < s = False
                 | 0 == s = False
                 | otherwise = True
     where ip = toAddrRange pfx

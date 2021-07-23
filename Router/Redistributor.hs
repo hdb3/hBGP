@@ -6,10 +6,11 @@ import Control.Concurrent
 import qualified System.IO.Streams as Streams
 import Control.Monad(void,when)
 
-import BGPlib.BGPlib
-import BGPRib.BGPRib
--- ************* VERY DANGEROUS - should re-export from BGPfsm to avoid conflict!!!!
---import qualified CustomRib as Rib
+import BGPlib.Prefixes ( toAddrRange )
+import BGPRib.BGPData ( localPeer )
+import BGPRib.Rib ( getNextHops, pullAllUpdates )
+--- ************* VERY DANGEROUS - should re-export from BGPfsm to avoid conflict!!!!
+---import qualified CustomRib as Rib
 import qualified Router.StdRib as Rib
 import ZServ.ZServ
 
