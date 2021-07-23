@@ -53,7 +53,7 @@ toHex :: Char8.ByteString -> String
 toHex = Char8.unpack . Data.ByteString.Base16.encode
 
 fromHex :: Char8.ByteString -> Char8.ByteString
-fromHex = fst . Data.ByteString.Base16.decode
+fromHex = Data.ByteString.Base16.decodeLenient
 
 data MRTRecord = MRTPeerIndexTable { tdBGPID :: BGPid , tdViewName :: String, peerTable :: [MRTPeer] } 
                  | RIBIPV4Unicast { re4SequenceNumber :: Word32 , re4Length :: Word8 , re4Address :: IPv4 , re4RIB :: [RIBEntry] }
