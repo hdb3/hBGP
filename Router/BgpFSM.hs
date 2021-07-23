@@ -294,15 +294,24 @@ runFSM g@Global{..} socketName peerName handle =
                 )
             rc
 
-    sendLoop handle rh = catch
+    sendLoop handle rh =
+      catch
         ( do
-             updates <- Rib.ribPull rh
-             trace $ "sendloop: updates (" ++ show (length updates) ++ ")"
-             bgpSndAll handle updates
-             sendLoop handle rh
+            updates <- Rib.ribPull rh
+            case updates of
+              [] ->
+                return ()
+                -- This exit on an empty list is a patch for believed changed behaviour in current ghc (8.10.5)
+                -- without it the binary spins in a tight loop at peer session end
+                --- Further investigation is advised.......
+              _ -> do
+                  trace $ "sendloop: updates (" ++ show (length updates) ++ ")"
+                  bgpSndAll handle updates
+                  sendLoop handle rh
         )
-        (\(BGPIOException _) -> return ()
-            -- this is the standard way to close down this thread
+
+        ( \(BGPIOException _) -> return ()
+        -- this is the standard way to close down this thread
         )
 
     keepaliveLoop handle timer | timer == 0 = return ()
