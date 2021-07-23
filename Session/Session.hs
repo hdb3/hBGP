@@ -1,5 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 module Session.Session where
 
 import Data.Maybe
@@ -31,6 +32,8 @@ data State = State { port :: NS.PortNumber
                    }
 -- TODO use conditional compilation to enable debug?
 {-# INLINE debug #-}
+
+
 debug :: String -> IO ()
 debug _ = return ()
 -- debug s = hPutStrLn stderr s >> hFlush stderr

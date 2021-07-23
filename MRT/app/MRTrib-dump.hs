@@ -5,13 +5,22 @@ import Data.List (isPrefixOf)
 import MRTBuilder
 import MRTrib
 import System.Environment (getArgs)
-import System.Exit (die)
+import System.Exit (die,exitSuccess)
 import System.IO
 import System.Posix.IO (stdOutput)
 import System.Posix.Terminal (queryTerminal)
 import Text.Read (readMaybe)
 
 verbose = any (isPrefixOf "--v") <$> getArgs
+help = any (isPrefixOf "--h") <$> getArgs
+
+usage = do
+  requested <- help
+  when requested ( do hPutStrLn stderr $ "numeric positional parameters\n" ++
+                                         "arg 0: MRT format input file - no command paramemeters, or '-' implies read from stdin\n" ++
+                                         "arg 1: # routes to dump - default = all\n" ++
+                                         "arg 2: maximum prefix population to permit - default = no limit"
+                      exitSuccess )
 
 info s = do
   v <- verbose
@@ -20,6 +29,7 @@ info s = do
 main :: IO ()
 main = do
   info "MRTrib-dump"
+  usage
   routes <- getRoutes
   sample <- selectRoutes routes
   handle <- getOutputHandle

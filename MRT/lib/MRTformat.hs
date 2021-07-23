@@ -98,7 +98,7 @@ getMRTTableDumps = do
 getMRTTableDump :: IO [MRTRecord]
 getMRTTableDump =
     do args <- getArgs
-       mrtParse <$> if null args then BS.getContents
+       mrtParse <$> if null args || "-" == (head args) then BS.getContents
                     else if "gz" `isSuffixOf` head args then decompress <$> BS.readFile (head args)
                     else BS.readFile (head args)
 
