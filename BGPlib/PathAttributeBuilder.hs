@@ -102,10 +102,10 @@ attributesParser n
           | TypeCodePathAttributeAtomicAggregate == code -> return PathAttributeAtomicAggregate
           | TypeCodePathAttributeAggregator == code -> do
             as <-
-              if  | len == 6 -> fromIntegral <$> A.anyWord32be
+              if  | len == 6 -> fromIntegral <$> A.anyWord16be
                   | len == 8 -> A.anyWord32be
                   | otherwise -> error $ "Bad length in PathAttributeAggregator: " ++ show len
-            bgpid <- A.anyWord32le
+            bgpid <- A.anyWord32be
             return $ PathAttributeAggregator (as, fromHostAddress bgpid)
           | TypeCodePathAttributeCommunities == code -> PathAttributeCommunities <$> A.count (fromIntegral $ len `div` 4) A.anyWord32be
           | TypeCodePathAttributeMPREachNLRI == code -> PathAttributeMPREachNLRI <$> A.take (fromIntegral len)
