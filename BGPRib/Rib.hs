@@ -134,7 +134,7 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
         | otherwise = do
               localPref <- evalLocalPref peerData pathAttributes pfxs
               let routeData = makeRouteData peerData pathAttributes routeId localPref
-                  routeData' = if importFilter routeData then trace "importFilter: filtered" $ Withdraw peerData else routeData
+                  routeData' = if importFilter routeData then Withdraw peerData else routeData
                   ( !prefixTable' , !updates ) = BGPRib.PrefixTable.update prefixTable pfxs routeData'
               updateRibOutWithPeerData peerData updates adjRibOutTables
               return $ Rib' prefixTable' adjRibOutTables
@@ -186,7 +186,7 @@ exportFilter trigger target route@RouteData {} = if checks then route else Withd
     checks = iBGPRelayCheck && noReturnCheck
     iBGPRelayCheck = fromEBGP route || isExternal target
     noReturnCheck = target /= peerData route
-exportFilter trigger target NullRoute = trace "export filter applied to null route" NullRoute
+exportFilter trigger target NullRoute = NullRoute
 exportFilter trigger target Withdraw{} = if checks then Withdraw undefined else NullRoute where
     checks = iBGPRelayCheck && noReturnCheck
     iBGPRelayCheck = isExternal trigger || isExternal target
