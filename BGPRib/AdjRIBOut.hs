@@ -18,28 +18,24 @@ import qualified Data.Tuple
 import BGPlib.BGPlib
 import BGPRib.Fifo
 
--- TODO
--- bite this bullet? - the AdjRIBEntry should simply carry the RouteData itself rather than the proxy Int which is a hash over the original
--- Update Path Attributes
---
-
 type AdjRIBEntry = ( [Prefix], Int )
-type AdjRIBTable = Fifo AdjRIBEntry
+-- type AdjRIBTable = Fifo AdjRIBEntry
+data AdjRIBTable = AdjRIBTable {fifo :: Fifo AdjRIBEntry}
 
 showAdjRIBTable :: AdjRIBTable -> IO String
-showAdjRIBTable = showFifo
+showAdjRIBTable = showFifo . fifo
 
 newAdjRIBTable  ::  IO AdjRIBTable
-newAdjRIBTable = emptyFifo
+newAdjRIBTable = fmap AdjRIBTable emptyFifo
 
 insertAdjRIBTable :: AdjRIBEntry -> AdjRIBTable -> IO ()
-insertAdjRIBTable are table = enqueue table are
+insertAdjRIBTable are table = enqueue (fifo table) are
 
 insertNAdjRIBTable :: [AdjRIBEntry] -> AdjRIBTable -> IO ()
-insertNAdjRIBTable arex table = enqueueN table arex
+insertNAdjRIBTable arex table = enqueueN (fifo table) arex
 
 getAllAdjRIBTable :: AdjRIBTable -> IO [AdjRIBEntry]
-getAllAdjRIBTable = dequeueAll
+getAllAdjRIBTable = dequeueAll . fifo
 
 groomAdjRIBList :: [AdjRIBEntry] -> [AdjRIBEntry]
 groomAdjRIBList = map Data.Tuple.swap . Data.IntMap.Strict.toList . Data.IntMap.Strict.fromList . map Data.Tuple.swap

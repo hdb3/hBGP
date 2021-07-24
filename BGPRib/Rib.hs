@@ -5,7 +5,6 @@ import qualified Data.Map.Strict as Data.Map
 import Data.Word(Word32)
 import Data.IP
 import Control.Arrow(second)
---import Debug.Trace
 import BGPlib.BGPlib
 
 import BGPRib.BGPData
@@ -14,7 +13,6 @@ import qualified BGPRib.PrefixTableUtils as PrefixTableUtils
 import BGPRib.AdjRIBOut
 import BGPRib.Common(groupBySecond)
 
-trace _ x = x
 
 type Rib = MVar Rib'
 -- TODO rename AdjRIB -> AdjRIBMap
@@ -62,7 +60,7 @@ addPeer rib peer = modifyMVar_ rib ( addPeer' peer )
         let ribDump = map f (PrefixTableUtils.getAdjRIBOut prefixTable)
             f (rd,pfxs) = (pfxs , routeId rd)
             -- make the RIB dump into a Fifo
-        aro <- mkFifo ribDump
+        aro <- fmap AdjRIBTable (mkFifo ribDump)
             -- TODO - this would be the place to insert an end-of-rib marker
         let adjRib' = Data.Map.insert peer aro adjRib
         return $ Rib' prefixTable adjRib'
@@ -108,12 +106,9 @@ getNextHops rib prefixes = do
 
 
 pullAllUpdates :: PeerData -> Rib -> IO [AdjRIBEntry]
--- TODO - look into why this is sometimes called with a peer not in the map...
--- this happens at peer down and the suspicion is that it implies that
--- there may be some withdrawals which are improperly dropped
 pullAllUpdates peer rib = do
     (Rib' _ arot) <- readMVar rib
-    maybe (return []) dequeueAll (arot Data.Map.!? peer)
+    maybe (return []) dequeueAll (fmap fifo (arot Data.Map.!? peer))
 
 -- TODO write and use the function 'getAdjRibForPeer'
 
@@ -166,25 +161,16 @@ updateRibOutWithPeerData :: PeerData -> [(Prefix,RouteData)] -> AdjRIB -> IO ()
 updateRibOutWithPeerData triggerPeer updates adjRIB = 
     sequence_ $ Data.Map.mapWithKey action adjRIB
 
--- reminder: type AdjRIB = Data.Map.Map PeerData AdjRIBTable
---         : insertNAdjRIBTable :: [([Prefix],Int)] -> AdjRIBTable -> IO ()
---
---         - applying an action to every AdjRIBTable in an 'AdjRIB' is achived by
---         -    sequence_ $ Data.Map.map action
---         - where 'action' is  AdjRIBTable -> IO ()
---         - If the requirement is to execute an action which is sependent upon the peer context then
---         -    sequence_ $ Data.Map.mapWithKey action'
---         - is required, where 'action'' is PeerData -> AdjRIBTable -> IO ()
-
     where 
         action :: PeerData -> AdjRIBTable -> IO ()
-        action targetPeer = insertNAdjRIBTable (f updates) where
+        action targetPeer = insertNAdjRIBTable exports where
             f0 :: [(Prefix,RouteData)] -> [(Prefix,Int)]
             f0 = map (second routeId)
             f1 :: [(Prefix,Int)] -> [([Prefix],Int)]
             f1 = groupBySecond
-            f :: [(Prefix,RouteData)] -> [([Prefix],Int)]
-            f = f1 . f0 . applyExportFilter exportFilter
+            exports = f1 . f0 $ updates
+            -- NB - remove export filter, should only be applied, if stateful, on export
+            -- exports = f1 . f0 . applyExportFilter exportFilter $ updates
             applyExportFilter :: (PeerData -> PeerData -> RouteData -> RouteData) -> [(Prefix,RouteData)] -> [(Prefix,RouteData)]
             applyExportFilter xf = map (\(pfx,rd) -> (pfx, xf triggerPeer targetPeer rd))
             -- ## TODO - consider whether WIthdraw constructor should carry PeerData at all....
@@ -196,13 +182,12 @@ importFilter route@RouteData{} = pathLoopCheck route where
 importFilter _ = error "importFilter only defined for updates"
 
 exportFilter :: PeerData -> PeerData -> RouteData -> RouteData
-exportFilter trigger target route@RouteData{} = if checks then route else trace "export filtered" $ Withdraw undefined where
+exportFilter trigger target route@RouteData {} = if checks then route else Withdraw undefined where
     checks = iBGPRelayCheck && noReturnCheck
     iBGPRelayCheck = fromEBGP route || isExternal target
     noReturnCheck = target /= peerData route
 exportFilter trigger target NullRoute = trace "export filter applied to null route" NullRoute
-exportFilter trigger target Withdraw{} = if checks then trace "export withdraw allowed" $ Withdraw undefined
-                                                   else trace "export withdraw filtered" NullRoute where
+exportFilter trigger target Withdraw{} = if checks then Withdraw undefined else NullRoute where
     checks = iBGPRelayCheck && noReturnCheck
     iBGPRelayCheck = isExternal trigger || isExternal target
     noReturnCheck = target /= trigger
