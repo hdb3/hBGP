@@ -301,11 +301,10 @@ runFSM g@Global{..} socketName peerName handle =
             case updates of
               [] ->
                 return ()
-                -- This exit on an empty list is a patch for believed changed behaviour in current ghc (8.10.5)
-                -- without it the binary spins in a tight loop at peer session end
-                --- Further investigation is advised.......
+                -- Exit on an empty list because the enqueue/dequeue logoc never signals on an empty FIFO;
+                -- The empty list represents a failure to find the peer in the list of current peers
+                -- Which transient condition arises when the parent process has exited.
               _ -> do
-                  trace $ "sendloop: updates (" ++ show (length updates) ++ ")"
                   bgpSndAll handle updates
                   sendLoop handle rh
         )
