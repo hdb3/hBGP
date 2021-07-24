@@ -34,7 +34,7 @@ update:: PrefixTable -> [Prefix] -> RouteData -> (PrefixTable,[(Prefix,RouteData
 update pt pfxs route = Data.List.foldl' f (pt,[]) pfxs where
     f (pt',acc) pfx = (pt'',acc') where
         acc' = if PT.pteBest new == PT.pteBest old then acc else (pfx,PT.pteBest new):acc
-        (old,new,pt'') = PT.ptUpdate (fromPrefix pfx) route pt
+        (old,new,pt'') = PT.ptUpdate (fromPrefix pfx) route pt'
 
 queryPrefixTable :: PrefixTable -> Prefix -> RouteData
 queryPrefixTable table pfx = PT.pteBest $ PT.ptQuery (fromPrefix pfx) table
