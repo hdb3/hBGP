@@ -62,7 +62,7 @@ addPeer rib peer = modifyMVar_ rib ( addPeer' peer )
         let ribDump = map f (PrefixTableUtils.getAdjRIBOut prefixTable)
             f (rd,pfxs) = (pfxs , routeId rd)
             -- make the RIB dump into a Fifo
-        aro <- fifo ribDump
+        aro <- mkFifo ribDump
             -- TODO - this would be the place to insert an end-of-rib marker
         let adjRib' = Data.Map.insert peer aro adjRib
         return $ Rib' prefixTable adjRib'
