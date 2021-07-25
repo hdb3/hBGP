@@ -64,7 +64,7 @@ addPeer rib peer = modifyMVar_ rib ( addPeer' peer )
         let adjRib' = Data.Map.insert peer aro adjRib
         return $ Rib' prefixTable adjRib'
 
-lookupRoutes :: Rib -> AdjRIBEntry -> IO (Maybe (RouteData,[Prefix]))
+lookupRoutes :: Rib -> PeerData -> AdjRIBEntry -> IO (Maybe (RouteData, [Prefix]))
 --- objective:
 --- The objective is to filter the input prefixes so that all remaining have the property that the route identified is still best for that prefix.
 --- Additionally, a copy of that (common) route is needed for further processing.
@@ -72,23 +72,38 @@ lookupRoutes :: Rib -> AdjRIBEntry -> IO (Maybe (RouteData,[Prefix]))
 ---    Drop from the head of the list whilst the prperty is not satisfied,
 ---    Return the first found result, reducing the remaining list with a simpler similar filter taht does not capture the RouteData returned by the lookup
 
-lookupRoutes rib (prefixes, 0) = return $ Just (Withdraw undefined, prefixes)
-lookupRoutes rib (prefixes, -1) = return $ Just (Withdraw undefined, prefixes)
-lookupRoutes rib (prefixes,hash) = do
+lookupRoutes _ _ (prefixes, 0) = return $ Just (Withdraw undefined, prefixes)
+lookupRoutes _  _ (prefixes, -1) = return $ Just (Withdraw undefined, prefixes)
+lookupRoutes rib target (prefixes, hash) = do
         rib' <- readMVar rib
         let 
             hashMatch route = hash == (routeHash route)
             hashMatch_ route | hashMatch route = Just route
                              | otherwise = Nothing 
             reduce :: [Prefix] -> Maybe (RouteData, [Prefix])
-            reduce [] = Nothing 
+            reduce [] = Nothing
             reduce (a : ax) = maybe (reduce ax) (\route -> Just (route, a : (filter check ax))) (get a)
             check :: Prefix -> Bool
             check = isJust . get
             get :: Prefix -> Maybe RouteData
             get pfx = (PT.ptBest (fromPrefix pfx) (prefixTable rib')) >>= hashMatch_
-            result = reduce prefixes
-        return $ reduce prefixes
+            
+        -- return $ reduce prefixes
+        return $ fmap (\(route, remainingPrefixes) ->
+            if exportFilter target route
+            then (route, remainingPrefixes)
+            else (NullRoute, remainingPrefixes)) (reduce prefixes)
+{- export filter rationale
+  the context of an export filter is the route itself and the respective source and target peers
+  simple checks are purely peer related.., but the source peer is part of the Route, so the route and target peer are always the parameters for the test
+-}
+exportFilter :: PeerData -> RouteData -> Bool
+exportFilter target route@RouteData {} = iBGPRelayCheck && noReturnCheck where
+    iBGPRelayCheck = fromEBGP route || isExternal target
+    noReturnCheck = target /= peerData route
+exportFilter _ NullRoute = undefined
+exportFilter _ Withdraw{} = undefined
+
 
 getNextHops :: Rib -> [Prefix] -> IO [(Prefix,Maybe IPv4)]
 getNextHops rib prefixes = do
@@ -162,15 +177,3 @@ importFilter :: RouteData -> Bool
 importFilter route@RouteData{} = pathLoopCheck route where
     pathLoopCheck r = elemASPath (myAS $ globalData $ peerData r) (pathAttributes r)
 importFilter _ = error "importFilter only defined for updates"
-
--- -- (TDOD) in future, exportFilter will be used for processing in the output leg (post FiFo)
--- exportFilter :: PeerData -> PeerData -> RouteData -> RouteData
--- exportFilter trigger target route@RouteData {} = if checks then route else Withdraw undefined where
---     checks = iBGPRelayCheck && noReturnCheck
---     iBGPRelayCheck = fromEBGP route || isExternal target
---     noReturnCheck = target /= peerData route
--- exportFilter trigger target NullRoute = NullRoute
--- exportFilter trigger target Withdraw{} = if checks then Withdraw undefined else NullRoute where
---     checks = iBGPRelayCheck && noReturnCheck
---     iBGPRelayCheck = isExternal trigger || isExternal target
---     noReturnCheck = target /= trigger
