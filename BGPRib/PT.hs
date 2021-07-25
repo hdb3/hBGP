@@ -87,6 +87,12 @@ ptUpdate k r pt = ( oldVal, newVal, IntMap.insert k newVal pt) where
 ptQuery ::Key -> PT -> PTE
 ptQuery k pt = fromMaybe pteEmpty (IntMap.lookup k pt)
 
+ptBest :: Key -> PT -> Maybe RouteData
+ptBest k pt = (IntMap.lookup k pt) >>= safeHead
+  where safeHead :: PTE -> Maybe RouteData
+        safeHead [] = Nothing
+        safeHead ax = Just (head ax)
+
 ptNew :: PT
 ptNew = IntMap.empty
 
