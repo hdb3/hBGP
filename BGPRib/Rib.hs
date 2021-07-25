@@ -4,19 +4,18 @@ import Control.Concurrent
 import qualified Data.Map.Strict as Data.Map
 import Data.Word(Word32)
 import Data.IP
+import Data.Maybe(isJust)
 import Control.Arrow(second)
 import BGPlib.BGPlib
 
 import BGPRib.BGPData
 import BGPRib.PrefixTable
+import qualified BGPRib.PT as PT (ptBest)
 import qualified BGPRib.PrefixTableUtils as PrefixTableUtils
 import BGPRib.AdjRIBOut
 import BGPRib.Common(groupBySecond)
 
-
 type Rib = MVar Rib'
--- TODO rename AdjRIB -> AdjRIBMap
--- and create a type 'AdjRIBMapEntry = (PeerData,AdjRIBTable)'
 
 type AdjRIB = Data.Map.Map PeerData AdjRIBTable
 data Rib' = Rib' { prefixTable :: PrefixTable
@@ -43,7 +42,7 @@ delPeer rib peer = modifyMVar_ rib ( delPeer' peer )
         let (prefixTable',prefixes) = withdrawPeer prefixTable peer
         -- schedule the withdraw dissemination
         -- NOTE - this does not change the AdjRIBMap
-        updateRibOutWithPeerData peer prefixes adjRib
+        updateRibOutWithPeerData prefixes adjRib
         -- now remove this peer completely from the AdjRIBMap
         -- it is liekly that this could be done before the previous action.....
         -- but the semantics should be identical as long as we didn't try to send withdraw messages to the peer which has gone away...
@@ -64,38 +63,32 @@ addPeer rib peer = modifyMVar_ rib ( addPeer' peer )
             -- TODO - this would be the place to insert an end-of-rib marker
         let adjRib' = Data.Map.insert peer aro adjRib
         return $ Rib' prefixTable adjRib'
-{-
-    delayed route look-up logic
-
-    This function performs three functions:
-       takes routeIDs and returns full RouteData objects
-       checks that the route did not change since the update was originally scheduled
-       drops the update for the case where it has changed.
-
-
-    redux - 
-    
-    regrading filters - optimal correct behaviour requires either preserved state from last sent route or recalculated equivalent.
-    unsolicited withdraw would allow safe behaviour - but this is only needed in the context of export filter capability, and can easily be implmented
-    when that capability is built.
-    
-    an alternate implementation might simply return the latest route, and mark that prefix/route combination as sent using a sequence number
-    then later queued updates can be ignored.  Whether that is better is unclear, but it is more complex, and so not taken up for now.
-    A superficial analysis argues tgat defrred transmission is sensible, because updates for churning prefixes would thereby be deferred in favour of stable ones.
--}
 
 lookupRoutes :: Rib -> AdjRIBEntry -> IO (Maybe (RouteData,[Prefix]))
-lookupRoutes rib (prefixes,routeHash) = do
+--- objective:
+--- The objective is to filter the input prefixes so that all remaining have the property that the route identified is still best for that prefix.
+--- Additionally, a copy of that (common) route is needed for further processing.
+--- narrative:
+---    Drop from the head of the list whilst the prperty is not satisfied,
+---    Return the first found result, reducing the remaining list with a simpler similar filter taht does not capture the RouteData returned by the lookup
+
+lookupRoutes rib (prefixes, 0) = return $ Just (Withdraw undefined, prefixes)
+lookupRoutes rib (prefixes, -1) = return $ Just (Withdraw undefined, prefixes)
+lookupRoutes rib (prefixes,hash) = do
         rib' <- readMVar rib
         let 
-            myLookup = map (\pfx -> ( queryPrefixTable (prefixTable rib') pfx, pfx))
-            -- myFilter = filter ((routeHash ==) . routeId .fst )
-            -- the following line removes the suppress changed routes check
-            -- which is essential for filters to work correctly
-            myFilter = id
-            unchangedPrefixes = myFilter $ myLookup prefixes
-            route = fst $ head unchangedPrefixes  -- safe becuase only called after test for null
-        return $ if null unchangedPrefixes then Nothing else Just (route,map snd unchangedPrefixes) 
+            hashMatch route = hash == (routeHash route)
+            hashMatch_ route | hashMatch route = Just route
+                             | otherwise = Nothing 
+            reduce :: [Prefix] -> Maybe (RouteData, [Prefix])
+            reduce [] = Nothing 
+            reduce (a : ax) = maybe (reduce ax) (\route -> Just (route, a : (filter check ax))) (get a)
+            check :: Prefix -> Bool
+            check = isJust . get
+            get :: Prefix -> Maybe RouteData
+            get pfx = (PT.ptBest (fromPrefix pfx) (prefixTable rib')) >>= hashMatch_
+            result = reduce prefixes
+        return $ reduce prefixes
 
 getNextHops :: Rib -> [Prefix] -> IO [(Prefix,Maybe IPv4)]
 getNextHops rib prefixes = do
@@ -136,7 +129,7 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
               let routeData = makeRouteData peerData pathAttributes routeId localPref
                   routeData' = if importFilter routeData then Withdraw peerData else routeData
                   ( !prefixTable' , !updates ) = BGPRib.PrefixTable.update prefixTable pfxs routeData'
-              updateRibOutWithPeerData peerData updates adjRibOutTables
+              updateRibOutWithPeerData updates adjRibOutTables
               return $ Rib' prefixTable' adjRibOutTables
 
     ribWithdrawMany :: PeerData -> [Prefix] -> Rib' -> IO Rib'
@@ -144,7 +137,7 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
         | null pfxs = return (Rib' prefixTable adjRibOutTables )
         | otherwise = do
             let ( !prefixTable' , !withdraws ) = BGPRib.PrefixTable.update prefixTable pfxs (Withdraw peerData)
-            updateRibOutWithPeerData peerData withdraws adjRibOutTables
+            updateRibOutWithPeerData withdraws adjRibOutTables
             return $ Rib' prefixTable' adjRibOutTables
 
     makeRouteData :: PeerData -> [PathAttribute] -> Int -> Word32 -> RouteData
@@ -157,37 +150,27 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
         nextHop = getNextHop pathAttributes
         origin = getOrigin pathAttributes
 
-updateRibOutWithPeerData :: PeerData -> [(Prefix,RouteData)] -> AdjRIB -> IO ()
-updateRibOutWithPeerData triggerPeer updates adjRIB = 
+updateRibOutWithPeerData :: [(Prefix,RouteData)] -> AdjRIB -> IO ()
+updateRibOutWithPeerData updates adjRIB = 
     sequence_ $ Data.Map.mapWithKey action adjRIB
 
     where 
         action :: PeerData -> AdjRIBTable -> IO ()
-        action targetPeer = insertNAdjRIBTable exports where
-            f0 :: [(Prefix,RouteData)] -> [(Prefix,Int)]
-            f0 = map (second routeId)
-            f1 :: [(Prefix,Int)] -> [([Prefix],Int)]
-            f1 = groupBySecond
-            exports = f1 . f0 $ updates
-            -- NB - remove export filter, should only be applied, if stateful, on export
-            -- exports = f1 . f0 . applyExportFilter exportFilter $ updates
-            applyExportFilter :: (PeerData -> PeerData -> RouteData -> RouteData) -> [(Prefix,RouteData)] -> [(Prefix,RouteData)]
-            applyExportFilter xf = map (\(pfx,rd) -> (pfx, xf triggerPeer targetPeer rd))
-            -- ## TODO - consider whether WIthdraw constructor should carry PeerData at all....
-            -- (the use is for input to RIB, not export (RIB never exports Withdraw, ony NullRoute))
+        action targetPeer = insertNAdjRIBTable $ groupBySecond $ map (second routeId) updates
 
 importFilter :: RouteData -> Bool
 importFilter route@RouteData{} = pathLoopCheck route where
     pathLoopCheck r = elemASPath (myAS $ globalData $ peerData r) (pathAttributes r)
 importFilter _ = error "importFilter only defined for updates"
 
-exportFilter :: PeerData -> PeerData -> RouteData -> RouteData
-exportFilter trigger target route@RouteData {} = if checks then route else Withdraw undefined where
-    checks = iBGPRelayCheck && noReturnCheck
-    iBGPRelayCheck = fromEBGP route || isExternal target
-    noReturnCheck = target /= peerData route
-exportFilter trigger target NullRoute = NullRoute
-exportFilter trigger target Withdraw{} = if checks then Withdraw undefined else NullRoute where
-    checks = iBGPRelayCheck && noReturnCheck
-    iBGPRelayCheck = isExternal trigger || isExternal target
-    noReturnCheck = target /= trigger
+-- -- (TDOD) in future, exportFilter will be used for processing in the output leg (post FiFo)
+-- exportFilter :: PeerData -> PeerData -> RouteData -> RouteData
+-- exportFilter trigger target route@RouteData {} = if checks then route else Withdraw undefined where
+--     checks = iBGPRelayCheck && noReturnCheck
+--     iBGPRelayCheck = fromEBGP route || isExternal target
+--     noReturnCheck = target /= peerData route
+-- exportFilter trigger target NullRoute = NullRoute
+-- exportFilter trigger target Withdraw{} = if checks then Withdraw undefined else NullRoute where
+--     checks = iBGPRelayCheck && noReturnCheck
+--     iBGPRelayCheck = isExternal trigger || isExternal target
+--     noReturnCheck = target /= trigger
