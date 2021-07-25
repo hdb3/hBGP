@@ -94,4 +94,4 @@ updateFromAdjRibEntrys rib target xs = catMaybes <$> mapM updateFromAdjRibEntry 
     where
     updateFromAdjRibEntry :: AdjRIBEntry -> IO (Maybe BGPOutput)
     updateFromAdjRibEntry (prefixes,routeHash) = 
-        fmap (\(route,prefixes') -> buildUpdate target prefixes' route) <$> lookupRoutes rib (prefixes,routeHash)
+        fmap (\(route,prefixes') -> buildUpdate target prefixes' route) <$> lookupRoutes rib target (prefixes,routeHash)
