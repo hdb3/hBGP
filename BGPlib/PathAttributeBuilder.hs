@@ -38,9 +38,11 @@ buildPathAttributes = foldMap buildPathAttribute
     buildAttributeWord32 :: PathAttributeTypeCode -> Word32 -> Builder
     buildAttributeWord32 code v = buildCommon code 4 <> word32BE v
     buildAttributeWords32 :: PathAttributeTypeCode -> [Word32] -> Builder
-    buildAttributeWords32 code ws | 63 > length ws = buildCommon code (fromIntegral $ 4 * length ws) <> foldMap word32BE ws
+    buildAttributeWords32 code ws | 63 > length ws = buildCommon code   (fromIntegral $ 4 * length ws) <> foldMap word32BE ws
+                                  | otherwise =      buildExtended code (fromIntegral $ 4 * length ws) <> foldMap word32BE ws
     buildAttributeWords64 :: PathAttributeTypeCode -> [Word64] -> Builder
-    buildAttributeWords64 code ws | 31 > length ws = buildCommon code (fromIntegral $ 8 * length ws) <> foldMap word64BE ws
+    buildAttributeWords64 code ws | 31 > length ws = buildCommon code    (fromIntegral $ 8 * length ws) <> foldMap word64BE ws
+                                  | otherwise =      buildExtended code  (fromIntegral $ 8 * length ws) <> foldMap word64BE ws
     buildAttributeWord64 :: PathAttributeTypeCode -> Word64 -> Builder
     buildAttributeWord64 code v = buildCommon code 8 <> word64BE v
     buildAttributeAggregator :: PathAttributeTypeCode -> Word32 -> Word32 -> Builder

@@ -1,4 +1,4 @@
-module BGPlib.AttoBGP where
+module BGPlib.AttoBGP (bgpParser, terminatingBGPParser) where
 
 import BGPlib.BGPMessage
 import BGPlib.Capabilities (parseOptionalParameters)
