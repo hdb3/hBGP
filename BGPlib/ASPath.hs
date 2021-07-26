@@ -56,7 +56,7 @@ parseASPath n
   | otherwise = do
     t <- A.anyWord8
     l <- A.anyWord8
-    let calculatedByteCount = fromIntegral $ 2 + 4 * l
+    let calculatedByteCount = 2 + 4 * ( fromIntegral l)
     when (n < calculatedByteCount) (error $ "parseASPath: invalid length n=" ++ show n ++ " l=" ++ show l ++ " t=" ++ show t)
     segment <-
       if  | t == enumASSequence -> ASSequence <$> A.count (fromIntegral l) A.anyWord32be
