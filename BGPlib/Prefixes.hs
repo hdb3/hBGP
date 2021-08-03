@@ -68,8 +68,6 @@ instance Read Prefix where
 
 instance Hashable Prefix
 
-instance Hashable IPv4
-
 instance Hashable IPv6
 
 instance {-# INCOHERENT #-} Show [Prefix] where

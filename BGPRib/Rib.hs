@@ -1,7 +1,7 @@
 {-# LANGUAGE RecordWildCards, TupleSections, BangPatterns #-}
 module BGPRib.Rib(Rib,ribPush,newRib,getLocRib,addPeer,delPeer,getPeersInRib,lookupRoutes,pullAllUpdates,getNextHops) where
 import Control.Concurrent
-import qualified Data.Map.Strict as Data.Map
+import qualified Data.HashMap.Strict as Data.Map
 import Data.Word(Word32)
 import Data.IP
 import Data.Maybe(isJust)
@@ -17,7 +17,7 @@ import BGPRib.Common(groupBySecond)
 
 type Rib = MVar Rib'
 
-type AdjRIBOut = Data.Map.Map PeerData PeerAdjRIBOut
+type AdjRIBOut = Data.Map.HashMap PeerData PeerAdjRIBOut
 data Rib' = Rib' { locRIB :: PrefixTable
                  , adjRibOut :: AdjRIBOut }
 
@@ -115,10 +115,10 @@ getNextHops rib prefixes = do
 
 pullAllUpdates :: PeerData -> Rib -> IO [PathChange]
 pullAllUpdates peer rib = do
-    (Rib' _ arot) <- readMVar rib
-    maybe (return []) dequeueAll (fmap pathChanges (arot Data.Map.!? peer))
-
--- TODO write and use the function 'getAdjRibForPeer'
+    (Rib' _ adjRIBOut) <- readMVar rib
+    let peerAdjRIBOut = adjRIBOut Data.Map.! peer
+        fifo = pathChanges peerAdjRIBOut
+    dequeueAll fifo
 
 getLocRib :: Rib -> IO PrefixTable
 getLocRib rib = do

@@ -1,4 +1,5 @@
 {-#LANGUAGE OverloadedStrings, RecordWildCards #-}
+{-# LANGUAGE DeriveGeneric #-}
 module BGPRib.BGPData where
 
 {- peer data holds persistent/static data about a BGP session peer
@@ -14,7 +15,8 @@ data GlobalData = GlobalData { myAS :: Word32
                              , myBGPid :: IPv4
                              -- TODO add a default local address - usually is going to be myBGPid but this might not be routable in some cases
                              }
-                            deriving (Show,Eq)
+                            deriving (Show,Eq,Generic)
+instance Hashable GlobalData
 
 data PeerData = PeerData { globalData :: GlobalData
                          ,  isExternal :: Bool
@@ -25,7 +27,8 @@ data PeerData = PeerData { globalData :: GlobalData
                          ,  localIPv4 :: IPv4
                          ,  localPort :: Word16
                          ,  peerLocalPref :: Word32
-                         }
+                         } deriving (Generic)
+instance Hashable PeerData
 
 data RouteData =  RouteData { peerData :: PeerData
                             , pathAttributes :: [PathAttribute]

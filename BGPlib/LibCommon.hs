@@ -1,4 +1,5 @@
 module BGPlib.LibCommon (module BGPlib.LibCommon, module GHC.Generics, module Control.DeepSeq, module Data.IP)  where
+import Data.Hashable
 import GHC.Generics(Generic)
 import Control.DeepSeq
 import Data.Word
@@ -8,6 +9,7 @@ import qualified Data.ByteString.Char8 as C8
 import qualified Data.ByteString.Base16 as Base16
 
 instance NFData IPv4
+instance Hashable IPv4
 
 class Enum e => EnumWord8 e where
     decode8 :: Word8 -> e
