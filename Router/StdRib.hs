@@ -1,6 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
-module Router.StdRib (ribPull,msgTimeout,addRouteRib,delRouteRib,updateFromAdjRibEntrys,delPeerByAddress,Router.StdRib.addPeer,Router.StdRib.ribPush,RibHandle) where
--- module Router.StdRib (ribPull,msgTimeout,addRouteRib,delRouteRib,updateFromAdjRibEntrys,delPeerByAddress,Router.StdRib.addPeer,Router.StdRib.ribPush,RibHandle) where
+module Router.StdRib (ribPull,msgTimeout,addRouteRib,delRouteRib,updateFromPathChanges,delPeerByAddress,Router.StdRib.addPeer,Router.StdRib.ribPush,RibHandle) where
 import Control.Monad.Extra(when)
 import System.Timeout(timeout)
 import Data.Maybe(fromMaybe,catMaybes)
@@ -38,7 +37,7 @@ delPeerByAddress rib port ip = do
         mapM_ (delPeer rib) peers
 
 ribPull :: RibHandle -> IO [BGPOutput]
-ribPull (rib,peer) = pullAllUpdates peer rib >>= updateFromAdjRibEntrys rib peer
+ribPull (rib,peer) = pullAllUpdates peer rib >>= updateFromPathChanges rib peer
 
 msgTimeout :: Int -> IO [a] -> IO [a]
 msgTimeout t f = fromMaybe [] <$> timeout (1000000 * t) f
@@ -89,9 +88,9 @@ buildUpdate target prefixes RouteData{..} = if isExternal target then egpUpdate 
                            delLocalPref pathAttributes
                            )
 
-updateFromAdjRibEntrys :: Rib -> PeerData -> [AdjRIBEntry] -> IO [BGPOutput]
-updateFromAdjRibEntrys rib target xs = catMaybes <$> mapM updateFromAdjRibEntry xs 
+updateFromPathChanges :: Rib -> PeerData -> [PathChange] -> IO [BGPOutput]
+updateFromPathChanges rib target xs = catMaybes <$> mapM updateFromPathChange xs 
     where
-    updateFromAdjRibEntry :: AdjRIBEntry -> IO (Maybe BGPOutput)
-    updateFromAdjRibEntry (prefixes,routeHash) = 
+    updateFromPathChange :: PathChange -> IO (Maybe BGPOutput)
+    updateFromPathChange (prefixes,routeHash) = 
         fmap (\(route,prefixes') -> buildUpdate target prefixes' route) <$> lookupRoutes rib target (prefixes,routeHash)
