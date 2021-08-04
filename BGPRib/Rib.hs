@@ -17,19 +17,30 @@ import BGPRib.Common(groupBySecond)
 
 type Rib = MVar Rib'
 
-type AdjRIBOut = Data.Map.HashMap PeerData PeerAdjRIBOut
+type AdjRIBOut = Data.Map.HashMap PeerData ( MVar PeerAdjRIBOut)
 data Rib' = Rib' { locRIB :: PrefixTable
-                 , adjRibOut :: AdjRIBOut }
+                 , adjRibOut :: MVar AdjRIBOut }
 
 newRib :: PeerData -> IO Rib
 newRib localPeer = do
-    adjRib <- newPeerAdjRIBOut
-    newMVar $ Rib' newPrefixTable ( Data.Map.singleton localPeer adjRib )
+    -- in future newPeerAdjRIBOut is a pure function, but not yet....
+    peerAdjRib <- newPeerAdjRIBOut
+    peerAdjRibMVar <- newMVar peerAdjRib
+    let newAdjRIBOut = Data.Map.singleton localPeer peerAdjRibMVar
+    newAdjRIBOutMVar <- newMVar newAdjRIBOut
+    let rib = Rib' newPrefixTable newAdjRIBOutMVar
+    newMVar rib
 
 getPeersInRib :: Rib -> IO [PeerData]
 getPeersInRib rib = do
     (Rib' _ adjRib ) <- readMVar rib
-    return $ Data.Map.keys adjRib
+    adjRib' <- readMVar adjRib
+    return $ Data.Map.keys adjRib'
+
+readAdjRIBOut :: Rib -> IO AdjRIBOut
+readAdjRIBOut rib = do
+  (Rib' _ adjRib) <- readMVar rib
+  readMVar adjRib
 
 delPeer :: Rib -> PeerData -> IO ()
 delPeer rib peer = modifyMVar_ rib ( delPeer' peer )
@@ -38,15 +49,21 @@ delPeer rib peer = modifyMVar_ rib ( delPeer' peer )
 
     delPeer' :: PeerData -> Rib' -> IO Rib'
     delPeer' peer Rib' {..} = do
-        -- drain the prefix table and save the resulting withdraws
-        let (locRIB',prefixes) = withdrawPeer locRIB peer
-        -- schedule the withdraw dissemination
-        -- NOTE - this does not change the AdjRIBMap
-        updateRibOutWithPeerData prefixes adjRibOut
-        -- now remove this peer completely from the AdjRIBMap
-        -- it is liekly that this could be done before the previous action.....
-        -- but the semantics should be identical as long as we didn't try to send withdraw messages to the peer which has gone away...
-        return $ Rib' locRIB' (Data.Map.delete peer adjRibOut)
+
+        -- first take the peer out of the visible RIB, avoid any further updates being scheduled...
+        -- we can discard its content, as we won't be talking to it again....
+        adjRibOut' <- takeMVar adjRibOut
+        let adjRibOut'' = Data.Map.delete peer adjRibOut'
+        putMVar adjRibOut adjRibOut''
+
+        -- drain the prefix table and save the resulting changes
+        let (locRIB',changes) = withdrawPeer locRIB peer
+
+        -- now, schedule the change dissemination, using the reduced new AdjRIB
+        updateAdjRIBOut changes adjRibOut''
+
+
+        return $ Rib' locRIB' adjRibOut
 
 addPeer :: Rib -> PeerData -> IO ()
 addPeer rib peer = modifyMVar_ rib ( addPeer' peer )
@@ -58,11 +75,18 @@ addPeer rib peer = modifyMVar_ rib ( addPeer' peer )
             -- get a complete RIB dump for the new peer...
         let ribDump = map f (PrefixTableUtils.getAdjRIBOut locRIB)
             f (rd,pfxs) = (pfxs , routeId rd)
-            -- make the RIB dump into a Fifo
-        aro <- fmap PeerAdjRIBOut (mkFifo ribDump)
-            -- TODO - this would be the place to insert an end-of-rib marker
-        let adjRibOut' = Data.Map.insert peer aro adjRibOut
-        return $ Rib' locRIB adjRibOut'
+        -- make the RIB dump into a Fifo
+        -- TODO - this would be the place to insert an end-of-rib marker
+        peerAdjRib <- fmap PeerAdjRIBOut (mkFifo ribDump)
+        -- and wrap it in an MVar
+        peerAdjRibMVar <- newMVar peerAdjRib
+
+        -- this is probaly a withMVar...
+        adjRibOut' <- takeMVar adjRibOut    
+        let adjRibOut'' = Data.Map.insert peer peerAdjRibMVar adjRibOut'
+        putMVar adjRibOut adjRibOut''
+
+        return $ Rib' locRIB adjRibOut
 
 lookupRoutes :: Rib -> PeerData -> PathChange -> IO (Maybe (RouteData, [Prefix]))
 --- objective:
@@ -116,9 +140,15 @@ getNextHops rib prefixes = do
 pullAllUpdates :: PeerData -> Rib -> IO [PathChange]
 pullAllUpdates peer rib = do
     (Rib' _ adjRIBOut) <- readMVar rib
-    let peerAdjRIBOut = adjRIBOut Data.Map.! peer
-        fifo = pathChanges peerAdjRIBOut
-    dequeueAll fifo
+    adjRIBOut' <- readMVar adjRIBOut
+    let peerAdjRIBOut = adjRIBOut' Data.Map.! peer
+
+    -- this take/put is null while the fifois itself MVar based...
+    peerAdjRIBOut' <- takeMVar peerAdjRIBOut
+    let fifo = pathChanges peerAdjRIBOut'
+    changes <- dequeueAll fifo
+    putMVar peerAdjRIBOut peerAdjRIBOut'
+    return changes
 
 getLocRib :: Rib -> IO PrefixTable
 getLocRib rib = do
@@ -141,10 +171,11 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
         | null pfxs = return (Rib' locRIB adjRibOut )
         | otherwise = do
               localPref <- evalLocalPref peerData pathAttributes pfxs
+              adjRibOut' <- readMVar adjRibOut
               let routeData = makeRouteData peerData pathAttributes routeId localPref
                   routeData' = if importFilter routeData then Withdraw peerData else routeData
                   ( !locRIB' , !updates ) = BGPRib.PrefixTable.update locRIB pfxs routeData'
-              updateRibOutWithPeerData updates adjRibOut
+              updateAdjRIBOut updates adjRibOut'
               return $ Rib' locRIB' adjRibOut
 
     ribWithdrawMany :: PeerData -> [Prefix] -> Rib' -> IO Rib'
@@ -152,7 +183,8 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
         | null pfxs = return (Rib' locRIB adjRibOut )
         | otherwise = do
             let ( !locRIB' , !withdraws ) = BGPRib.PrefixTable.update locRIB pfxs (Withdraw peerData)
-            updateRibOutWithPeerData withdraws adjRibOut
+            adjRibOut' <- readMVar adjRibOut
+            updateAdjRIBOut withdraws adjRibOut'
             return $ Rib' locRIB' adjRibOut
 
     makeRouteData :: PeerData -> [PathAttribute] -> Int -> Word32 -> RouteData
@@ -165,13 +197,18 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
         nextHop = getNextHop pathAttributes
         origin = getOrigin pathAttributes
 
-updateRibOutWithPeerData :: [(Prefix, RouteData)] -> AdjRIBOut -> IO ()
-updateRibOutWithPeerData updates adjRIB = 
+updateAdjRIBOut :: [(Prefix, RouteData)] -> AdjRIBOut -> IO ()
+updateAdjRIBOut updates adjRIB = 
     sequence_ $ Data.Map.mapWithKey action adjRIB
 
     where 
-        action :: PeerData -> PeerAdjRIBOut -> IO ()
-        action targetPeer = insertPathChanges $ groupBySecond $ map (second routeId) updates
+        action :: PeerData -> MVar PeerAdjRIBOut -> IO ()
+        action targetPeer peerAdjRIBOut = do
+            -- this take/put is null while the fifois itself MVar based...
+            peerAdjRIBOut' <- takeMVar peerAdjRIBOut
+            let pathChanges = groupBySecond $ map (second routeId) updates
+            insertPathChanges pathChanges peerAdjRIBOut'
+            putMVar peerAdjRIBOut peerAdjRIBOut'
 
 importFilter :: RouteData -> Bool
 importFilter route@RouteData{} = pathLoopCheck route where
