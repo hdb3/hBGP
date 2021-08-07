@@ -15,17 +15,20 @@ import qualified Router.StdRib as Rib
 import ZServ.ZServ
 
 import Router.Global
-import Router.Config
-import Router.Log
+import qualified Router.Config as Config
+import Control.Logger.Simple
+import qualified Data.Text as T
+trace = logTrace . T.pack
+info = logInfo . T.pack
 
 redistribute :: Global -> IO ()
 redistribute global@Global{..} = do
-    when (configEnableDataPlane config )
+    when (Config.configEnableDataPlane config )
          ( do   threadId <- myThreadId
                 trace $ "Thread " ++ show threadId ++ " starting redistributor"
                 ( zStreamIn, zStreamOut ) <- getZServerStreamUnix "/var/run/quagga/zserv.api"
                 zservRegister zStreamOut _ZEBRA_ROUTE_BGP
-                if configEnableRedistribution config
+                if Config.configEnableRedistribution config
                 then void $ forkIO (zservReader global (localPeer gd) ( zStreamIn, zStreamOut ))
                 else info "configEnableRedistribution not enabled - not staring Zserv listener"
 

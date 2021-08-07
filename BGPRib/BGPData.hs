@@ -42,7 +42,7 @@ data RouteData =  RouteData { peerData :: PeerData
                             , originAS :: Word32
                             , lastAS :: Word32
                             }
-                            | Withdraw { peerData :: PeerData }
+                            | Withdraw PeerData
                             | NullRoute
 getRouteNextHop :: RouteData -> Maybe IPv4
 getRouteNextHop rd@RouteData{} = Just $ nextHop rd
@@ -80,7 +80,7 @@ instance Show PeerData where
 instance Show RouteData where
     show rd@RouteData{..} = getASPathList pathAttributes ++ " nexthop: " ++ show nextHop ++ ",  peer ID: " ++ show (peerBGPid peerData) ++ ",  pref " ++ show localPref
     show NullRoute = "NullRoute"
-    show Withdraw{} = "Withdraw"
+    show (Withdraw peer) = "Withdraw " ++ show peer
 
 instance Eq RouteData where
     (==) NullRoute NullRoute = True
@@ -98,6 +98,7 @@ instance Ord PeerData where
 instance Ord RouteData where
   compare rd1@RouteData{} rd2@RouteData{} = compare (localPref rd1, pathLength rd2, origin rd2, fromEBGP rd1, peerBGPid (peerData rd2), peerIPv4 (peerData rd2))
                                                     (localPref rd2, pathLength rd1, origin rd1, fromEBGP rd2, peerBGPid (peerData rd1), peerIPv4 (peerData rd1))
+  compare _ _ = error "should never order unmatched route sorts"
 
 -- rank as higher some parameters when lower - these are Origin, Path Length, peer BGPID, peer address
 -- ## TODO ## MED comparison is slightly tricky - only applies when adjacent AS is equal, and needs to accomodate missing Meds in either or both routes

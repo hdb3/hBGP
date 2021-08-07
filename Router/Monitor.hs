@@ -1,8 +1,11 @@
 module Router.Monitor where
 
 import Control.Concurrent (readChan)
+import Control.Logger.Simple
+import qualified Data.Text as T
 import Router.Global
-import Router.Log
+
+info = logInfo . T.pack
 
 startMonitor :: Global -> IO ()
 startMonitor global = do

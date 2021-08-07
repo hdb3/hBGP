@@ -22,7 +22,9 @@ import Data.Maybe(fromMaybe)
 import System.Exit(die)
 import Control.Monad(unless)
 import BGPlib.BGPlib
-import Router.Log
+import Control.Logger.Simple
+import qualified Data.Text as T
+info = logInfo . T.pack
 
 data Config = Config { configAS :: Word32
                      , configBGPID :: IPv4
@@ -146,7 +148,7 @@ data PeerConfig = PeerConfig { peerConfigIPv4 :: (IPv4,IPv4)
                              }
                              deriving (Eq,Show,Read)
 
-defaultPeerConfig = PeerConfig { peerConfigIPv4 = undefined
+defaultPeerConfig = PeerConfig { peerConfigIPv4 = ("0.0.0.0","127.0.0.1")
                                , peerConfigAS = Nothing
                                , peerConfigBGPID = Nothing
                                , peerConfigLocalAS = Nothing

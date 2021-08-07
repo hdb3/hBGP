@@ -3,10 +3,12 @@ module BGPlib.BGPHandle where
 import BGPlib.AttoBGP
 import BGPlib.BGPMessage (BGPMessage (..))
 import Control.Exception (Exception, evaluate, throw)
+import Control.Logger.Simple
 import Data.Attoparsec.ByteString
 import qualified Data.ByteString as B
 import Data.IORef
 import Data.Maybe (fromMaybe)
+import qualified Data.Text as T
 import Network.Socket (Socket, socketToHandle)
 import System.IO (Handle, IOMode (ReadWriteMode), hClose, hPutStrLn, stderr)
 import System.IO.Error (catchIOError)
@@ -67,4 +69,9 @@ bgpSendHandle :: BGPHandle -> B.ByteString -> IO ()
 bgpSendHandle (BGPHandle h _) bs =
   catchIOError
     (B.hPut h bs)
-    (\e -> throw $ BGPIOException (show (e :: IOError)))
+    -- (\e -> throw $ BGPIOException (show (e :: IOError)))
+    -- (\e -> logDebug $ T.pack $ (show (e :: IOError)))
+    ( \e -> do
+        logDebug $ T.pack $ (show (e :: IOError))
+        throw $ BGPIOException (show (e :: IOError))
+    )

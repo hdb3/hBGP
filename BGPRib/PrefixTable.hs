@@ -19,7 +19,7 @@ import BGPRib.BGPData
 import BGPlib.BGPlib (Prefix,toPrefix,fromPrefix)
 import qualified BGPRib.PT as PT
 
-type PrefixTableEntry = PT.PTE
+-- type PrefixTableEntry = PT.PTE
 type PrefixTable = PT.PT
 
 instance {-# OVERLAPPING #-} Show PrefixTable where
@@ -44,11 +44,13 @@ showRibAt table pfx = show (PT.ptQuery (fromPrefix pfx) table)
 
 -- TODO merge update and withdraw by using a route value of Withdraw {..}
 withdraw :: PrefixTable -> [Prefix] -> PeerData -> (PrefixTable,[(Prefix,RouteData)])
-withdraw pt pfxs pd = update pt pfxs (Withdraw pd)
+withdraw pt pfxs peerData = update pt pfxs (Withdraw peerData)
 -- withdraw pt pfxs pd = Data.List.foldl' f (pt,[]) pfxs where
 --     f (pt',acc) pfx = let acc' = if (PT.pteBest new) == (PT.pteBest old) then acc else (pfx,PT.pteBest new):acc
 --                           (old,new,pt'') = PT.ptUpdate (fromPrefix pfx) (Withdraw pd) pt'
 --                       in (pt'',acc')
+
+-- withdrawPrefix :: PrefixTable -> [Prefix] -> PeerData -> (PrefixTable,[(Prefix,RouteData)])
 
 withdrawPeer :: PrefixTable -> PeerData -> (PrefixTable,[(Prefix,RouteData)])
 withdrawPeer pt = withdraw pt (map toPrefix $ PT.ptKeys pt)

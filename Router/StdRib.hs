@@ -7,24 +7,27 @@ import Data.Word
 import BGPlib.BGPlib hiding (nlri,withdrawn)
 import BGPRib.BGPRib
 import qualified BGPRib.BGPRib as BGPRib
-import Router.Log
+import Control.Logger.Simple
+import qualified Data.Text as T
+warn = logWarn . T.pack
 
 type RibHandle = (Rib,PeerData)
 
 addPeer :: Rib -> PeerData -> IO RibHandle
 addPeer rib peer = do
-    event $ "Peer Up: " ++ show (peerIPv4 peer)
+    logNote $ T.pack $ "Peer Up: " ++ show (peerIPv4 peer)
     BGPRib.addPeer rib peer
     return (rib,peer)
 
 ribPush :: RibHandle -> ParsedUpdate -> IO()
 ribPush (_,peer) NullUpdate = return ()
-ribPush (rib,peer) update@ParsedUpdate{} =do
-    if null (nlri update)
-        then if null (withdrawn update)
-            then event $ "EOR: " ++ show (peerIPv4 peer)
-            else event $ "Withdraw: " ++ show (peerIPv4 peer) ++ show (withdrawn update)
-        else event $ "Update: " ++ show (peerIPv4 peer) ++ show update
+ribPush (rib,peer) update@ParsedUpdate{} = do
+    logTrace $ T.pack $ case (null (nlri update), null (withdrawn update)) of
+      (True, True)  -> "EOR: " ++ show (peerIPv4 peer)
+      (True, False) -> "Withdraw: " ++ show (peerIPv4 peer) ++ show (withdrawn update)
+      (False, True) ->  "Update: " ++ show (peerIPv4 peer) ++ show update
+      _             -> "Update: " ++ show (peerIPv4 peer) ++ show update ++ "Withdraw: " ++ show (peerIPv4 peer) ++ show (withdrawn update)
+
     BGPRib.ribPush rib peer update
 
 delPeerByAddress :: Rib -> Word16 -> IPv4 -> IO ()

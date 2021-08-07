@@ -14,6 +14,8 @@ import qualified BGPRib.PT as PT (ptBest)
 import qualified BGPRib.PrefixTableUtils as PrefixTableUtils
 import BGPRib.AdjRIBOut
 import BGPRib.Common(groupBySecond)
+import Control.Logger.Simple
+import qualified Data.Text as T
 
 type Rib = MVar Rib'
 
@@ -72,8 +74,8 @@ lookupRoutes :: Rib -> PeerData -> PathChange -> IO (Maybe (RouteData, [Prefix])
 ---    Drop from the head of the list whilst the prperty is not satisfied,
 ---    Return the first found result, reducing the remaining list with a simpler similar filter taht does not capture the RouteData returned by the lookup
 
-lookupRoutes _ _ (prefixes, 0) = return $ Just (Withdraw undefined, prefixes)
-lookupRoutes _  _ (prefixes, -1) = return $ Just (Withdraw undefined, prefixes)
+lookupRoutes _ peerData (prefixes, 0) = return $ Just (Withdraw peerData, prefixes)
+lookupRoutes _ peerData (prefixes, -1) = return $ Just (Withdraw peerData, prefixes)
 lookupRoutes rib target (prefixes, hash) = do
         rib' <- readMVar rib
         let 
@@ -135,6 +137,7 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
 
     ribPush' :: PeerData -> ParsedUpdate -> Rib' -> IO Rib'
     ribPush' peerData ParsedUpdate{..} rib = ribUpdateMany peerData puPathAttributes hash nlri rib >>= ribWithdrawMany peerData withdrawn
+    ribPush' _ NullUpdate _ = error "can't push null update becuase shouldn't be asking"
 
     ribUpdateMany :: PeerData -> [PathAttribute] -> Int -> [Prefix] -> Rib' -> IO Rib'
     ribUpdateMany peerData pathAttributes routeId pfxs (Rib' locRIB adjRibOut )
@@ -142,16 +145,18 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
         | otherwise = do
               localPref <- evalLocalPref peerData pathAttributes pfxs
               let routeData = makeRouteData peerData pathAttributes routeId localPref
-                  routeData' = if importFilter routeData then Withdraw peerData else routeData
+                  routeData' = if importFilter routeData then (Withdraw peerData) else routeData
                   ( !locRIB' , !updates ) = BGPRib.PrefixTable.update locRIB pfxs routeData'
               updateRibOutWithPeerData updates adjRibOut
               return $ Rib' locRIB' adjRibOut
 
     ribWithdrawMany :: PeerData -> [Prefix] -> Rib' -> IO Rib'
     ribWithdrawMany peerData pfxs (Rib' locRIB adjRibOut)
-        | null pfxs = return (Rib' locRIB adjRibOut )
+        | null pfxs = logDebug "ribWithdrawMany []" >> return (Rib' locRIB adjRibOut )
         | otherwise = do
+            logDebug  .T.pack $ "ribWithdrawMany " ++ show pfxs
             let ( !locRIB' , !withdraws ) = BGPRib.PrefixTable.update locRIB pfxs (Withdraw peerData)
+            logDebug . T.pack $ "ribWithdrawMany " ++ show (length withdraws) ++ " changes"
             updateRibOutWithPeerData withdraws adjRibOut
             return $ Rib' locRIB' adjRibOut
 

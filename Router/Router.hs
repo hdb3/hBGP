@@ -1,4 +1,7 @@
-{-# LANGUAGE DuplicateRecordFields,RecordWildCards,TemplateHaskell #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Main where
 
 import Development.GitRev
@@ -22,11 +25,14 @@ import Router.Global
 import Router.Redistributor(redistribute)
 import Router.Console(startConsole)
 import Router.Monitor(startMonitor)
-import Router.Log
+import Control.Logger.Simple
+import qualified Data.Text as T
 
 main :: IO ()
-main = do
-    info banner
+-- main = withGlobalLogging (LogConfig (Just "hbgp.log") True) $ do
+main = withGlobalLogging (LogConfig (Nothing) True) $ do
+    setLogLevel LogInfo
+    logNote banner
 
     (rawConfig, fileBaseName) <- getConfig
     config <- checkCapabilities rawConfig >>= fixCapabilities
@@ -41,15 +47,16 @@ main = do
     let
         app = bgpFSM global
 
-    debug $ "connecting to " ++ show (activePeers config)
-    debug $ "activeOnly = " ++ show (activeOnly config)
+    logInfo $ T.pack $ "connecting to " ++ show (activePeers config)
+    logInfo $ T.pack $ "activeOnly = " ++ show (activeOnly config)
     _ <- forkIO $ Session.session 179 app (configListenAddress config) (activePeers config) (not $ activeOnly config)
-    info $ "Router " ++ fileBaseName ++ " ready"
+    logInfo $ T.pack $ "Router " ++ fileBaseName ++ " ready"
     takeMVar (exitFlag global)
     -- gracefull cleanup would have to be called here
     -- currently, sessions just fall of a cliff edge (TCP reset)
 
-banner = "hbgp " ++ showVersion version
+banner :: T.Text
+banner = T.pack $ "hbgp " ++ showVersion version
          ++ if "master" == $(gitBranch) then "" else " (" ++ $(gitBranch)++ ")"
 
 getConfig :: IO (Config, String)
