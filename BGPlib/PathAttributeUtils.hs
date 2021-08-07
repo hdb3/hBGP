@@ -1,74 +1,86 @@
-{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-#LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE OverloadedStrings #-}
+
 module BGPlib.PathAttributeUtils where
-import Data.Word
-import Data.IP
-import Data.Maybe(fromJust,fromMaybe)
-import Data.List(delete)
 
 import BGPlib.PathAttributes
+import Data.IP
+import Data.List (delete)
+import Data.Maybe (fromJust, fromMaybe)
+import Data.Word
 
 prePendAS :: ASNumber -> [PathAttribute] -> [PathAttribute]
-prePendAS asn = updatePathAttribute TypeCodePathAttributeASPath (asPrePend' asn) where
-    asPrePend' asn ( PathAttributeASPath p) = PathAttributeASPath (asPrePend asn p)
+prePendAS asn = updatePathAttribute TypeCodePathAttributeASPath (asPrePend' asn)
+  where
+    asPrePend' asn (PathAttributeASPath p) = PathAttributeASPath (asPrePend asn p)
 
 getASPathLength :: [PathAttribute] -> Int
-getASPathLength pas = maybe
-                      0
-                      (\(PathAttributeASPath asPath) -> asPathLength asPath)
-                      (getPathAttribute TypeCodePathAttributeASPath pas)
+getASPathLength pas =
+  maybe
+    0
+    (\(PathAttributeASPath asPath) -> asPathLength asPath)
+    (getPathAttribute TypeCodePathAttributeASPath pas)
 
 -- normaliseASPath:  eliminate as4 path by replacing the original as2 path with the contens of the as4 path
 -- should be a lossless conversion
 -- the reverse would be needed if talking to an as2 only peer...
-normaliseASPath pas = let toASPath4' (PathAttributeASPath p) = PathAttributeASPath p
-                          pas' = updatePathAttribute TypeCodePathAttributeASPath toASPath4' pas in
-    maybe pas'
-          (\(PathAttributeAS4Path path) -> deletePathAttributeType TypeCodePathAttributeAS4Path $ insertPathAttribute (PathAttributeASPath path) pas)
-          (getPathAttribute TypeCodePathAttributeAS4Path pas)
+normaliseASPath pas =
+  let toASPath4' (PathAttributeASPath p) = PathAttributeASPath p
+      pas' = updatePathAttribute TypeCodePathAttributeASPath toASPath4' pas
+   in maybe
+        pas'
+        (\(PathAttributeAS4Path path) -> deletePathAttributeType TypeCodePathAttributeAS4Path $ insertPathAttribute (PathAttributeASPath path) pas)
+        (getPathAttribute TypeCodePathAttributeAS4Path pas)
 
 getAS2Path = fromJust . getPathAttribute TypeCodePathAttributeASPath
+
 getAS4Path = fromJust . getPathAttribute TypeCodePathAttributeAS4Path
 
 getASPathAttribute pax = fromMaybe (getAS2Path pax) (getPathAttribute TypeCodePathAttributeAS4Path pax)
 
 getASPathList :: [PathAttribute] -> String
-getASPathList = list . getASPathContent where
+getASPathList = list . getASPathContent
+  where
     list [] = "[]"
     list [ASSequence seq] = show seq
     list [ASSet set] = show set
     list _ = error "AS Set and multi Set/Sequence detail not written yet"
 
 getASPathDetail :: [PathAttribute] -> (Int, Word32, Word32)
-getASPathDetail = detail . getASPathContent where
-    detail [] = (0,0,0)
+getASPathDetail = detail . getASPathContent
+  where
+    detail [] = (0, 0, 0)
     detail [ASSequence seq] = (length seq, last seq, head seq)
     detail [ASSet set] = (length set, last set, head set)
     detail _ = error "AS Set and multi Sequence detail not written yet"
-    
+
 elemASPath :: Word32 -> [PathAttribute] -> Bool
-elemASPath asn = go . getASPathContent where
+elemASPath asn = go . getASPathContent
+  where
     go [] = False
-    go (a:ax) = go' a || go ax
+    go (a : ax) = go' a || go ax
     go' (ASSet set) = go'' set
     go' (ASSequence seq) = go'' seq
     go'' [] = False
-    go'' (a:ax) = a == asn || go'' ax
+    go'' (a : ax) = a == asn || go'' ax
 
 getASPath :: [PathAttribute] -> ASPath
-getASPath = unwrapASPath . getASPathAttribute where
+getASPath = unwrapASPath . getASPathAttribute
+  where
     unwrapASPath (PathAttributeASPath asPath) = asPath
     unwrapASPath (PathAttributeAS4Path asPath) = asPath
 
 getASPathContent :: [PathAttribute] -> [ASSegment]
 getASPathContent = getASPath
+
 --getASPathContent = unwrapSegments . toASPath4 . getASPath where
-    --unwrapSegments (ASPath4 segments) = segments
+--unwrapSegments (ASPath4 segments) = segments
 -- getASPathContent (PathAttributeASPath (ASPath4 segments)) = segments
 -- getASPathContent (PathAttributeASPath (ASPath2 segments)) = map toASPath4 segments
 
 getASPathSegmentCount = length . getASPathContent
+
 getASPathOrigin = getLastASN . last . getASPathContent
 
 -- getLastASN :: ASSegment Word32 -> Word32
@@ -94,17 +106,16 @@ setOrigin :: Word8 -> [PathAttribute] -> [PathAttribute]
 setOrigin = insertPathAttribute . PathAttributeOrigin
 
 getOrigin :: [PathAttribute] -> Word8
-getOrigin pas = maybe 0 (\(PathAttributeOrigin x) -> x ) (getPathAttribute TypeCodePathAttributeOrigin pas)
+getOrigin pas = maybe 0 (\(PathAttributeOrigin x) -> x) (getPathAttribute TypeCodePathAttributeOrigin pas)
 
 setNextHop :: IPv4 -> [PathAttribute] -> [PathAttribute]
 setNextHop = insertPathAttribute . PathAttributeNextHop
 
 getNextHop :: [PathAttribute] -> IPv4
-getNextHop pas = maybe "127.0.0.127" (\(PathAttributeNextHop x) -> x ) (getPathAttribute TypeCodePathAttributeNextHop pas)
+getNextHop pas = maybe "127.0.0.127" (\(PathAttributeNextHop x) -> x) (getPathAttribute TypeCodePathAttributeNextHop pas)
 
 checkForRequiredPathAttributes :: [PathAttribute] -> Bool
 checkForRequiredPathAttributes pas = included requiredPathAttributes (map identify pas)
-
 
 -- there may be a standard way to express this - the requirement is that all elements of the list requiredPathAttributes
 -- are in the list generated by '(map identify pas)'
@@ -113,4 +124,4 @@ checkForRequiredPathAttributes pas = included requiredPathAttributes (map identi
 
 included [] _ = True
 included ax [] | not (null ax) = False
-included ax (b:bx) = included (delete b ax) bx
+included ax (b : bx) = included (delete b ax) bx

@@ -1,4 +1,4 @@
-module BGPRib.AdjRIBOut(module BGPRib.Fifo, module BGPRib.AdjRIBOut) where
+module BGPRib.AdjRIBOut (module BGPRib.Fifo, module BGPRib.AdjRIBOut) where
 
 {-
  - AdjRIBOut provides a list structure to support route dissemination
@@ -12,19 +12,19 @@ module BGPRib.AdjRIBOut(module BGPRib.Fifo, module BGPRib.AdjRIBOut) where
  - when an entire route table must be exchanged
 -}
 
+import BGPRib.Fifo
+import BGPlib.BGPlib
 import qualified Data.IntMap.Strict
 import qualified Data.Tuple
 
-import BGPlib.BGPlib
-import BGPRib.Fifo
+type PathChange = ([Prefix], Int)
 
-type PathChange = ( [Prefix], Int )
 data PeerAdjRIBOut = PeerAdjRIBOut {pathChanges :: Fifo PathChange}
 
 showPeerAdjRIBOut :: PeerAdjRIBOut -> IO String
 showPeerAdjRIBOut = showFifo . pathChanges
 
-newPeerAdjRIBOut  ::  IO PeerAdjRIBOut
+newPeerAdjRIBOut :: IO PeerAdjRIBOut
 newPeerAdjRIBOut = fmap PeerAdjRIBOut emptyFifo
 
 insertPathChange :: PathChange -> PeerAdjRIBOut -> IO ()

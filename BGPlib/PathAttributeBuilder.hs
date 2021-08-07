@@ -12,8 +12,8 @@ import BGPlib.Prefixes ()
 import ByteString.StrictBuilder
 import Control.Monad (unless)
 import qualified Data.Attoparsec.Binary as A
-import qualified Data.Attoparsec.ByteString as A
 import Data.Attoparsec.ByteString (Parser)
+import qualified Data.Attoparsec.ByteString as A
 import qualified Data.ByteString as B
 import Data.Word
 
@@ -38,11 +38,13 @@ buildPathAttributes = foldMap buildPathAttribute
     buildAttributeWord32 :: PathAttributeTypeCode -> Word32 -> Builder
     buildAttributeWord32 code v = buildCommon code 4 <> word32BE v
     buildAttributeWords32 :: PathAttributeTypeCode -> [Word32] -> Builder
-    buildAttributeWords32 code ws | 63 > length ws = buildCommon code   (fromIntegral $ 4 * length ws) <> foldMap word32BE ws
-                                  | otherwise =      buildExtended code (fromIntegral $ 4 * length ws) <> foldMap word32BE ws
+    buildAttributeWords32 code ws
+      | 63 > length ws = buildCommon code (fromIntegral $ 4 * length ws) <> foldMap word32BE ws
+      | otherwise = buildExtended code (fromIntegral $ 4 * length ws) <> foldMap word32BE ws
     buildAttributeWords64 :: PathAttributeTypeCode -> [Word64] -> Builder
-    buildAttributeWords64 code ws | 31 > length ws = buildCommon code    (fromIntegral $ 8 * length ws) <> foldMap word64BE ws
-                                  | otherwise =      buildExtended code  (fromIntegral $ 8 * length ws) <> foldMap word64BE ws
+    buildAttributeWords64 code ws
+      | 31 > length ws = buildCommon code (fromIntegral $ 8 * length ws) <> foldMap word64BE ws
+      | otherwise = buildExtended code (fromIntegral $ 8 * length ws) <> foldMap word64BE ws
     buildAttributeWord64 :: PathAttributeTypeCode -> Word64 -> Builder
     buildAttributeWord64 code v = buildCommon code 8 <> word64BE v
     buildAttributeAggregator :: PathAttributeTypeCode -> Word32 -> Word32 -> Builder
@@ -90,7 +92,8 @@ attributesParser n
     {-# INLINE attributeParser #-}
     attributeParser :: Word16 -> PathAttributeTypeCode -> Parser PathAttribute
     attributeParser len code =
-      if  | TypeCodePathAttributeOrigin == code -> do
+      if
+          | TypeCodePathAttributeOrigin == code -> do
             unless (len == 1) (error "Bad Length")
             v <- A.anyWord8
             unless (v < 3) (error "Bad Origin Code")
@@ -104,7 +107,8 @@ attributesParser n
           | TypeCodePathAttributeAtomicAggregate == code -> return PathAttributeAtomicAggregate
           | TypeCodePathAttributeAggregator == code -> do
             as <-
-              if  | len == 6 -> fromIntegral <$> A.anyWord16be
+              if
+                  | len == 6 -> fromIntegral <$> A.anyWord16be
                   | len == 8 -> A.anyWord32be
                   | otherwise -> error $ "Bad length in PathAttributeAggregator: " ++ show len
             bgpid <- A.anyWord32be
@@ -114,10 +118,11 @@ attributesParser n
           | TypeCodePathAttributeMPUnreachNLRI == code -> PathAttributeMPUnreachNLRI <$> A.take (fromIntegral len)
           | TypeCodePathAttributeExtendedCommunities == code -> PathAttributeExtendedCommunities <$> A.count (fromIntegral $ len `div` 8) A.anyWord64be
           | TypeCodePathAttributeAS4Path == code -> PathAttributeAS4Path <$> parseASPath len
-          | TypeCodePathAttributeAS4Aggregator == code -> PathAttributeAS4Aggregator <$> do
-            w0 <- A.anyWord32be
-            w1 <- A.anyWord32be
-            return (w0, w1)
+          | TypeCodePathAttributeAS4Aggregator == code ->
+            PathAttributeAS4Aggregator <$> do
+              w0 <- A.anyWord32be
+              w1 <- A.anyWord32be
+              return (w0, w1)
           | TypeCodePathAttributeConnector == code -> PathAttributeConnector <$> A.take (fromIntegral len)
           | TypeCodePathAttributeASPathlimit == code -> PathAttributeASPathlimit <$> A.take (fromIntegral len)
           | TypeCodePathAttributeLargeCommunity == code -> PathAttributeLargeCommunity <$> A.count (fromIntegral $ len `div` 12) get3word32be

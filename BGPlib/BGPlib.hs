@@ -18,7 +18,6 @@ import BGPlib.ASPath
 import BGPlib.BGPHandle
 import BGPlib.BGPMessage
 import BGPlib.Capabilities
-import BGPlib.Update
 import BGPlib.Codes
 import BGPlib.LibCommon
 import BGPlib.PathAttributeBuilder
@@ -26,3 +25,4 @@ import BGPlib.PathAttributeUtils
 import BGPlib.PathAttributes
 import BGPlib.Prefixes
 import BGPlib.RFC4271
+import BGPlib.Update

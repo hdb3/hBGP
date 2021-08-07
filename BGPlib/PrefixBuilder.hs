@@ -29,7 +29,6 @@ when a new builder is started.
 
 The kernel function assuming that the limit value is in scope, has signature
 
-
   go :: accumulator -> Int -> [Prefix] -> Builders
   go acc freespace prefixes = builders
 
@@ -149,7 +148,7 @@ extUpdateBuilder limit withdrawn attributeBuilder nlri =
           <> withdrawBuilder
           <> word16BE 0
    in if limit >= baseSize + attributeLength + withdrawnLength + nlriLength
-        then-- common / simple case  - all will fit in one message......
+        then -- common / simple case  - all will fit in one message......
         -- NB - this inlcludes the null case (EndOfRIB), and multiprtotocol cases which have only attributes
         --      though the latter will likely require a similar segmentation capability to ensure that the attribute
         --      bytesize remains under the message limit.
@@ -167,6 +166,6 @@ extUpdateBuilder limit withdrawn attributeBuilder nlri =
             <> word16BE (fromIntegral attributeLength)
             <> attributeBuilder
             <> if null nlriBuilders then mempty else head nlriBuilders
-        else-- there is enough stuff that more than one message is needed
+        else -- there is enough stuff that more than one message is needed
         -- most likely not both nlri and withdrawn, but even if both present it is near enough optimal to simply split the two types and send seprately rather than attempt to cram both sorts in a single message
           foldMap buildWithdraw withdrawnBuilders <> foldMap buildNLRI nlriBuilders

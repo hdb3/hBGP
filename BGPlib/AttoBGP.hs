@@ -5,11 +5,11 @@ import BGPlib.Capabilities (parseOptionalParameters)
 import BGPlib.LibCommon (decode8, fromHostAddress)
 import BGPlib.PathAttributeBuilder (attributesParser)
 import BGPlib.Prefixes
-import Control.Applicative ((<|>), Alternative, liftA2)
+import Control.Applicative (Alternative, liftA2, (<|>))
 import Control.Monad (unless)
 import qualified Data.Attoparsec.Binary as A
-import qualified Data.Attoparsec.ByteString as A
 import Data.Attoparsec.ByteString (Parser)
+import qualified Data.Attoparsec.ByteString as A
 import Data.Bits
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
@@ -94,7 +94,7 @@ bgpParser1 = do
 
 --parseX = inline parse1 -- this is the original recursive parser
 parseX = parse2 -- this is the case statement parser
-  --parseX = inline parse3 -- this is the simplified version of parse2
+--parseX = inline parse3 -- this is the simplified version of parse2
 
 prefixBuilder (a, b) = mkPrefix a b
 

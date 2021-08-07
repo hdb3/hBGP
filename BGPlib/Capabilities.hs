@@ -175,7 +175,8 @@ parseOptionalParameters n
             return $ cap : caps
     parseCapability :: Word8 -> Word8 -> A.Parser Capability
     parseCapability t l =
-      if  | t == _CapCodeMultiprotocol -> do
+      if
+          | t == _CapCodeMultiprotocol -> do
             afi <- A.anyWord16be
             _ <- A.anyWord8
             CapMultiprotocol afi <$> A.anyWord8

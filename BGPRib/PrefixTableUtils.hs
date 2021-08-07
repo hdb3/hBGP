@@ -14,13 +14,14 @@ module BGPRib.PrefixTableUtils where
 -}
 
 --import Data.IntMap.Strict(toList)
-import qualified Data.List
-import Data.IP
-import BGPlib.BGPlib (Prefix,toPrefix)
-import BGPRib.Common
+
 import BGPRib.BGPData
-import BGPRib.PrefixTable(PrefixTable)
+import BGPRib.Common
 import qualified BGPRib.PT as PT
+import BGPRib.PrefixTable (PrefixTable)
+import BGPlib.BGPlib (Prefix, toPrefix)
+import Data.IP
+import qualified Data.List
 
 -- ===================================================
 --
@@ -28,33 +29,41 @@ import qualified BGPRib.PT as PT
 --
 -- ===================================================
 
-getDB :: PrefixTable -> [(Prefix,[RouteData])]
-getDB pt = map f (PT.ptList pt) where
-    f (pfx,routes) = (toPrefix pfx,routes)
+getDB :: PrefixTable -> [(Prefix, [RouteData])]
+getDB pt = map f (PT.ptList pt)
+  where
+    f (pfx, routes) = (toPrefix pfx, routes)
 
 lengthRIB :: PrefixTable -> Int
 lengthRIB pt = length (PT.ptList pt)
 
-getRIB :: PrefixTable -> [(RouteData,Prefix)]
-getRIB pt = f (PT.ptList pt) where
+getRIB :: PrefixTable -> [(RouteData, Prefix)]
+getRIB pt = f (PT.ptList pt)
+  where
     f [] = []
-    f ((k,pte):ax) | PT.pteNull pte = f ax
-                   | otherwise = (PT.pteBest pte, toPrefix k) : f ax 
-   -- f (pfx,routes) = (fromJust $ PT.pteBest routes, toPrefix pfx)
+    f ((k, pte) : ax)
+      | PT.pteNull pte = f ax
+      | otherwise = (PT.pteBest pte, toPrefix k) : f ax
 
-getFIB :: PrefixTable -> [(Prefix,IPv4)]
-getFIB pt = map f (getRIB pt) where
-    f (route,pfx) = (pfx , nextHop route)
+-- f (pfx,routes) = (fromJust $ PT.pteBest routes, toPrefix pfx)
 
-getAdjRIBOut :: PrefixTable -> [(RouteData,[Prefix])]
+getFIB :: PrefixTable -> [(Prefix, IPv4)]
+getFIB pt = map f (getRIB pt)
+  where
+    f (route, pfx) = (pfx, nextHop route)
+
+getAdjRIBOut :: PrefixTable -> [(RouteData, [Prefix])]
 getAdjRIBOut = groupBy_ . getRIB
 
 showPrefixTable :: PrefixTable -> String
-showPrefixTable pt = unlines $ map showPrefixTableItem (getDB pt) where
-    showPrefixTableItem (k,v) = show k ++ " [" ++ Data.List.intercalate " , " (showRoutes v) ++ "]"
-    showRoutes = map (\route -> ( show.nextHop) route ++ " (" ++ (show.pathLength) route ++ ")" )
+showPrefixTable pt = unlines $ map showPrefixTableItem (getDB pt)
+  where
+    showPrefixTableItem (k, v) = show k ++ " [" ++ Data.List.intercalate " , " (showRoutes v) ++ "]"
+    showRoutes = map (\route -> (show . nextHop) route ++ " (" ++ (show . pathLength) route ++ ")")
 
 showPrefixTableByRoute :: PrefixTable -> String
 showPrefixTableByRoute = showPrefixTableByRoute' show
-showPrefixTableByRoute' fr pt = unlines $ map showRoute (getAdjRIBOut pt) where
-    showRoute (r,pfxs) = unwords $  fr r : ":" : if length pfxs < 3 then map show pfxs else map show (take 2 pfxs) ++ ["..."]
+
+showPrefixTableByRoute' fr pt = unlines $ map showRoute (getAdjRIBOut pt)
+  where
+    showRoute (r, pfxs) = unwords $ fr r : ":" : if length pfxs < 3 then map show pfxs else map show (take 2 pfxs) ++ ["..."]
