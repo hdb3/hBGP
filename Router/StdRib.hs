@@ -14,17 +14,17 @@ import System.Timeout (timeout)
 
 warn = logWarn . T.pack
 
-type RibHandle = (Rib, PeerData)
+type RibHandle = (Rib, PeerData, PeerAdjRIBOut)
 
 addPeer :: Rib -> PeerData -> IO RibHandle
 addPeer rib peer = do
   logNote $ T.pack $ "Peer Up: " ++ show (peerIPv4 peer)
-  BGPRib.addPeer rib peer
-  return (rib, peer)
+  fifo <- BGPRib.addPeer rib peer
+  return (rib, peer, fifo)
 
 ribPush :: RibHandle -> ParsedUpdate -> IO ()
-ribPush (_, peer) NullUpdate = return ()
-ribPush (rib, peer) update@ParsedUpdate {} = do
+ribPush (_, _, _) NullUpdate = return ()
+ribPush (rib, peer, _) update@ParsedUpdate {} = do
   logTrace $
     T.pack $ case (null (nlri update), null (withdrawn update)) of
       (True, True) -> "EOR: " ++ show (peerIPv4 peer)
@@ -44,7 +44,7 @@ delPeerByAddress rib port ip = do
       mapM_ (delPeer rib) peers
 
 ribPull :: RibHandle -> IO [BGPOutput]
-ribPull (rib, peer) = pullAllUpdates peer rib >>= updateFromPathChanges rib peer
+ribPull (rib, peer, fifo) = pullAllUpdates fifo >>= updateFromPathChanges rib peer
 
 msgTimeout :: Int -> IO [a] -> IO [a]
 msgTimeout t f = fromMaybe [] <$> timeout (1000000 * t) f

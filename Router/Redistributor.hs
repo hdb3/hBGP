@@ -4,7 +4,7 @@
 module Router.Redistributor where
 
 import BGPRib.BGPData (localPeer)
-import BGPRib.Rib (getNextHops, pullAllUpdates)
+import BGPRib.Rib (getNextHops, getPeerAdjRIBOut, pullAllUpdates)
 import BGPlib.Prefixes (toAddrRange)
 import Control.Concurrent
 --- ************* VERY DANGEROUS - should re-export from BGPfsm to avoid conflict!!!!
@@ -44,11 +44,12 @@ redistribute global@Global {..} = do
               delRoute zStreamOut (toAddrRange route)
         -- delRoute zStreamOut (toAddrRange $ toPrefix route)
 
-        ribUpdateListener routeInstall global (localPeer gd) 1
+        localAdjRIBOut <- getPeerAdjRIBOut (localPeer gd) rib
+        ribUpdateListener routeInstall global (localPeer gd) localAdjRIBOut 1
     )
 
-ribUpdateListener routeInstall global@Global {..} peer timeout = do
-  updates <- Rib.msgTimeout timeout (pullAllUpdates peer rib)
+ribUpdateListener routeInstall global@Global {..} peer adjribout timeout = do
+  updates <- Rib.msgTimeout timeout (pullAllUpdates adjribout)
   if null updates
     then yield -- null op - could check if exit from thread is needed...
     else do
@@ -61,7 +62,7 @@ ribUpdateListener routeInstall global@Global {..} peer timeout = do
 
   -- rinse and repeat...
 
-  ribUpdateListener routeInstall global peer timeout
+  ribUpdateListener routeInstall global peer adjribout timeout
 
 zservReader Global {..} peer (zStreamIn, zStreamOut) = do
   zservRequestRouterId zStreamOut
