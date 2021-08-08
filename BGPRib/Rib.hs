@@ -2,7 +2,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
 
-module BGPRib.Rib (Rib, filterLookupManyRoutesMVar, ribPush, newRib, addPeer, delPeer, getPeersInRib, lookupRoutes, pullAllUpdates, getLocRib, getNextHops, getPeerAdjRIBOut, newFilterState) where
+module BGPRib.Rib (Rib, filterLookupManyRoutesMVar, ribPush, newRib, addPeer, delPeer, getPeersInRib, pullAllUpdates, getLocRib, getNextHops, getPeerAdjRIBOut, newFilterState) where
 
 import BGPRib.AdjRIBOut
 import BGPRib.BGPData
@@ -15,7 +15,6 @@ import Control.Arrow (second)
 import Control.Concurrent
 import Control.Logger.Simple
 import qualified Data.HashMap.Strict as Data.Map
-import Data.IP
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.List (foldl')
@@ -105,6 +104,8 @@ newFilterState = IntSet.empty
 filterLookupManyRoutes peer locrib = foldmf (filterLookupRoutes peer locrib)
 
 filterLookupRoutes :: PeerData -> PrefixTable -> FilterState -> PathChange -> (FilterState, Maybe (RouteData, [Prefix]))
+filterLookupRoutes peerData _ s (prefixes, 0) = (s, Just (NullRoute, prefixes))
+filterLookupRoutes peerData _ s (prefixes, -1) = (s, Just (Withdraw peerData, prefixes))
 filterLookupRoutes peer locrib state (prefixes, pathref) = (state, phase1 prefixes)
   where
     get :: Prefix -> Maybe RouteData
@@ -127,44 +128,44 @@ filterCheck state prefix False = (IntSet.delete (fromPrefix prefix) state, IntSe
 --   where
 --     state' = state
 --     isAnnounced = True
-lookupRoutes :: Rib -> FilterState -> PeerData -> PathChange -> IO (FilterState, Maybe (RouteData, [Prefix]))
--- lookupRoutes :: Rib -> PeerData -> PathChange -> IO (Maybe (RouteData, [Prefix]))
---- objective:
---- The objective is to filter the input prefixes so that all remaining have the property that the route identified is still best for that prefix.
---- Additionally, a copy of that (common) route is needed for further processing.
---- narrative:
----    Drop from the head of the list whilst the prperty is not satisfied,
----    Return the first found result, reducing the remaining list with a simpler similar filter taht does not capture the RouteData returned by the lookup
+-- lookupRoutes :: Rib -> FilterState -> PeerData -> PathChange -> IO (FilterState, Maybe (RouteData, [Prefix]))
+-- -- lookupRoutes :: Rib -> PeerData -> PathChange -> IO (Maybe (RouteData, [Prefix]))
+-- --- objective:
+-- --- The objective is to filter the input prefixes so that all remaining have the property that the route identified is still best for that prefix.
+-- --- Additionally, a copy of that (common) route is needed for further processing.
+-- --- narrative:
+-- ---    Drop from the head of the list whilst the prperty is not satisfied,
+-- ---    Return the first found result, reducing the remaining list with a simpler similar filter taht does not capture the RouteData returned by the lookup
 
-lookupRoutes _ s peerData (prefixes, 0) = return $ (s, Just (Withdraw peerData, prefixes))
-lookupRoutes _ s peerData (prefixes, -1) = return $ (s, Just (Withdraw peerData, prefixes))
-lookupRoutes rib s target (prefixes, hash) =
-  withMVar
-    (locRIB rib)
-    ( \locrib -> do
-        let hashMatch route = hash == (routeHash route)
-            hashMatch_ route
-              | hashMatch route = Just route
-              | otherwise = Nothing
-            reduce :: [Prefix] -> Maybe (RouteData, [Prefix])
-            reduce [] = Nothing
-            reduce (a : ax) = maybe (reduce ax) (\route -> Just (route, a : (filter check ax))) (get a)
-            check :: Prefix -> Bool
-            check = isJust . get
-            get :: Prefix -> Maybe RouteData
-            get pfx = (PT.ptBest (fromPrefix pfx) locrib) >>= hashMatch_
+-- lookupRoutes _ s peerData (prefixes, 0) = return $ (s, Just (Withdraw peerData, prefixes))
+-- lookupRoutes _ s peerData (prefixes, -1) = return $ (s, Just (Withdraw peerData, prefixes))
+-- lookupRoutes rib s target (prefixes, hash) =
+--   withMVar
+--     (locRIB rib)
+--     ( \locrib -> do
+--         let hashMatch route = hash == (routeHash route)
+--             hashMatch_ route
+--               | hashMatch route = Just route
+--               | otherwise = Nothing
+--             reduce :: [Prefix] -> Maybe (RouteData, [Prefix])
+--             reduce [] = Nothing
+--             reduce (a : ax) = maybe (reduce ax) (\route -> Just (route, a : (filter check ax))) (get a)
+--             check :: Prefix -> Bool
+--             check = isJust . get
+--             get :: Prefix -> Maybe RouteData
+--             get pfx = (PT.ptBest (fromPrefix pfx) locrib) >>= hashMatch_
 
-        return $
-          ( s,
-            fmap
-              ( \(route, remainingPrefixes) ->
-                  if exportFilter target route
-                    then (route, remainingPrefixes)
-                    else (NullRoute, remainingPrefixes)
-              )
-              (reduce prefixes)
-          )
-    )
+--         return $
+--           ( s,
+--             fmap
+--               ( \(route, remainingPrefixes) ->
+--                   if exportFilter target route
+--                     then (route, remainingPrefixes)
+--                     else (NullRoute, remainingPrefixes)
+--               )
+--               (reduce prefixes)
+--           )
+--     )
 
 {- export filter rationale
   the context of an export filter is the route itself and the respective source and target peers
