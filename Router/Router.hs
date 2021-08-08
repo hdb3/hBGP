@@ -31,7 +31,7 @@ import System.FilePath.Posix (takeBaseName)
 main :: IO ()
 -- main = withGlobalLogging (LogConfig (Just "hbgp.log") True) $ do
 main = withGlobalLogging (LogConfig (Nothing) True) $ do
-  setLogLevel LogInfo
+  setLogLevel LogTrace
   logNote banner
 
   (rawConfig, fileBaseName) <- getConfig

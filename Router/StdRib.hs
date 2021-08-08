@@ -1,6 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 
-module Router.StdRib (ribPull, msgTimeout, addRouteRib, delRouteRib, updateFromPathChanges, delPeerByAddress, Router.StdRib.addPeer, Router.StdRib.ribPush, RibHandle) where
+module Router.StdRib (ribPull, msgTimeout, addRouteRib, delRouteRib, delPeerByAddress, Router.StdRib.addPeer, Router.StdRib.ribPush, RibHandle) where
 
 import BGPRib.BGPRib
 import qualified BGPRib.BGPRib as BGPRib
@@ -43,8 +43,19 @@ delPeerByAddress rib port ip = do
       when (length peers > 1) $ warn $ "delPeerByAddress failed for (multiplepeers!) " ++ show ip ++ ":" ++ show port
       mapM_ (delPeer rib) peers
 
+-- filterLookupManyRoutesMVar :: Rib -> FilterState -> PeerData -> [PathChange] -> IO (FilterState, [(RouteData, [Prefix])])
 ribPull :: RibHandle -> IO [BGPOutput]
-ribPull (rib, peer, fifo) = pullAllUpdates fifo >>= updateFromPathChanges rib peer
+ribPull (rib, target, fifo) = do
+  pathChanges <- pullAllUpdates fifo
+  (newState, changes) <- filterLookupManyRoutesMVar rib newFilterState target pathChanges
+  let bgpOutputs = fmap (\(route, prefixes') -> buildUpdate target prefixes' route) changes
+  -- maybeUpdates <- mapM updateFromPathChange pathChanges
+  return bgpOutputs
+
+-- where
+--   updateFromPathChange :: PathChange -> IO (Maybe BGPOutput)
+--   updateFromPathChange (prefixes, routeHash) =
+--     fmap (\(route, prefixes') -> buildUpdate target prefixes' route) <$> lookupRoutes rib target (prefixes, routeHash)
 
 msgTimeout :: Int -> IO [a] -> IO [a]
 msgTimeout t f = fromMaybe [] <$> timeout (1000000 * t) f
@@ -100,10 +111,3 @@ buildUpdate target prefixes RouteData {..} = if isExternal target then egpUpdate
                 prePendAS (myAS $ globalData peerData) $
                   delLocalPref pathAttributes
         )
-
-updateFromPathChanges :: Rib -> PeerData -> [PathChange] -> IO [BGPOutput]
-updateFromPathChanges rib target xs = catMaybes <$> mapM updateFromPathChange xs
-  where
-    updateFromPathChange :: PathChange -> IO (Maybe BGPOutput)
-    updateFromPathChange (prefixes, routeHash) =
-      fmap (\(route, prefixes') -> buildUpdate target prefixes' route) <$> lookupRoutes rib target (prefixes, routeHash)

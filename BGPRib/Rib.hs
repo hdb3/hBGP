@@ -2,7 +2,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
 
-module BGPRib.Rib (Rib, ribPush, newRib, addPeer, delPeer, getPeersInRib, lookupRoutes, pullAllUpdates, getLocRib, getNextHops, getPeerAdjRIBOut) where
+module BGPRib.Rib (Rib, filterLookupManyRoutesMVar, ribPush, newRib, addPeer, delPeer, getPeersInRib, lookupRoutes, pullAllUpdates, getLocRib, getNextHops, getPeerAdjRIBOut, newFilterState) where
 
 import BGPRib.AdjRIBOut
 import BGPRib.BGPData
@@ -16,9 +16,14 @@ import Control.Concurrent
 import Control.Logger.Simple
 import qualified Data.HashMap.Strict as Data.Map
 import Data.IP
-import Data.Maybe (isJust)
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as IntSet
+import Data.List (foldl')
+import Data.Maybe (catMaybes, isJust)
 import qualified Data.Text as T
 import Data.Word (Word32)
+
+type FilterState = IntSet
 
 type AdjRIBOut = Data.Map.HashMap PeerData PeerAdjRIBOut
 
@@ -72,7 +77,58 @@ addPeer rib peer =
     modifyMVar_ (adjRibOut rib) (\adjrib -> do return $ Data.Map.insert peer aro adjrib)
     return aro
 
-lookupRoutes :: Rib -> PeerData -> PathChange -> IO (Maybe (RouteData, [Prefix]))
+foldmf :: (s -> a -> (s, Maybe b)) -> s -> [a] -> (s, [b])
+foldmf f s = foldl' f' (s, [])
+  where
+    f' (state, acc) item = let (state', result) = f state item in maybe (state', acc) (\r -> (state', r : acc)) result
+
+foldf :: (s -> a -> (s, b)) -> s -> [a] -> (s, [b])
+foldf f s = foldl' f' (s, [])
+  where
+    f' (state, acc) item = let (state', result) = f state item in (state, result : acc)
+
+filterLookupRoutesMVar :: Rib -> FilterState -> PeerData -> PathChange -> IO (FilterState, Maybe (RouteData, [Prefix]))
+filterLookupRoutesMVar rib state peer pathchange =
+  withMVar
+    (locRIB rib)
+    (\rib -> return $ filterLookupRoutes peer rib state pathchange)
+
+filterLookupManyRoutesMVar :: Rib -> FilterState -> PeerData -> [PathChange] -> IO (FilterState, [(RouteData, [Prefix])])
+filterLookupManyRoutesMVar rib state peer pathchange =
+  withMVar
+    (locRIB rib)
+    (\rib -> return $ filterLookupManyRoutes peer rib state pathchange)
+
+newFilterState :: FilterState
+newFilterState = IntSet.empty
+
+filterLookupManyRoutes peer locrib = foldmf (filterLookupRoutes peer locrib)
+
+filterLookupRoutes :: PeerData -> PrefixTable -> FilterState -> PathChange -> (FilterState, Maybe (RouteData, [Prefix]))
+filterLookupRoutes peer locrib state (prefixes, pathref) = (state, phase1 prefixes)
+  where
+    get :: Prefix -> Maybe RouteData
+    get pfx = (PT.ptBest (fromPrefix pfx) locrib)
+
+    phase1 :: [Prefix] -> Maybe (RouteData, [Prefix])
+    phase1 [] = Nothing
+    phase1 (pfx : pfxs) = maybe (phase1 pfxs) (phase1a pfx pfxs) (get pfx)
+    phase1a pfx pfxs route = if pathref == (routeHash route) then phase2 [pfx] route pfxs else phase1 pfxs
+
+    phase2 :: [Prefix] -> RouteData -> [Prefix] -> Maybe (RouteData, [Prefix])
+    phase2 acc route [] = Just (route, acc)
+    phase2 acc route (pfx : pfxs) = if (Just route) == (get pfx) then phase2 (pfx : acc) route pfxs else phase2 acc route pfxs
+
+filterCheck :: FilterState -> Prefix -> Bool -> (FilterState, Bool)
+filterCheck state prefix True = (IntSet.insert (fromPrefix prefix) state, IntSet.member (fromPrefix prefix) state)
+filterCheck state prefix False = (IntSet.delete (fromPrefix prefix) state, IntSet.member (fromPrefix prefix) state)
+
+-- filterCheck state prefix isUpdate = (state', isAnnounced)
+--   where
+--     state' = state
+--     isAnnounced = True
+lookupRoutes :: Rib -> FilterState -> PeerData -> PathChange -> IO (FilterState, Maybe (RouteData, [Prefix]))
+-- lookupRoutes :: Rib -> PeerData -> PathChange -> IO (Maybe (RouteData, [Prefix]))
 --- objective:
 --- The objective is to filter the input prefixes so that all remaining have the property that the route identified is still best for that prefix.
 --- Additionally, a copy of that (common) route is needed for further processing.
@@ -80,9 +136,9 @@ lookupRoutes :: Rib -> PeerData -> PathChange -> IO (Maybe (RouteData, [Prefix])
 ---    Drop from the head of the list whilst the prperty is not satisfied,
 ---    Return the first found result, reducing the remaining list with a simpler similar filter taht does not capture the RouteData returned by the lookup
 
-lookupRoutes _ peerData (prefixes, 0) = return $ Just (Withdraw peerData, prefixes)
-lookupRoutes _ peerData (prefixes, -1) = return $ Just (Withdraw peerData, prefixes)
-lookupRoutes rib target (prefixes, hash) =
+lookupRoutes _ s peerData (prefixes, 0) = return $ (s, Just (Withdraw peerData, prefixes))
+lookupRoutes _ s peerData (prefixes, -1) = return $ (s, Just (Withdraw peerData, prefixes))
+lookupRoutes rib s target (prefixes, hash) =
   withMVar
     (locRIB rib)
     ( \locrib -> do
@@ -99,13 +155,15 @@ lookupRoutes rib target (prefixes, hash) =
             get pfx = (PT.ptBest (fromPrefix pfx) locrib) >>= hashMatch_
 
         return $
-          fmap
-            ( \(route, remainingPrefixes) ->
-                if exportFilter target route
-                  then (route, remainingPrefixes)
-                  else (NullRoute, remainingPrefixes)
-            )
-            (reduce prefixes)
+          ( s,
+            fmap
+              ( \(route, remainingPrefixes) ->
+                  if exportFilter target route
+                    then (route, remainingPrefixes)
+                    else (NullRoute, remainingPrefixes)
+              )
+              (reduce prefixes)
+          )
     )
 
 {- export filter rationale
