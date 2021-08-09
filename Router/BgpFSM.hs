@@ -1,5 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-
 module Router.BgpFSM (bgpFSM) where
 
 import BGPRib.BGPRib (PeerData (..), myAS, myBGPid)
@@ -13,6 +11,7 @@ import Control.Exception
 
 import Control.Logger.Simple
 import Control.Monad (void)
+import Control.Monad.State
 import qualified Data.ByteString.Lazy as L
 import qualified Data.Map.Strict as Data.Map
 import Data.Maybe (fromJust, fromMaybe, isJust)
@@ -25,7 +24,7 @@ import Router.Global
 import Router.Open
 import qualified Router.StdRib as Rib
 
-data FSMState = St
+data BGPState = St
   { handle :: BGPHandle,
     peerName :: SockAddr,
     socketName :: SockAddr,
@@ -36,13 +35,13 @@ data FSMState = St
     ribHandle :: Maybe Rib.RibHandle
   }
 
-type F = FSMState -> IO (State, FSMState)
+type F = BGPState -> IO (FSMState, BGPState)
 
 trace = logTrace . T.pack
 
 warn = logWarn . T.pack
 
-data State = StateConnected | StateOpenSent | StateOpenConfirm | ToEstablished | Established | Idle deriving (Show, Eq)
+data FSMState = StateConnected | StateOpenSent | StateOpenConfirm | ToEstablished | Established | Idle deriving (Show, Eq)
 
 bgpFSM :: Global -> (Socket, SockAddr) -> IO ()
 bgpFSM global@Global {..} (sock, peerName) =
@@ -133,7 +132,7 @@ runFSM g@Global {..} socketName peerName handle =
           )
     )
   where
-    fsm :: (State, FSMState) -> IO (Either String String)
+    fsm :: (FSMState, BGPState) -> IO (Either String String)
     fsm (s, st)
       | s == Idle = do
         maybe
