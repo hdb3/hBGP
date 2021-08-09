@@ -1,12 +1,12 @@
-
 module State where
+
 import Control.Monad
 
 -------------------------------------------------------------------------------
 -- State Monad Implementation
 -------------------------------------------------------------------------------
 
-newtype State s a = State { runState :: s -> (a,s) }
+newtype State s a = State {runState :: s -> (a, s)}
 
 instance Functor (State s) where
   fmap = Control.Monad.liftM
@@ -20,7 +20,7 @@ instance Monad (State s) where
 
   State act >>= k = State $ \s ->
     let (a, s') = act s
-    in runState (k a) s'
+     in runState (k a) s'
 
 get :: State s s
 get = State $ \s -> (s, s)

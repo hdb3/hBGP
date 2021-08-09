@@ -1,21 +1,21 @@
 module BMPlib (module BMPlib, module BMPMessage) where
+
+import BMPMessage
 import qualified Data.IP as IP
 import qualified Network.Socket as NS
 import qualified System.IO
 import qualified System.IO.Streams as Streams
 import qualified System.IO.Streams.Attoparsec.ByteString as Streams
 
-import BMPMessage
-
 getBMPStreamStdIn = Streams.parserToInputStream bmpParser Streams.stdin
+
 getBMPStreamPath path = System.IO.openFile path System.IO.ReadMode >>= Streams.handleToInputStream >>= Streams.parserToInputStream bmpParser
+
 getBMPStreamInet addr = do
-    sock <- NS.socket NS.AF_INET NS.Stream NS.defaultProtocol
-    NS.connect sock ( NS.SockAddrInet 5000 (IP.toHostAddress addr))
-    handle <- NS.socketToHandle sock System.IO.ReadWriteMode
-    Streams.handleToInputStream handle >>= Streams.parserToInputStream bmpParser
-
-
+  sock <- NS.socket NS.AF_INET NS.Stream NS.defaultProtocol
+  NS.connect sock (NS.SockAddrInet 5000 (IP.toHostAddress addr))
+  handle <- NS.socketToHandle sock System.IO.ReadWriteMode
+  Streams.handleToInputStream handle >>= Streams.parserToInputStream bmpParser
 
 {-
    Copyright 2018 Nicholas Hart

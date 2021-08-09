@@ -124,6 +124,6 @@ instance Rib MapRib where
       insertLookup :: Ord k => k -> a -> Map.Map k a -> (Maybe a, Map.Map k a)
       insertLookup = Map.insertLookupWithKey f where f _ new_value _ = new_value
 
-      -- and the derived results are just:
+-- and the derived results are just:
 
 -- but note may need adjustment to allow for the delete(withdraw) action

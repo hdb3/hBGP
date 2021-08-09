@@ -225,7 +225,7 @@ ribPush rib peerData ParsedUpdate {..} = do
         localPref <- evalLocalPref peerData pathAttributes pfxs
         let routeData = makeRouteData peerData pathAttributes routeId localPref
             routeData' = if importFilter routeData then (Withdraw peerData) else routeData
-            (!locRIB', !updates) = BGPRib.PrefixTable.update locRIB pfxs routeData'
+            (locRIB', updates) = BGPRib.PrefixTable.update locRIB pfxs routeData'
         logDebug . T.pack $ "ribUpdateMany " ++ show (length updates) ++ " changes"
         return $ (locRIB', updates)
 
@@ -236,7 +236,7 @@ ribPush rib peerData ParsedUpdate {..} = do
         return $ (locRIB, [])
       | otherwise = do
         logDebug . T.pack $ "ribWithdrawMany " ++ show pfxs
-        let (!locRIB', !withdraws) = BGPRib.PrefixTable.update locRIB pfxs (Withdraw peerData)
+        let (locRIB', withdraws) = BGPRib.PrefixTable.update locRIB pfxs (Withdraw peerData)
         logDebug . T.pack $ "ribWithdrawMany " ++ show (length withdraws) ++ " changes"
         return $ (locRIB', withdraws)
 
