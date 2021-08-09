@@ -1,6 +1,3 @@
-{-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE RecordWildCards #-}
-
 module BGPlib.BGPMessage where
 
 import BGPlib.Capabilities

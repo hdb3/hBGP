@@ -1,7 +1,3 @@
-{-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
-
 module Session.Session where
 
 import Control.Concurrent

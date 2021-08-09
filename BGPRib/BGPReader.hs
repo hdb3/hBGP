@@ -1,5 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-
 module BGPRib.BGPReader (updateRib, readMsgs, readRib, bgpMsgReader, bgpReader, readGroupedRibF, readGroupedRib, pathReadRib) where
 
 import BGPRib.BGPRib
@@ -32,6 +30,7 @@ bgpReader path = do
 
 updateRib :: Rib -> ParsedUpdate -> IO ()
 updateRib rib parsedUpdate@ParsedUpdate {..} = BGPRib.ribPush rib BGPRib.dummyPeerData parsedUpdate
+updateRib _ _ = error "updateRib only defined for Updates"
 
 -- readRib: a convenience function for simple applications
 -- the returned structure masks only derived or artificial data

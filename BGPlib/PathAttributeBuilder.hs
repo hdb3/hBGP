@@ -1,5 +1,3 @@
-{-# LANGUAGE Strict #-}
-
 module BGPlib.PathAttributeBuilder where
 
 import BGPlib.ASPath

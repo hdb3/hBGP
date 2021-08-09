@@ -1,7 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE Strict #-}
-
 module BGPlib.Prefixes
   ( Prefix,
     toAddrRange,

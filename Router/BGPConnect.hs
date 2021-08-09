@@ -1,5 +1,3 @@
-{-# LANGUAGE MultiWayIf #-}
-
 module Router.BGPConnect
   ( Socket,
     close,

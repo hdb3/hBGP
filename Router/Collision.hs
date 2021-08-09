@@ -1,5 +1,3 @@
-{-# LANGUAGE Strict #-}
-
 module Router.Collision where
 
 import Control.Concurrent

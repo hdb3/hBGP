@@ -1,19 +1,18 @@
-{-# LANGUAGE RecordWildCards #-}
-
 module Router.StdRib (ribPull, msgTimeout, addRouteRib, delRouteRib, delPeerByAddress, Router.StdRib.addPeer, Router.StdRib.ribPush, RibHandle) where
 
 import BGPRib.BGPRib
-import qualified BGPRib.Rib as BGPRib ( addPeer, ribPush )
+import qualified BGPRib.Rib as BGPRib (addPeer, ribPush)
 import BGPlib.BGPlib hiding (nlri, withdrawn)
 import Control.Logger.Simple
 import Control.Monad.Extra (when)
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
-import Data.Word ( Word16 )
+import Data.Word (Word16)
 import System.Timeout (timeout)
 
 warn :: String -> IO ()
 warn = logWarn . T.pack
+
 debug :: String -> IO ()
 debug = logDebug . T.pack
 

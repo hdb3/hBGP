@@ -1,5 +1,3 @@
-{-# LANGUAGE FlexibleInstances #-}
-
 module BGPRib.PrefixTable where
 
 {- A single prefix table holds everything about a prefix we could care about

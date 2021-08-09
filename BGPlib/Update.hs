@@ -1,6 +1,3 @@
-{-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE RecordWildCards #-}
-
 module BGPlib.Update
   ( ParsedUpdate (..),
     parseUpdate,

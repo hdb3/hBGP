@@ -1,6 +1,3 @@
-{-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE RecordWildCards #-}
-
 module Main where
 
 import BGPlib.AttoBGP (bgpParser, bgpParser1)

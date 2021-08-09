@@ -1,5 +1,3 @@
-{-# LANGUAGE MultiWayIf #-}
-
 module BGPlib.Capabilities where
 
 import ByteString.StrictBuilder

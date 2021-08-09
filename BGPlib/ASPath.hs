@@ -1,7 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE Strict #-}
-
 module BGPlib.ASPath where
 
 -- this interface masks AS2/AS4 encoding - all AS numbers are simply Word32

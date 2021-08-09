@@ -1,5 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-
 module Router.Open where
 
 import BGPlib.BGPlib

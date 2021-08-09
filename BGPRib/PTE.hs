@@ -1,5 +1,3 @@
-{-# LANGUAGE FlexibleInstances #-}
-
 module BGPRib.PTE where
 
 import BGPRib.PT
