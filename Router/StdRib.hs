@@ -45,14 +45,14 @@ delPeerByAddress rib port ip = do
       when (length peers > 1) $ warn $ "delPeerByAddress failed for (multiplepeers!) " ++ show ip ++ ":" ++ show port
       mapM_ (delPeer rib) peers
 
-ribPull :: RibHandle -> IO [BGPOutput]
-ribPull (rib, target, fifo) = do
+ribPull :: RibHandle -> FilterState -> IO ([BGPOutput], FilterState)
+ribPull (rib, target, fifo) filterState = do
   pathChanges <- pullAllUpdates fifo
   debug $ "ribPull: (" ++ show target ++ ") raw change count: " ++ show (length pathChanges)
-  (newState, changes) <- filterLookupManyRoutesMVar rib newFilterState target pathChanges
+  (filterState', changes) <- filterLookupManyRoutesMVar rib filterState target pathChanges
   let bgpOutputs = fmap (\(route, prefixes') -> buildUpdate target prefixes' route) changes
   debug $ "ribPull: (" ++ show target ++ ") filtered change count: " ++ show (length bgpOutputs)
-  return bgpOutputs
+  return (bgpOutputs, filterState')
 
 msgTimeout :: Int -> IO [a] -> IO [a]
 msgTimeout t f = fromMaybe [] <$> timeout (1000000 * t) f

@@ -1,4 +1,4 @@
-module BGPRib.Rib (Rib, filterLookupManyRoutesMVar, ribPush, newRib, addPeer, delPeer, getPeersInRib, pullAllUpdates, getLocRib, getNextHops, getPeerAdjRIBOut, newFilterState) where
+module BGPRib.Rib (Rib, FilterState, filterLookupManyRoutesMVar, ribPush, newRib, addPeer, delPeer, getPeersInRib, pullAllUpdates, getLocRib, getNextHops, getPeerAdjRIBOut, newFilterState) where
 
 import BGPRib.AdjRIBOut
 import BGPRib.BGPData

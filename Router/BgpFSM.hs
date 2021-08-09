@@ -1,6 +1,6 @@
 module Router.BgpFSM (bgpFSM) where
 
-import BGPRib.BGPRib (PeerData (..), myAS, myBGPid)
+import BGPRib.BGPRib (FilterState, PeerData (..), myAS, myBGPid, newFilterState)
 import BGPlib.BGPlib
 import ByteString.StrictBuilder
 import Control.Applicative ((<|>))
@@ -255,7 +255,7 @@ startFSM g@Global {..} socketName peerName handle =
       -- it would be much better to remove the temptation to use conficured data by forcing a new type for relevant purposes, and dscarding the
       -- preconfigured values as soon as possible
       ribHandle <- Rib.addPeer rib peerData
-      _ <- forkIO $ sendLoop ribHandle
+      _ <- forkIO $ sendLoop ribHandle newFilterState
       _ <- forkIO $ keepaliveLoop handle (getKeepAliveTimer osm)
       writeChan monitorChannel (Right peerData)
       return (Established, st {maybePD = Just peerData, ribHandle = Just ribHandle})
@@ -310,10 +310,11 @@ startFSM g@Global {..} socketName peerName handle =
         )
         rc
 
-    sendLoop rh =
+    sendLoop :: Rib.RibHandle -> FilterState -> IO ()
+    sendLoop rh filterState =
       catch
         ( do
-            updates <- Rib.ribPull rh
+            (updates, modifiedFilterState) <- Rib.ribPull rh filterState
             case updates of
               [] ->
                 return ()
@@ -323,7 +324,7 @@ startFSM g@Global {..} socketName peerName handle =
               _ -> do
                 trace $ "sendloop: updates (" ++ show (length updates) ++ ")"
                 bgpSndAll updates
-                sendLoop rh
+                sendLoop rh modifiedFilterState
         )
         ( \(BGPIOException _) -> return ()
         -- this is the standard way to close down this thread
