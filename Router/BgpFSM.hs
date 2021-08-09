@@ -11,7 +11,6 @@ import Control.Exception
 
 import Control.Logger.Simple
 import Control.Monad (void)
-import Control.Monad.State
 import qualified Data.ByteString.Lazy as L
 import qualified Data.Map.Strict as Data.Map
 import Data.Maybe (fromJust, fromMaybe, isJust)
@@ -63,7 +62,7 @@ bgpFSM global@Global {..} (sock, peerName) =
               else Nothing
     fsmExitStatus <-
       catch
-        (runFSM global socketName peerName handle maybePeer)
+        (startFSM global socketName peerName handle maybePeer)
         ( \(BGPIOException s) ->
             return $ Left s
         )
@@ -97,71 +96,65 @@ initialiseOSM Global {..} PeerConfig {..} =
             caps = peerConfigRequiredCapabilities
           }
 
-bgpSnd :: BGPHandle -> BGPMessage -> IO ()
-bgpSnd bgph bgpmsg = bgpSendHandle bgph (builderBytes $ builder bgpmsg)
+-- bgpSnd :: BGPHandle -> BGPMessage -> IO ()
+-- bgpSnd bgph bgpmsg = bgpSendHandle bgph (builderBytes $ builder bgpmsg)
 
-bgpSndOutput :: BGPHandle -> BGPOutput -> IO ()
-bgpSndOutput h m = bgpSndAll h [m]
+-- bgpSndOutput :: BGPHandle -> BGPOutput -> IO ()
+-- bgpSndOutput h m = bgpSndAll h [m]
 
-bgpSndAll :: BGPHandle -> [BGPOutput] -> IO ()
-bgpSndAll bgph msgs = bgpSendHandle bgph (deparseBGPOutputs msgs)
+-- bgpSndAll :: BGPHandle -> [BGPOutput] -> IO ()
+-- bgpSndAll bgph msgs = bgpSendHandle bgph (deparseBGPOutputs msgs)
 
-runFSM :: Global -> SockAddr -> SockAddr -> BGPHandle -> Maybe PeerConfig -> IO (Either String String)
-runFSM g@Global {..} socketName peerName handle =
+startFSM :: Global -> SockAddr -> SockAddr -> BGPHandle -> Maybe PeerConfig -> IO (Either String String)
+startFSM g@Global {..} socketName peerName handle =
   -- The 'Maybe PeerData' allows the FSM to handle unwanted connections, i.e. send BGP Notification
-  -- thereby absolving the caller from having and BGP protocol awareness
+  -- thereby absolving the caller from having any BGP protocol awareness
   maybe
     ( do
-        bgpSnd handle $ BGPNotify NotificationCease _NotificationCeaseSubcodeConnectionRejected L.empty
+        bgpSnd $ BGPNotify NotificationCease _NotificationCeaseSubcodeConnectionRejected L.empty
         return $ Left "connection rejected for unconfigured peer"
     )
     ( \peerConfig -> do
         ro <- newEmptyMVar
-        fsm
-          ( StateConnected,
-            St
-              { peerName = peerName,
-                socketName = socketName,
-                handle = handle,
-                osm = initialiseOSM g peerConfig,
-                peerConfig = peerConfig,
-                maybePD = Nothing,
-                rcvdOpen = ro,
-                ribHandle = Nothing
-              }
-          )
-    )
-  where
-    fsm :: (FSMState, BGPState) -> IO (Either String String)
-    fsm (s, st)
-      | s == Idle = do
+        let initBGPState =
+              St
+                { peerName = peerName,
+                  socketName = socketName,
+                  handle = handle,
+                  osm = initialiseOSM g peerConfig,
+                  peerConfig = peerConfig,
+                  maybePD = Nothing,
+                  rcvdOpen = ro,
+                  ribHandle = Nothing
+                }
+        exitState <- actions (StateConnected, initBGPState)
         maybe
           (warn "FSM exit without defined peer")
           (writeChan monitorChannel . Left)
-          (maybePD st)
+          (maybePD exitState)
         return $ Right "FSM normal exit"
-      | otherwise = do
-        (s', st') <- f s st
-        fsm (s', st')
-      where
-        f StateConnected = stateConnected
-        f StateOpenSent = stateOpenSent
-        f StateOpenConfirm = stateOpenConfirm
-        f ToEstablished = toEstablished
-        f Established = established
-        f Idle = error "unreachable"
+    )
+  where
+    bgpSnd bgpmsg = bgpSendHandle handle (builderBytes $ builder bgpmsg)
+    bgpSndOutput m = bgpSndAll [m]
+    bgpSndAll msgs = bgpSendHandle handle (deparseBGPOutputs msgs)
 
-    idle st s = do
-      trace $ "IDLE - reason: " ++ s
-      return (Idle, st)
+    actions :: (FSMState, BGPState) -> IO BGPState
+    actions (s, st) = do
+      (s', st') <- action (s, st)
+      if s' == Idle then return st' else actions (s', st')
 
-    stateConnected :: F
-    stateConnected st@St {..} = do
+    action :: (FSMState, BGPState) -> IO (FSMState, BGPState)
+    action (Idle, st) = error "unreachable"
+    --
+    -- StateConnected
+    --
+    action (StateConnected, st@St {..}) = do
       msg <- bgpRcv handle delayOpenTimer
       case msg of
         BGPTimeout -> do
           trace "stateConnected - event: delay open expiry"
-          bgpSnd handle (localOffer osm)
+          bgpSnd (localOffer osm)
           trace "stateConnected -> stateOpenSent"
           return (StateOpenSent, st)
         open@BGPOpen {} -> do
@@ -171,32 +164,33 @@ runFSM g@Global {..} socketName peerName handle =
           collision <- collisionCheck collisionDetector (myBGPid gd) (bgpID open)
           if isJust collision
             then do
-              bgpSnd handle $ BGPNotify NotificationCease _NotificationCeaseSubcodeConnectionCollisionResolution L.empty
+              bgpSnd $ BGPNotify NotificationCease _NotificationCeaseSubcodeConnectionCollisionResolution L.empty
               idle st (fromJust collision)
             else
               if isKeepalive resp
                 then do
                   trace "stateConnected -> stateOpenConfirm"
-                  bgpSnd handle (localOffer osm)
-                  bgpSnd handle resp
+                  bgpSnd (localOffer osm)
+                  bgpSnd resp
                   return (StateOpenConfirm, st {osm = osm'})
                 else do
-                  bgpSnd handle resp
+                  bgpSnd resp
                   idle st "stateConnected - event: open rejected error"
         BGPNotify {} ->
           -- TODO - improve Notify analysis and display
           idle st "stateConnected -> exit rcv notify"
         BGPUpdate {} -> do
-          bgpSnd handle $ BGPNotify NotificationFiniteStateMachineError 0 L.empty
+          bgpSnd $ BGPNotify NotificationFiniteStateMachineError 0 L.empty
           idle st "stateConnected - recvd Update - FSM error"
         z -> idle st $ "stateConnected - network exception - " ++ show z
-
-    stateOpenSent :: F
-    stateOpenSent st@St {..} = do
+    --
+    -- StateOpenSent
+    --
+    action (StateOpenSent, st@St {..}) = do
       msg <- bgpRcv handle initialHoldTimer
       case msg of
         BGPTimeout -> do
-          bgpSnd handle $ BGPNotify NotificationHoldTimerExpired 0 L.empty
+          bgpSnd $ BGPNotify NotificationHoldTimerExpired 0 L.empty
           idle st "stateOpenSent - error initial Hold Timer expiry"
         open@BGPOpen {} -> do
           let osm' = updateOpenStateMachine osm open
@@ -205,39 +199,41 @@ runFSM g@Global {..} socketName peerName handle =
           collision <- collisionCheck collisionDetector (myBGPid gd) (bgpID open)
           if isJust collision
             then do
-              bgpSnd handle $ BGPNotify NotificationCease 0 L.empty
+              bgpSnd $ BGPNotify NotificationCease 0 L.empty
               idle st (fromJust collision)
             else
               if isKeepalive resp
                 then do
-                  bgpSnd handle resp
+                  bgpSnd resp
                   trace "stateOpenSent -> stateOpenConfirm"
                   return (StateOpenConfirm, st {osm = osm'})
                 else do
-                  bgpSnd handle resp
+                  bgpSnd resp
                   idle st "stateOpenSent - event: open rejected error"
         BGPNotify {} -> idle st "stateOpenSent - rcv notify"
         msg -> do
-          bgpSnd handle $ BGPNotify NotificationFiniteStateMachineError 0 L.empty
+          bgpSnd $ BGPNotify NotificationFiniteStateMachineError 0 L.empty
           idle st $ "stateOpenSent - FSM error" ++ show msg
-
-    stateOpenConfirm :: F
-    stateOpenConfirm st@St {..} = do
+    --
+    -- StateOpenConfirm
+    --
+    action (StateOpenConfirm, st@St {..}) = do
       msg <- bgpRcv handle (getNegotiatedHoldTime osm)
       case msg of
         BGPTimeout -> do
-          bgpSnd handle $ BGPNotify NotificationHoldTimerExpired 0 L.empty
+          bgpSnd $ BGPNotify NotificationHoldTimerExpired 0 L.empty
           idle st "stateOpenConfirm - error Hold Timer expiry"
         BGPKeepalive -> do
           trace "stateOpenConfirm - rcv keepalive"
           return (ToEstablished, st)
         BGPNotify {} -> idle st "stateOpenConfirm - rcv notify"
         _ -> do
-          bgpSnd handle $ BGPNotify NotificationFiniteStateMachineError 0 L.empty
+          bgpSnd $ BGPNotify NotificationFiniteStateMachineError 0 L.empty
           idle st "stateOpenConfirm - FSM error"
-
-    toEstablished :: F
-    toEstablished st@St {..} = do
+    --
+    -- ToEstablished
+    --
+    action (ToEstablished, st@St {..}) = do
       trace "transition -> established"
       trace $ "hold timer: " ++ show (getNegotiatedHoldTime osm) ++ " keep alive timer: " ++ show (getKeepAliveTimer osm)
       -- only now can we create the peer data record becasue we have the remote AS/BGPID available and confirmed
@@ -258,15 +254,15 @@ runFSM g@Global {..} socketName peerName handle =
       -- VERY IMPORTANT TO USE THE NEW VALUE peerData' AS THIS IS THE ONLY ONE WHICH CONTAINS ACCURATE REMOTE IDENTITY FOR DYNAMIC PEERS!!!!
       -- it would be much better to remove the temptation to use conficured data by forcing a new type for relevant purposes, and dscarding the
       -- preconfigured values as soon as possible
-      -- TODO - make the addPeer function return a handle so that rib and peer data are not exposed
       ribHandle <- Rib.addPeer rib peerData
-      _ <- forkIO $ sendLoop handle ribHandle
+      _ <- forkIO $ sendLoop ribHandle
       _ <- forkIO $ keepaliveLoop handle (getKeepAliveTimer osm)
       writeChan monitorChannel (Right peerData)
       return (Established, st {maybePD = Just peerData, ribHandle = Just ribHandle})
-
-    established :: F
-    established st@St {..} = do
+    --
+    -- Established
+    --
+    action (Established, st@St {..}) = do
       msg <- bgpRcv handle (getNegotiatedHoldTime osm)
       case msg of
         BGPKeepalive -> do
@@ -279,12 +275,15 @@ runFSM g@Global {..} socketName peerName handle =
         BGPNotify {} -> idle st "established - rcv notify"
         BGPEndOfStream -> idle st "established: BGPEndOfStream"
         BGPTimeout -> do
-          bgpSnd handle $ BGPNotify NotificationHoldTimerExpired 0 L.empty
+          bgpSnd $ BGPNotify NotificationHoldTimerExpired 0 L.empty
           idle st "established - HoldTimerExpired error"
         _ -> do
-          bgpSnd handle $ BGPNotify NotificationFiniteStateMachineError 0 L.empty
+          bgpSnd $ BGPNotify NotificationFiniteStateMachineError 0 L.empty
           idle st $ "established - FSM error (" ++ show msg ++ ")"
 
+    idle st s = do
+      trace $ "IDLE - reason: " ++ s
+      return (Idle, st)
     -- collisionCheck
     -- manage cases where there is an established connection (always reject)
     -- and where another connection is in openSent state (use tiebreaker)
@@ -311,7 +310,7 @@ runFSM g@Global {..} socketName peerName handle =
         )
         rc
 
-    sendLoop handle rh =
+    sendLoop rh =
       catch
         ( do
             updates <- Rib.ribPull rh
@@ -323,8 +322,8 @@ runFSM g@Global {..} socketName peerName handle =
               -- Which transient condition arises when the parent process has exited.
               _ -> do
                 trace $ "sendloop: updates (" ++ show (length updates) ++ ")"
-                bgpSndAll handle updates
-                sendLoop handle rh
+                bgpSndAll updates
+                sendLoop rh
         )
         ( \(BGPIOException _) -> return ()
         -- this is the standard way to close down this thread
@@ -337,7 +336,7 @@ runFSM g@Global {..} socketName peerName handle =
           ( do
               threadDelay (1000000 * timer)
               trace $ "keepaliveLoop send"
-              bgpSnd handle BGPKeepalive
+              bgpSnd BGPKeepalive
               keepaliveLoop handle timer
           )
           ( \(BGPIOException _) -> do
