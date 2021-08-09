@@ -1,4 +1,3 @@
-{-# LANGUAGE FlexibleInstances, DeriveGeneric #-}
 module MRTlib ( module MRTformat
               , PeerIndex
               , IP4Prefix,IP6Prefix

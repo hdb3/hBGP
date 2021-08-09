@@ -1,29 +1,31 @@
-{-#LANGUAGE OverloadedStrings #-}
 module Main where
-import System.Environment
+
 import Data.IP
+import System.Environment
 import qualified System.IO.Streams as Streams
 import Text.Read
-
 import ZServ
 
 main :: IO ()
 main = do
-    args <- getArgs
-    let s = args !! 0
-    (inputStream,outputStream) <- 
-        maybe ( getZStreamUnix s )
-              getZStreamInet
-              ( readMaybe s :: Maybe IPv4)
+  args <- getArgs
+  let s = args !! 0
+  (inputStream, outputStream) <-
+    maybe
+      (getZStreamUnix s)
+      getZStreamInet
+      (readMaybe s :: Maybe IPv4)
 
-    zservRegister outputStream _ZEBRA_ROUTE_BGP
-    zservRequestRouterId outputStream
-    loop inputStream
-    where
+  zservRegister outputStream _ZEBRA_ROUTE_BGP
+  zservRequestRouterId outputStream
+  loop inputStream
+  where
     loop stream = do
-        msg <- Streams.read stream
-        maybe (putStrLn "end of messages")
-              ( \zMsg -> do 
-                              print zMsg
-                              loop stream )
-              msg
+      msg <- Streams.read stream
+      maybe
+        (putStrLn "end of messages")
+        ( \zMsg -> do
+            print zMsg
+            loop stream
+        )
+        msg

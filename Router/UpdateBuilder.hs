@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Main where
 
 import BGPRib.Update (deparseBGPOutputs, endOfRib, originateUpdate)
@@ -7,7 +5,6 @@ import BGPlib.BGPlib (ASPath (..), ASSegment (..), PathAttribute (..), fromAddrR
 import Data.ByteString (hPut)
 import Data.ByteString.Char8 (pack)
 import Data.IP
--- import Data.Word
 import System.IO (stderr, stdout)
 
 main :: IO ()

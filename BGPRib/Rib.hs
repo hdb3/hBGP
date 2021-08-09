@@ -1,7 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TupleSections #-}
-
 module BGPRib.Rib (Rib, filterLookupManyRoutesMVar, ribPush, newRib, addPeer, delPeer, getPeersInRib, pullAllUpdates, getLocRib, getNextHops, getPeerAdjRIBOut, newFilterState) where
 
 import BGPRib.AdjRIBOut
@@ -18,7 +14,6 @@ import qualified Data.HashMap.Strict as Data.Map
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.List (foldl')
-import Data.Maybe (catMaybes, isJust)
 import qualified Data.Text as T
 import Data.Word (Word32)
 

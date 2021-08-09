@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 {-
 
    BGPwaiter - wait for an incoming connection on port 179

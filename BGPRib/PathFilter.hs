@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module BGPRib.PathFilter where
 
 import BGPlib.BGPlib

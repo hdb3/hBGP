@@ -1,5 +1,3 @@
-{-#LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE BangPatterns #-}
 module OverlapProto where
 import Data.List(foldl')
 import Data.Bits

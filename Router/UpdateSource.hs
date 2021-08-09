@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Router.UpdateSource where
 
 import BGPRib.BGPRib hiding (group, update)

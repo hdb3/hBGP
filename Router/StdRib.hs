@@ -7,7 +7,7 @@ import qualified BGPRib.Rib as BGPRib ( addPeer, ribPush )
 import BGPlib.BGPlib hiding (nlri, withdrawn)
 import Control.Logger.Simple
 import Control.Monad.Extra (when)
-import Data.Maybe (catMaybes, fromMaybe)
+import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 import Data.Word ( Word16 )
 import System.Timeout (timeout)

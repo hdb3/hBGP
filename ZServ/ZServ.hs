@@ -1,7 +1,3 @@
-{-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-
 module ZServ.ZServ
   ( module ZServ.ZServ,
     module ZServ.ZMsg,

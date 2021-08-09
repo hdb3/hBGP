@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Router.PrefixSource where
 
 import Control.Concurrent

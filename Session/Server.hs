@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 {-
 
    A simple network server application, showcasing the forking of multiple threads

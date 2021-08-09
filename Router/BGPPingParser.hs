@@ -1,6 +1,3 @@
-{-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE OverloadedStrings #-}
-
 module Router.BGPPingParser
   ( getGenerator,
     getNext,

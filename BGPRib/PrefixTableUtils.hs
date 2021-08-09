@@ -20,7 +20,6 @@ import BGPRib.Common
 import qualified BGPRib.PT as PT
 import BGPRib.PrefixTable (PrefixTable)
 import BGPlib.BGPlib (Prefix, toPrefix)
-import Data.IP
 import qualified Data.List
 
 -- ===================================================

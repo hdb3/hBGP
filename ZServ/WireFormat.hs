@@ -1,12 +1,5 @@
-{-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-
 module ZServ.WireFormat where
 
--- from package attoparsec
-
--- from package attoparsec-binary
 import Control.Applicative
 import Control.Monad (when)
 import Data.Attoparsec.Binary

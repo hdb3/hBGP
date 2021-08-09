@@ -1,15 +1,9 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-
 module Router.Redistributor where
 
 import BGPRib.BGPData (localPeer)
 import BGPRib.Rib (getNextHops, getPeerAdjRIBOut, pullAllUpdates)
 import BGPlib.Prefixes (toAddrRange)
 import Control.Concurrent
---- ************* VERY DANGEROUS - should re-export from BGPfsm to avoid conflict!!!!
----import qualified CustomRib as Rib
-
 import Control.Logger.Simple
 import Control.Monad (void, when)
 import qualified Data.Text as T

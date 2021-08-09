@@ -1,8 +1,7 @@
 module BGPRib.Fifo where
 
 import Control.Concurrent
-import Data.Maybe
-import System.Timeout (timeout)
+import Data.Maybe (fromMaybe)
 
 type Fifo t = MVar ([t], [t])
 

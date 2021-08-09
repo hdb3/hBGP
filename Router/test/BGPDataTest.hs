@@ -1,12 +1,10 @@
-{-#LANGUAGE OverloadedStrings #-}
 module Main where
 
-import Data.Word
-import Data.IP(IPv4)
-
-import RFC4271
 import BGPData
 import BGPDataTestData
+import Data.IP (IPv4)
+import Data.Word
+import RFC4271
 
 {-
 gd1 = GlobalData 65501 "172.16.0.1"
@@ -41,10 +39,10 @@ route2 = route1 { peerData = gd2Peer1 }
 -}
 
 main = do
-    print gd1
-    print gd1Peer1
-    print route1
+  print gd1
+  print gd1Peer1
+  print route1
 
-    print gd2
-    print gd2Peer1
-    print route2
+  print gd2
+  print gd2Peer1
+  print route2

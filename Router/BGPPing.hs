@@ -1,6 +1,3 @@
-{-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE OverloadedStrings #-}
-
 module Main where
 
 import BGPlib.AttoBGP (bgpParser1)

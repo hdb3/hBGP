@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module BGPlib.PrefixBuilder
   ( prefixBuilder,
     updateBuilder,

@@ -1,6 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-
 module Router.Config where
 
 -- ## TODO rework the whole Config concept of 'enabled' peers
@@ -20,13 +17,13 @@ module Router.Config where
 import BGPlib.BGPlib
 import Control.Logger.Simple
 import Control.Monad (unless)
-import Data.IP
 import Data.List (foldl', nub, (\\))
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 import Data.Word
 import System.Exit (die)
 
+info :: String -> IO ()
 info = logInfo . T.pack
 
 data Config = Config
