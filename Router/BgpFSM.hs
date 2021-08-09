@@ -151,6 +151,7 @@ runFSM g@Global {..} socketName peerName handle =
         f StateOpenConfirm = stateOpenConfirm
         f ToEstablished = toEstablished
         f Established = established
+        f Idle = error "unreachable"
 
     idle st s = do
       trace $ "IDLE - reason: " ++ s

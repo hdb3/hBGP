@@ -76,6 +76,10 @@ addPeer rib peer =
     modifyMVar_ (adjRibOut rib) (\adjrib -> do return $ Data.Map.insert peer aro adjrib)
     return aro
 
+{- foldf / foldmf
+    Generic combinator/sequencers for state threaded working
+    Perhaps State m might do the same, but all I seek is foldM
+ -}
 foldmf :: (s -> a -> (s, Maybe b)) -> s -> [a] -> (s, [b])
 foldmf f s = foldl' f' (s, [])
   where

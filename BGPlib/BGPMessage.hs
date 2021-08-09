@@ -83,6 +83,7 @@ wireFormat bldr = marker <> word16BE (fromIntegral (builderLength bldr) + 18) <>
 
 builder :: BGPMessage -> Builder
 builder BGPTimeout {} = error "should not try to send an input condition"
+builder BGPUpdate {} = error "BGPUpdate has special builder equivalent"
 builder BGPError {} = error "should not try to send an input condition"
 builder BGPEndOfStream {} = error "should not try to send an input condition"
 builder BGPKeepalive =

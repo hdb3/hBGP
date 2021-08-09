@@ -172,6 +172,7 @@ instance Binary ZServerRoute where
           -- my interprettaion is that the format for multiple hops is (1byte hop count) followed by (n x (ipv4, 0x01,ifindex) in the case of ipv4+ifindex
           -- a cleaner read would allow alternative nexthop formats, which would be flagged by the API_MESSAGE_NEXTHOP / ZAPI_MESSAGE_IFINDEX flag bits
           putServerNextHop (ZNHIPv4Ifindex ipv4 ifindex) = put ipv4 <> putWord8 0x01 <> put ifindex
+          putServerNextHop _ = error "putServerNextHop only implmented for ifindex"
           putServerNextHops hops = putWord8 (fromIntegral $ length hops) <> mapM_ putServerNextHop hops
 
       put zrType <> put zrFlags <> put zrMsg'''' <> putzvPrefix zrPrefix

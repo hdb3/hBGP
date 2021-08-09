@@ -42,6 +42,7 @@ instance Enum EnumNotificationCode where
     | n == 4 = NotificationHoldTimerExpired
     | n == 5 = NotificationFiniteStateMachineError
     | n == 6 = NotificationCease
+    | otherwise = error "unhandled EnumNotificationCode"
 
   fromEnum e
     | e == InvalidNotificationError = 0
@@ -51,6 +52,7 @@ instance Enum EnumNotificationCode where
     | e == NotificationHoldTimerExpired = 4
     | e == NotificationFiniteStateMachineError = 5
     | e == NotificationCease = 6
+    | otherwise = error "unhandled EnumNotificationCode"
 
 instance EnumWord8 EnumNotificationCode
 
@@ -134,6 +136,7 @@ instance Enum EnumNotificationOpenSubcode where
     | n == 3 = BadBGPIdentifier
     | n == 4 = UnsupportedOptionalParameter
     | n == 6 = UnacceptableHoldTime
+    | otherwise = error "unhandled EnumNotificationOpenSubcode"
 
   fromEnum e
     | e == InvalidOpenSubcode = 0
@@ -142,5 +145,6 @@ instance Enum EnumNotificationOpenSubcode where
     | e == BadBGPIdentifier = 3
     | e == UnsupportedOptionalParameter = 4
     | e == UnacceptableHoldTime = 6
+    | otherwise = error "unhandled EnumNotificationOpenSubcode"
 
 instance EnumWord8 EnumNotificationOpenSubcode

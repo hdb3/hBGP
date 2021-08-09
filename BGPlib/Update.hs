@@ -81,6 +81,7 @@ makeBGPUpdate nlri withdrawn attributes = parseUpdate $ BGPUpdate {withdrawn = w
 {-# INLINE parseUpdate #-}
 parseUpdate :: BGPMessage -> ParsedUpdate
 parseUpdate BGPUpdate {..} = ParsedUpdate {puPathAttributes = attributes, nlri = nlri, withdrawn = withdrawn, hash = pathHash attributes}
+parseUpdate other = error $ "can't parseUpdate a not-Update: " ++ show other
 
 {-# INLINE myHash #-}
 myHash :: B.ByteString -> Int

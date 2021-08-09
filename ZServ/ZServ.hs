@@ -48,6 +48,7 @@ getZStream role (address, family) = do
   return (zStream, outputStream)
 
 toIPv4Range ZPrefixV4 {..} = makeAddrRange v4address (fromIntegral plen)
+toIPv4Range other = error "toIPv4Range: can't convert other things"
 
 fromIPv4Range ipv4range =
   let (v4address, plen') = addrRangePair ipv4range
@@ -100,6 +101,7 @@ getZRoute (ZMIPV4ServerRouteAdd ZServerRoute {..}) = Just (toIPv4Range zrPrefix,
   where
     nextHop ((ZNHIPv4Ifindex ip _) : _) = Just ip
     nextHop ([]) = Nothing
+    nextHop other = error "getZRoute unexpected next hop"
 getZRoute (ZMIPV4ServerRouteDelete ZServerRoute {..}) = Just (toIPv4Range zrPrefix, Nothing) where
 getZRoute (ZMInterfaceAddressAdd ZInterfaceAddressV4 {..}) = Just (makeAddrRange addressA (fromIntegral plen), Just "127.0.0.1")
 getZRoute _ = Nothing

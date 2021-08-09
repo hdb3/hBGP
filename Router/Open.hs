@@ -61,10 +61,14 @@ data OpenStateMachine = OpenStateMachine
   deriving (Show)
 
 makeOpenStateMachine :: BGPMessage -> BGPMessage -> OpenStateMachine
-makeOpenStateMachine local required | isOpen local = OpenStateMachine local Nothing required
+makeOpenStateMachine local required
+  | isOpen local = OpenStateMachine local Nothing required
+  | otherwise = error "makeOpenStateMachine _ Nothing unreachable"
 
 updateOpenStateMachine :: OpenStateMachine -> BGPMessage -> OpenStateMachine
-updateOpenStateMachine osm remoteOpen | isOpen remoteOpen = osm {remoteOffer = Just remoteOpen}
+updateOpenStateMachine osm remoteOpen
+  | isOpen remoteOpen = osm {remoteOffer = Just remoteOpen}
+  | otherwise = error "updateOpenStateMachine _ Nothing unreachable"
 
 -- this might be better if it returned the Word16 values and allowed consumers to make the cast, but it would break the API for now...
 getNegotiatedHoldTime :: OpenStateMachine -> Int
@@ -85,7 +89,9 @@ checkAS4Capability OpenStateMachine {..} = hasAS4 (caps remoteOffer') && hasAS4 
 -- getResponse should not be called before an OPEN message has been received
 
 getResponse :: OpenStateMachine -> BGPMessage
-getResponse osm@OpenStateMachine {..} | isJust remoteOffer = firstMaybe [checkmyAS, checkBgpID, checkHoldTime, checkOptionalCapabilities, keepalive]
+getResponse osm@OpenStateMachine {..}
+  | isJust remoteOffer = firstMaybe [checkmyAS, checkBgpID, checkHoldTime, checkOptionalCapabilities, keepalive]
+  | otherwise = error "getResponse _ Nothing unreachable"
   where
     firstMaybe [] = undefined
     firstMaybe (Just m : mx) = m

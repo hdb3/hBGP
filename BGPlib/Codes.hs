@@ -85,6 +85,7 @@ flagsOf e
   | e == TypeCodePathAttributeLargeCommunity = transitive .|. optional
   | e == TypeCodePathAttributeAttrSet = transitive .|. optional
   | e == TypeCodePathAttributeUnknown = optional
+flagsOf _ = error "flagsOf is an incomplete function"
 
 instance EnumWord8 PathAttributeTypeCode
 
@@ -127,6 +128,7 @@ instance Enum PathAttributeTypeCode where
     | e == TypeCodePathAttributeASPathlimit = 21
     | e == TypeCodePathAttributeLargeCommunity = 32
     | e == TypeCodePathAttributeAttrSet = 128
+    | otherwise = error $ "fromEnum incomplete for " ++ show e
 
 -- ----------------------------------------
 -- for ASPath?.hs
@@ -141,10 +143,12 @@ instance Enum ASSegmentElementTypeCode where
   toEnum n
     | n == 1 = EnumASSet
     | n == 2 = EnumASSequence
+    | otherwise = error "unknown ASSegmentElementTypeCode"
 
   fromEnum e
     | e == EnumASSet = 1
     | e == EnumASSequence = 2
+    | otherwise = error "unknown ASSegmentElementTypeCode"
 
 enumASSet = 1 :: Word8
 

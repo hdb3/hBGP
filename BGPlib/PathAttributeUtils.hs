@@ -14,6 +14,7 @@ prePendAS :: ASNumber -> [PathAttribute] -> [PathAttribute]
 prePendAS asn = updatePathAttribute TypeCodePathAttributeASPath (asPrePend' asn)
   where
     asPrePend' asn (PathAttributeASPath p) = PathAttributeASPath (asPrePend asn p)
+    asPrePend' asn attr = error "can only prepend to paths"
 
 getASPathLength :: [PathAttribute] -> Int
 getASPathLength pas =
@@ -27,6 +28,7 @@ getASPathLength pas =
 -- the reverse would be needed if talking to an as2 only peer...
 normaliseASPath pas =
   let toASPath4' (PathAttributeASPath p) = PathAttributeASPath p
+      toASPath4' attr = error "can only normalise paths"
       pas' = updatePathAttribute TypeCodePathAttributeASPath toASPath4' pas
    in maybe
         pas'
@@ -70,6 +72,7 @@ getASPath = unwrapASPath . getASPathAttribute
   where
     unwrapASPath (PathAttributeASPath asPath) = asPath
     unwrapASPath (PathAttributeAS4Path asPath) = asPath
+    unwrapASPath _ = error "cant unwrap paths from not-paths"
 
 getASPathContent :: [PathAttribute] -> [ASSegment]
 getASPathContent = getASPath
@@ -125,3 +128,4 @@ checkForRequiredPathAttributes pas = included requiredPathAttributes (map identi
 included [] _ = True
 included ax [] | not (null ax) = False
 included ax (b : bx) = included (delete b ax) bx
+included _ _ = error "included: unthougt of combination"

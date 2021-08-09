@@ -180,6 +180,7 @@ zNextHopParser = do
       | nextHopType == _ZEBRA_NEXTHOP_IFINDEX -> do
         w32 <- anyWord32be
         return $ ZNHIfindex w32
+      | True -> error $ " unknown nextHopType " ++ show nextHopType
 
 zNextHopRegisterParser :: Parser ZNextHopRegister
 zNextHopRegisterParser = do
@@ -205,6 +206,7 @@ zInterfaceAddressParser = do
   if
       | afi == _AF_INET -> zInterfaceAddressParserV4 ifindex flags
       | afi == _AF_INET6 -> zInterfaceAddressParserV6 ifindex flags
+      | True -> error "unhandled AFI"
 
 zInterfaceAddressParserV4 ifindex flags = do
   addressA <- zIPv4
@@ -319,6 +321,7 @@ zvPrefixIPv4Parser = do
         | plen < 17 -> readPrefix2Byte
         | plen < 25 -> readPrefix3Byte
         | plen < 33 -> readPrefix4Byte
+        | True -> error "prefix too long (>32)"
   let v4address = fromHostAddress $ byteSwap32 prefix'
   return ZPrefixV4 {..}
   where

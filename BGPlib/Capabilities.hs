@@ -108,6 +108,7 @@ capCode CapLLGR = _CapCodeLLGR
 capCode CapCiscoRefresh = _CapCodeCiscoRefresh
 capCode CapEnhancedRouteRefresh = _CapCodeEnhancedRouteRefresh
 capCode CapExtendedLength = _CapCodeExtendedLength
+capCode cap = error $ "capCode incomplete for " ++ show cap
 
 capCodes = map capCode
 
@@ -140,6 +141,7 @@ capabilityBuilder (CapGracefulRestart rFlag restartTime) = word8 _CapCodeGracefu
 capabilityBuilder (CapMultiprotocol afi safi) = word8 _CapCodeMultiprotocol <> word8 4 <> word16BE afi <> word8 0 <> word8 safi
 capabilityBuilder CapExtendedLength = word8 _CapCodeExtendedLength <> word8 0
 capabilityBuilder (CapUnknown t bs) = word8 t <> word8 (fromIntegral (B.length bs)) <> bytes bs
+capabilityBuilder _ = error "capabilityBuilder incomplete"
 
 parseOptionalParameters :: Word8 -> A.Parser [Capability]
 parseOptionalParameters n
