@@ -21,13 +21,13 @@ pteUpdate :: RouteData -> PrefixTableEntry -> PrefixTableEntry
 pteUpdate (Withdraw _) [] = pureWarn "Withdraw in an empty RIB" $ []
 pteUpdate NullRoute [] = pureTrace "Nullroute in an empty RIB" $ []
 pteUpdate NullRoute rx = pureTrace "Nullroute in an empty RIB" $ rx
-pteUpdate route@RouteData {} [] = [route]
-pteUpdate route@RouteData {} rx = reverse $ f_start [] rx
+pteUpdate route@Update {} [] = [route]
+pteUpdate route@Update {} rx = reverse $ f_start [] rx
   where
     f_start :: [RouteData] -> [RouteData] -> [RouteData]
     f_start head [] = head
     f_start head (r : rr)
-      | (peerData route) == (peerData r) = f_got_match head rr
+      | peerData route == peerData r = f_got_match head rr
       | route > r = f_done_insert (route : head) (r : rr)
       | otherwise = f_start (r : head) rr
     f_got_match :: [RouteData] -> [RouteData] -> [RouteData]

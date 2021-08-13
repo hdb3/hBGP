@@ -79,4 +79,4 @@ readRib' = do
         else return (take n rib)
 
 normalise :: (RouteData, t) -> ((Int, [PathAttribute]), t)
-normalise (routeData, a) = ((BGPRib.routeId routeData, BGPRib.pathAttributes routeData), a)
+normalise (routeData, a) = ((BGPRib.routeId routeData, BGPRib.pathAttributes (path routeData)), a)

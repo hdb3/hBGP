@@ -49,7 +49,7 @@ getRIB pt = f (PT.ptList pt)
 getFIB :: PrefixTable -> [(Prefix, IPv4)]
 getFIB pt = map f (getRIB pt)
   where
-    f (route, pfx) = (pfx, nextHop route)
+    f (route, pfx) = (pfx, nextHop (path route))
 
 getAdjRIBOut :: PrefixTable -> [(RouteData, [Prefix])]
 getAdjRIBOut = groupBy_ . getRIB
@@ -58,7 +58,7 @@ showPrefixTable :: PrefixTable -> String
 showPrefixTable pt = unlines $ map showPrefixTableItem (getDB pt)
   where
     showPrefixTableItem (k, v) = show k ++ " [" ++ Data.List.intercalate " , " (showRoutes v) ++ "]"
-    showRoutes = map (\route -> (show . nextHop) route ++ " (" ++ (show . pathLength) route ++ ")")
+    showRoutes = map (\route -> (show . nextHop . path) route ++ " (" ++ (show . pathLength . path) route ++ ")")
 
 showPrefixTableByRoute :: PrefixTable -> String
 showPrefixTableByRoute = showPrefixTableByRoute' show

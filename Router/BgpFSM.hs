@@ -336,12 +336,12 @@ startFSM g@Global {..} socketName peerName handle =
         catch
           ( do
               threadDelay (1000000 * timer)
-              trace $ "keepaliveLoop send"
+              trace "keepaliveLoop send"
               bgpSnd BGPKeepalive
               keepaliveLoop handle timer
           )
           ( \(BGPIOException _) -> do
               -- this is the standard way to close down this thread
-              trace $ "keepaliveLoop exit"
+              trace "keepaliveLoop exit"
               return ()
           )

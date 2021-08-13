@@ -72,6 +72,6 @@ bgpSendHandle (BGPHandle h _) bs =
     -- (\e -> throw $ BGPIOException (show (e :: IOError)))
     -- (\e -> logDebug $ T.pack $ (show (e :: IOError)))
     ( \e -> do
-        logDebug $ T.pack $ (show (e :: IOError))
+        logDebug $ T.pack $ show (e :: IOError)
         throw $ BGPIOException (show (e :: IOError))
     )

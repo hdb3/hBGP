@@ -1,3 +1,5 @@
+{-# LANGUAGE DuplicateRecordFields #-}
+
 module BGPRib.BGPData where
 
 {- peer data holds persistent/static data about a BGP session peer
@@ -33,33 +35,37 @@ data PeerData = PeerData
 instance Hashable PeerData
 
 data RouteData
-  = RouteData
+  = Update
       { peerData :: PeerData,
-        pathAttributes :: [PathAttribute],
-        routeHash :: Int,
-        pathLength :: Int,
-        nextHop :: IPv4,
-        origin :: Word8,
-        med :: Maybe Word32,
-        fromEBGP :: Bool,
-        localPref :: Word32,
-        originAS :: Word32,
-        lastAS :: Word32
+        path :: PathData
       }
   | Withdraw PeerData
   | NullRoute
 
+data PathData = PathData
+  { pathAttributes :: [PathAttribute],
+    routeHash :: Int,
+    pathLength :: Int,
+    nextHop :: IPv4,
+    origin :: Word8,
+    med :: Maybe Word32,
+    fromEBGP :: Bool,
+    localPref :: Word32,
+    originAS :: Word32,
+    lastAS :: Word32
+  }
+
 getRouteNextHop :: RouteData -> Maybe IPv4
-getRouteNextHop rd@RouteData {} = Just $ nextHop rd
+getRouteNextHop rd@Update {} = Just $ nextHop $ path rd
 getRouteNextHop _ = Nothing
 
 routeId :: RouteData -> Int
 routeId NullRoute = 0
 routeId Withdraw {} = -1
-routeId rd@RouteData {} = routeHash rd
+routeId rd@Update {} = routeHash (path rd)
 
 instance Hashable RouteData where
-  hashWithSalt _ = routeHash
+  hashWithSalt _ = routeHash . path
 
 localPeer gd =
   PeerData
@@ -84,15 +90,18 @@ dummyGlobalData = GlobalData 64512 "127.0.0.1"
 instance Show PeerData where
   show pd = " peer AS: " ++ show (peerAS pd) ++ ",  peer addr: " ++ show (peerIPv4 pd)
 
+-- TDOD make first class instances for Path and derive the Route instances from them
 instance Show RouteData where
-  show rd@RouteData {..} = getASPathList pathAttributes ++ " nexthop: " ++ show nextHop ++ ",  peer ID: " ++ show (peerBGPid peerData) ++ ",  pref " ++ show localPref
+  show rd@Update {..} = getASPathList (pathAttributes path) ++ " nexthop: " ++ show (nextHop path) ++ ",  peer ID: " ++ show (peerBGPid peerData) ++ ",  pref " ++ show (localPref path)
   show NullRoute = "NullRoute"
   show (Withdraw peer) = "Withdraw " ++ show peer
 
 instance Eq RouteData where
   (==) NullRoute NullRoute = True
   (==) (Withdraw a) (Withdraw b) = a == b
-  (==) a@RouteData {} b@RouteData {} = routeHash a == routeHash b
+  -- TDOD this looks plainly wrong - the comparison of an Update should compare peers and paths
+  -- if program logic requires a path only comparison it should doit explicitly!
+  (==) a@Update {} b@Update {} = routeHash (path a) == routeHash (path b)
   (==) _ _ = False
 
 instance Eq PeerData where
@@ -103,10 +112,11 @@ instance Ord PeerData where
 
 -- note only defined for case where neither parameter is Withdraw (that constructor should never be found in the wild)
 instance Ord RouteData where
-  compare rd1@RouteData {} rd2@RouteData {} =
-    compare
-      (localPref rd1, pathLength rd2, origin rd2, fromEBGP rd1, peerBGPid (peerData rd2), peerIPv4 (peerData rd2))
-      (localPref rd2, pathLength rd1, origin rd1, fromEBGP rd2, peerBGPid (peerData rd1), peerIPv4 (peerData rd1))
+  compare up1@Update {} up2@Update {} =
+    let rd1 = path up1; rd2 = path up2; peer1 = peerData up1; peer2 = peerData up2
+     in compare
+          (localPref rd1, pathLength rd2, origin rd2, fromEBGP rd1, peerBGPid peer2, peerIPv4 peer2)
+          (localPref rd2, pathLength rd1, origin rd1, fromEBGP rd2, peerBGPid peer1, peerIPv4 peer1)
   compare _ _ = error "should never order unmatched route sorts"
 
 -- rank as higher some parameters when lower - these are Origin, Path Length, peer BGPID, peer address

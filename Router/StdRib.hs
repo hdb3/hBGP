@@ -83,28 +83,28 @@ buildUpdate :: PeerData -> [Prefix] -> RouteData -> BGPOutput
 --
 buildUpdate target prefixes NullRoute = makeUpdate [] prefixes []
 buildUpdate target prefixes Withdraw {} = makeUpdate [] prefixes []
-buildUpdate target prefixes RouteData {..} = if isExternal target then egpUpdate else igpUpdate
+buildUpdate target prefixes Update {..} = if isExternal target then egpUpdate else igpUpdate
   where
     igpUpdate =
       makeUpdate
         prefixes
         []
         ( sortPathAttributes $
-            setOrigin origin $
+            setOrigin (origin path) $
               -- this is reflector/controller default, bur for a router next-hop-self is default:
-              setNextHop nextHop $
+              setNextHop (nextHop path) $
                 -- setNextHop (localIPv4 peerData ) $ -- next hop self! - but not very good if the route is actually local, unless we set the local peer ip4...
                 setLocalPref
-                  localPref
-                  pathAttributes
+                  (localPref path)
+                  (pathAttributes path)
         )
     egpUpdate =
       makeUpdate
         prefixes
         []
         ( sortPathAttributes $
-            setOrigin origin $
+            setOrigin (origin path) $
               setNextHop (localIPv4 target) $ -- next hop self!
                 prePendAS (myAS $ globalData peerData) $
-                  delLocalPref pathAttributes
+                  delLocalPref (pathAttributes path)
         )
