@@ -85,13 +85,13 @@ foldf f s = foldl' f' (s, [])
   where
     f' (state, acc) item = let (state', result) = f state item in (state, result : acc)
 
-filterLookupRoutesMVar :: Rib -> FilterState -> PeerData -> PathChange -> IO (FilterState, Maybe (RouteData, [Prefix]))
+filterLookupRoutesMVar :: Rib -> FilterState -> PeerData -> PathChange -> IO (FilterState, Maybe (RouteExport, [Prefix]))
 filterLookupRoutesMVar rib state peer pathchange =
   withMVar
     (locRIB rib)
     (\rib -> return $ filterLookupRoutes peer rib state pathchange)
 
-filterLookupManyRoutesMVar :: Rib -> FilterState -> PeerData -> [PathChange] -> IO (FilterState, [(RouteData, [Prefix])])
+filterLookupManyRoutesMVar :: Rib -> FilterState -> PeerData -> [PathChange] -> IO (FilterState, [(RouteExport, [Prefix])])
 filterLookupManyRoutesMVar rib state peer pathchange =
   withMVar
     (locRIB rib)
@@ -102,29 +102,26 @@ newFilterState = IntSet.empty
 
 filterLookupManyRoutes peer locrib = foldmf (filterLookupRoutes peer locrib)
 
-filterLookupRoutes :: PeerData -> PrefixTable -> FilterState -> PathChange -> (FilterState, Maybe (RouteData, [Prefix]))
-filterLookupRoutes peerData _ s (prefixes, 0) = pureError "filterLookupRoutes called ona null route" $ (s, Nothing) -- (s, Just (NullRoute, prefixes))
-filterLookupRoutes peerData _ s (prefixes, -1) = (s, Just (Withdraw peerData, prefixes))
+filterLookupRoutes :: PeerData -> PrefixTable -> FilterState -> PathChange -> (FilterState, Maybe (RouteExport, [Prefix]))
+filterLookupRoutes peerData _ s (prefixes, 0) = pureError "filterLookupRoutes called on a null route" $ (s, Nothing) -- (s, Just (NullRoute, prefixes))
+filterLookupRoutes peerData _ s (prefixes, -1) = (s, Just (RouteExportWithdraw, prefixes))
 filterLookupRoutes peer locrib oldstate (prefixes, pathref) = filterRoute peer oldstate (phase1 prefixes)
   where
-    get :: Prefix -> Maybe RouteData
-    get pfx = PT.ptBest (fromPrefix pfx) locrib
+    get :: Prefix -> RouteExport
+    get pfx = maybe RouteExportWithdraw exportRoute (PT.ptBest (fromPrefix pfx) locrib)
     -- note on withdraw / absent from table handling
     -- Nothing means either not found, or an empty list
     -- either case matches withdraw
 
-    phase1 :: [Prefix] -> Maybe (RouteData, [Prefix])
+    phase1 :: [Prefix] -> Maybe (RouteExport, [Prefix])
     phase1 [] = Nothing
-    phase1 (pfx : pfxs) = maybe (phase1 pfxs) (phase1a pfx pfxs) (get pfx)
-      where
-        match = True
-        phase1a pfx pfxs route = if pathref == routeHash (path route) then phase2 [pfx] route pfxs else phase1 pfxs
+    phase1 (pfx : pfxs) = let route = get pfx in if pathref == exportPathID route then phase2 [pfx] route pfxs else phase1 pfxs
 
-    phase2 :: [Prefix] -> RouteData -> [Prefix] -> Maybe (RouteData, [Prefix])
+    phase2 :: [Prefix] -> RouteExport -> [Prefix] -> Maybe (RouteExport, [Prefix])
     phase2 acc route [] = Just (route, acc)
-    phase2 acc route (pfx : pfxs) = if Just route == get pfx then phase2 (pfx : acc) route pfxs else phase2 acc route pfxs
+    phase2 acc route (pfx : pfxs) = if route == get pfx then phase2 (pfx : acc) route pfxs else phase2 acc route pfxs
 
-filterRoute :: PeerData -> FilterState -> Maybe (RouteData, [Prefix]) -> (FilterState, Maybe (RouteData, [Prefix]))
+filterRoute :: PeerData -> FilterState -> Maybe (RouteExport, [Prefix]) -> (FilterState, Maybe (RouteExport, [Prefix]))
 filterRoute peer filter z = (filter, z)
 
 -- filterRoute peer filter Nothing = (filter, Nothing)
@@ -194,7 +191,7 @@ exportFilter :: PeerData -> RouteData -> Bool
 exportFilter target route@Update {} = not (iBGPRelayCheck && noReturnCheck)
   where
     iBGPRelayCheck = fromEBGP (path route) || isExternal target
-    noReturnCheck = target /= peerData route
+    noReturnCheck = target /= sourcePeer route
 exportFilter _ NullRoute = undefined
 exportFilter _ Withdraw {} = undefined
 
@@ -261,10 +258,10 @@ ribPush rib peerData ParsedUpdate {..} = do
         return (locRIB', withdraws)
 
     makeRouteData :: PeerData -> [PathAttribute] -> Int -> Word32 -> RouteData
-    makeRouteData peerData pathAttributes routeHash overrideLocalPref = Update {..}
+    makeRouteData sourcePeer pathAttributes routeHash overrideLocalPref = Update {..}
       where
         (pathLength, originAS, lastAS) = getASPathDetail pathAttributes
-        fromEBGP = isExternal peerData
+        fromEBGP = isExternal sourcePeer
         med = getMED pathAttributes -- currently not used for tiebreak -- only present value is for forwarding on IBGP
         localPref = if fromEBGP then overrideLocalPref else getLocalPref pathAttributes
         nextHop = getNextHop pathAttributes
@@ -281,5 +278,5 @@ updateRibOutWithPeerData updates adjRIB =
 importFilter :: RouteData -> Bool
 importFilter route@Update {} = pathLoopCheck route
   where
-    pathLoopCheck r = elemASPath (myAS $ globalData $ peerData r) (pathAttributes $ path r)
+    pathLoopCheck r = elemASPath (myAS $ globalData $ sourcePeer r) (pathAttributes $ path r)
 importFilter _ = error "importFilter only defined for updates"

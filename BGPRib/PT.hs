@@ -27,7 +27,7 @@ pteUpdate route@Update {} rx = reverse $ f_start [] rx
     f_start :: [RouteData] -> [RouteData] -> [RouteData]
     f_start head [] = head
     f_start head (r : rr)
-      | peerData route == peerData r = f_got_match head rr
+      | sourcePeer route == sourcePeer r = f_got_match head rr
       | route > r = f_done_insert (route : head) (r : rr)
       | otherwise = f_start (r : head) rr
     f_got_match :: [RouteData] -> [RouteData] -> [RouteData]
@@ -38,18 +38,18 @@ pteUpdate route@Update {} rx = reverse $ f_start [] rx
     f_done_insert :: [RouteData] -> [RouteData] -> [RouteData]
     f_done_insert head [] = head
     f_done_insert head (r : rr)
-      | (peerData route) == (peerData r) = f_finish head rr
+      | (sourcePeer route) == (sourcePeer r) = f_finish head rr
       | otherwise = f_done_insert (r : head) rr
     f_finish :: [RouteData] -> [RouteData] -> [RouteData]
 
     f_finish head [] = head
     f_finish head (r : rr) = f_finish (r : head) rr
-pteUpdate (Withdraw sourcePeer) rx = reverse $ f_start [] rx
+pteUpdate (Withdraw peer) rx = reverse $ f_start [] rx
   where
     f_start :: [RouteData] -> [RouteData] -> [RouteData]
     f_start head [] = head
     f_start head (r : rr)
-      | sourcePeer == (peerData r) = f_finish head rr
+      | peer == (sourcePeer r) = f_finish head rr
       | otherwise = f_start (r : head) rr
     f_finish :: [RouteData] -> [RouteData] -> [RouteData]
     f_finish head [] = head

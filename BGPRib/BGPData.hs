@@ -34,13 +34,35 @@ data PeerData = PeerData
 
 instance Hashable PeerData
 
+exportRoute :: RouteData -> RouteExport
+exportRoute (Withdraw _) = RouteExportWithdraw --  error "the rib cannot contain an explicit withdraw"
+exportRoute NullRoute = RouteExportWithdraw
+exportRoute Update {..} = RouteExportUpdate {exportSourcePeer = sourcePeer, exportPath = path}
+
+exportPathID :: RouteExport -> Int
+exportPathID RouteExportUpdate {..} = routeHash exportPath
+exportPathID RouteExportWithdraw = -1
+
+data Route = Route
+  { routePeer :: PeerData,
+    routePath :: PathData
+  }
+
 data RouteData
   = Update
-      { peerData :: PeerData,
+      { sourcePeer :: PeerData,
         path :: PathData
       }
   | Withdraw PeerData
   | NullRoute
+
+data RouteExport
+  = RouteExportUpdate
+      { exportSourcePeer :: PeerData,
+        exportPath :: PathData
+      }
+  | RouteExportWithdraw
+  deriving (Eq)
 
 data PathData = PathData
   { pathAttributes :: [PathAttribute],
@@ -54,6 +76,8 @@ data PathData = PathData
     originAS :: Word32,
     lastAS :: Word32
   }
+
+instance Eq PathData where (==) a@PathData {} b@PathData {} = routeHash a == routeHash b
 
 getRouteNextHop :: RouteData -> Maybe IPv4
 getRouteNextHop rd@Update {} = Just $ nextHop $ path rd
@@ -81,6 +105,9 @@ localPeer gd =
     }
 
 -- ## TODO - consider an adjunct 'DdummyPeerData' type for safety (where/how is this used?)
+-- (august 2021) - probably the usage is export withdraw 'routes' where there is no peer context.
+--               - the prefrred solution in progress is a disticnt data type for this case
+
 dummyPeerData :: PeerData
 dummyPeerData = PeerData dummyGlobalData True 64513 "127.0.0.2" "127.0.0.2" 0 "127.0.0.1" 0 0
 
@@ -92,7 +119,7 @@ instance Show PeerData where
 
 -- TDOD make first class instances for Path and derive the Route instances from them
 instance Show RouteData where
-  show rd@Update {..} = getASPathList (pathAttributes path) ++ " nexthop: " ++ show (nextHop path) ++ ",  peer ID: " ++ show (peerBGPid peerData) ++ ",  pref " ++ show (localPref path)
+  show rd@Update {..} = getASPathList (pathAttributes path) ++ " nexthop: " ++ show (nextHop path) ++ ",  peer ID: " ++ show (peerBGPid sourcePeer) ++ ",  pref " ++ show (localPref path)
   show NullRoute = "NullRoute"
   show (Withdraw peer) = "Withdraw " ++ show peer
 
@@ -113,7 +140,7 @@ instance Ord PeerData where
 -- note only defined for case where neither parameter is Withdraw (that constructor should never be found in the wild)
 instance Ord RouteData where
   compare up1@Update {} up2@Update {} =
-    let rd1 = path up1; rd2 = path up2; peer1 = peerData up1; peer2 = peerData up2
+    let rd1 = path up1; rd2 = path up2; peer1 = sourcePeer up1; peer2 = sourcePeer up2
      in compare
           (localPref rd1, pathLength rd2, origin rd2, fromEBGP rd1, peerBGPid peer2, peerIPv4 peer2)
           (localPref rd2, pathLength rd1, origin rd1, fromEBGP rd2, peerBGPid peer1, peerIPv4 peer1)

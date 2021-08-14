@@ -67,7 +67,7 @@ delRouteRib = error "delRouteRib: undefined"
 
 -- delRouteRib rib peer prefix = BGPRib.ribPush rib peer (bgpWithdraw [fromAddrRange prefix])
 
-buildUpdate :: PeerData -> [Prefix] -> RouteData -> BGPOutput
+buildUpdate :: PeerData -> [Prefix] -> RouteExport -> BGPOutput
 -- there are three distinct 'peers' and associated PeerData potentially in scope here
 --     the peer which originated the route
 --     the peer which will receive this update ('target')
@@ -77,34 +77,34 @@ buildUpdate :: PeerData -> [Prefix] -> RouteData -> BGPOutput
 --     for the iBGP/eBGP choice - the peer which will receive this update ('target')
 --     for the onward NextHop attribute - the peer which will receive this update ('target')
 --     for localPref (iBGP only) - the setting is a policy one, but should be the same regardless of target,
---          hence taken from the route origin ('peerData')
+--          hence taken from the route origin ('sourcePeer')
 --
--- Note: the Route source peer can be reached from the RouteData record via peerData
+-- Note: the Route source peer can be reached from the RouteData record via sourcePeer
 --
-buildUpdate target prefixes NullRoute = makeUpdate [] prefixes []
-buildUpdate target prefixes Withdraw {} = makeUpdate [] prefixes []
-buildUpdate target prefixes Update {..} = if isExternal target then egpUpdate else igpUpdate
+
+buildUpdate target prefixes RouteExportWithdraw = makeUpdate [] prefixes []
+buildUpdate target prefixes RouteExportUpdate {..} = if isExternal target then egpUpdate else igpUpdate
   where
     igpUpdate =
       makeUpdate
         prefixes
         []
         ( sortPathAttributes $
-            setOrigin (origin path) $
-              -- this is reflector/controller default, bur for a router next-hop-self is default:
-              setNextHop (nextHop path) $
-                -- setNextHop (localIPv4 peerData ) $ -- next hop self! - but not very good if the route is actually local, unless we set the local peer ip4...
+            setOrigin (origin exportPath) $
+              -- this is reflector/controller default, but for a router next-hop-self is default:
+              setNextHop (nextHop exportPath) $
+                -- setNextHop (localIPv4 sourcePeer ) $ -- next hop self! - but not very good if the route is actually local, unless we set the local peer ip4...
                 setLocalPref
-                  (localPref path)
-                  (pathAttributes path)
+                  (localPref exportPath)
+                  (pathAttributes exportPath)
         )
     egpUpdate =
       makeUpdate
         prefixes
         []
         ( sortPathAttributes $
-            setOrigin (origin path) $
+            setOrigin (origin exportPath) $
               setNextHop (localIPv4 target) $ -- next hop self!
-                prePendAS (myAS $ globalData peerData) $
-                  delLocalPref (pathAttributes path)
+                prePendAS (myAS $ globalData exportSourcePeer) $
+                  delLocalPref (pathAttributes exportPath)
         )
