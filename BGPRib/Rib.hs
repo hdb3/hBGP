@@ -1,4 +1,4 @@
-module BGPRib.Rib (Rib, FilterState, filterLookupManyRoutesMVar, ribPush, newRib, addPeer, delPeer, getPeersInRib, pullAllUpdates, getLocRib, getNextHops, getPeerAdjRIBOut, newFilterState) where
+module BGPRib.Rib (Rib, FilterState, filterLookupManyRoutesMVar, ribPush, newRib, addPeer, delPeer, getPeersInRib, pullAllUpdates, getLocRib, getPeerAdjRIBOut, newFilterState) where
 
 import BGPRib.AdjRIBOut
 import BGPRib.BGPData
@@ -61,7 +61,7 @@ addPeer rib peer =
         (locRIB rib)
         ( \rib ->
             do
-              let f (rd, pfxs) = (pfxs, routeId rd)
+              let f (rd, pfxs) = (pfxs, exportPathID rd)
               -- get a complete RIB dump for the new peer...
               return $ map f (PrefixTableUtils.getAdjRIBOut rib)
         )
@@ -103,12 +103,12 @@ newFilterState = IntSet.empty
 filterLookupManyRoutes peer locrib = foldmf (filterLookupRoutes peer locrib)
 
 filterLookupRoutes :: PeerData -> PrefixTable -> FilterState -> PathChange -> (FilterState, Maybe (RouteExport, [Prefix]))
-filterLookupRoutes peerData _ s (prefixes, 0) = pureError "filterLookupRoutes called on a null route" $ (s, Nothing) -- (s, Just (NullRoute, prefixes))
+filterLookupRoutes peerData _ s (prefixes, 0) = pureError "filterLookupRoutes called on a null route" (s, Nothing) -- (s, Just (NullRoute, prefixes))
 filterLookupRoutes peerData _ s (prefixes, -1) = (s, Just (RouteExportWithdraw, prefixes))
 filterLookupRoutes peer locrib oldstate (prefixes, pathref) = filterRoute peer oldstate (phase1 prefixes)
   where
     get :: Prefix -> RouteExport
-    get pfx = maybe RouteExportWithdraw exportRoute (PT.ptBest (fromPrefix pfx) locrib)
+    get pfx = PT.ptBest (fromPrefix pfx) locrib
     -- note on withdraw / absent from table handling
     -- Nothing means either not found, or an empty list
     -- either case matches withdraw
@@ -195,16 +195,16 @@ exportFilter target route@Update {} = not (iBGPRelayCheck && noReturnCheck)
 exportFilter _ NullRoute = undefined
 exportFilter _ Withdraw {} = undefined
 
-getNextHops :: Rib -> [Prefix] -> IO [(Prefix, Maybe IPv4)]
-getNextHops rib prefixes =
-  withMVar
-    (locRIB rib)
-    ( \locrib ->
-        return $
-          map
-            (\prefix -> (prefix,) $ getRouteNextHop $ queryPrefixTable locrib prefix)
-            prefixes
-    )
+-- getNextHops :: Rib -> [Prefix] -> IO [(Prefix, Maybe IPv4)]
+-- getNextHops rib prefixes =
+--   withMVar
+--     (locRIB rib)
+--     ( \locrib ->
+--         return $
+--           map
+--             (\prefix -> (prefix,) $ getRouteNextHop $ queryPrefixTable locrib prefix)
+--             prefixes
+--     )
 
 pullAllUpdates :: PeerAdjRIBOut -> IO [PathChange]
 pullAllUpdates = dequeueAll
@@ -232,7 +232,7 @@ ribPush rib peerData ParsedUpdate {..} = do
   withMVar (adjRibOut rib) (updateRibOutWithPeerData pathChangesA)
   withMVar (adjRibOut rib) (updateRibOutWithPeerData pathChangesB)
   where
-    ribUpdateMany :: PeerData -> [PathAttribute] -> Int -> [Prefix] -> PrefixTable -> IO (PrefixTable, [(Prefix, RouteData)])
+    ribUpdateMany :: PeerData -> [PathAttribute] -> Int -> [Prefix] -> PrefixTable -> IO (PrefixTable, [(Prefix, RouteExport)])
     ribUpdateMany peerData pathAttributes routeId pfxs locRIB
       | null pfxs = do
         logDebug "ribUpdateMany []"
@@ -246,7 +246,7 @@ ribPush rib peerData ParsedUpdate {..} = do
         logDebug . T.pack $ "ribUpdateMany " ++ show (length updates) ++ " changes"
         return (locRIB', updates)
 
-    ribWithdrawMany :: PeerData -> [Prefix] -> PrefixTable -> IO (PrefixTable, [(Prefix, RouteData)])
+    ribWithdrawMany :: PeerData -> [Prefix] -> PrefixTable -> IO (PrefixTable, [(Prefix, RouteExport)])
     ribWithdrawMany peerData pfxs locRIB
       | null pfxs = do
         logDebug "ribWithdrawMany []"
@@ -268,12 +268,12 @@ ribPush rib peerData ParsedUpdate {..} = do
         origin = getOrigin pathAttributes
         path = PathData {..}
 
-updateRibOutWithPeerData :: [(Prefix, RouteData)] -> AdjRIBOut -> IO ()
+updateRibOutWithPeerData :: [(Prefix, RouteExport)] -> AdjRIBOut -> IO ()
 updateRibOutWithPeerData updates adjRIB =
   sequence_ $ Data.Map.mapWithKey action adjRIB
   where
     action :: PeerData -> PeerAdjRIBOut -> IO ()
-    action targetPeer = insertPathChanges $ groupBySecond $ map (second routeId) updates
+    action targetPeer = insertPathChanges $ groupBySecond $ map (second exportPathID) updates
 
 importFilter :: RouteData -> Bool
 importFilter route@Update {} = pathLoopCheck route

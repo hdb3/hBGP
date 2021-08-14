@@ -1,7 +1,7 @@
 module Router.Redistributor where
 
 import BGPRib.BGPData (localPeer)
-import BGPRib.Rib (getNextHops, getPeerAdjRIBOut, pullAllUpdates)
+import BGPRib.Rib (getPeerAdjRIBOut, pullAllUpdates)
 import BGPlib.Prefixes (toAddrRange)
 import Control.Concurrent
 import Control.Logger.Simple
@@ -51,8 +51,10 @@ ribUpdateListener routeInstall global@Global {..} peer adjribout timeout = do
       -- this function is simpler than the re-advertisement over BGP case
       -- we need only use the prefix lists to query the RIB for the current nexthops, or delete if not found...
       let prefixes = concatMap fst updates
-      routes <- getNextHops rib prefixes
-      mapM_ routeInstall routes
+
+      -- routes <- getNextHops rib prefixes
+      -- mapM_ routeInstall routes
+      return $ error "unimplemented" --- problem with semantics of  getNextHops
 
   -- rinse and repeat...
 

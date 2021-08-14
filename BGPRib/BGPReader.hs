@@ -20,7 +20,7 @@ bgpMsgReader path = do
 bgpUpdateMsgReader :: FilePath -> IO [ParsedUpdate]
 bgpUpdateMsgReader = fmap (map parseUpdate . filter isUpdate) . bgpMsgReader
 
-bgpReader :: FilePath -> IO [(BGPRib.RouteData, Prefix)]
+bgpReader :: FilePath -> IO [(BGPRib.RouteExport, Prefix)]
 bgpReader path = do
   updates <- bgpUpdateMsgReader path
   rib <- BGPRib.newRib BGPRib.dummyPeerData
@@ -66,7 +66,7 @@ readMsgs = do
         else return (take n msgs)
 
 -- TODO convert the readrib chain to use readMsgs.....
-readRib' :: IO [(RouteData, Prefix)]
+readRib' :: IO [(RouteExport, Prefix)]
 readRib' = do
   args <- getArgs
   let n = if 1 < length args then read (args !! 1) :: Int else 0
@@ -78,5 +78,5 @@ readRib' = do
         then return rib
         else return (take n rib)
 
-normalise :: (RouteData, t) -> ((Int, [PathAttribute]), t)
-normalise (routeData, a) = ((BGPRib.routeId routeData, BGPRib.pathAttributes (path routeData)), a)
+normalise :: (RouteExport, t) -> ((Int, [PathAttribute]), t)
+normalise (routeData, a) = ((BGPRib.exportPathID routeData, BGPRib.pathAttributes (exportPath routeData)), a)

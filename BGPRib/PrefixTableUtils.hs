@@ -28,7 +28,7 @@ import qualified Data.List
 --
 -- ===================================================
 
-getDB :: PrefixTable -> [(Prefix, [RouteData])]
+getDB :: PrefixTable -> [(Prefix, [RibRoute])]
 getDB pt = map f (PT.ptList pt)
   where
     f (pfx, routes) = (toPrefix pfx, routes)
@@ -36,29 +36,30 @@ getDB pt = map f (PT.ptList pt)
 lengthRIB :: PrefixTable -> Int
 lengthRIB pt = length (PT.ptList pt)
 
-getRIB :: PrefixTable -> [(RouteData, Prefix)]
-getRIB pt = f (PT.ptList pt)
-  where
-    f [] = []
-    f ((k, pte) : ax)
-      | PT.pteNull pte = f ax
-      | otherwise = (PT.pteBest pte, toPrefix k) : f ax
+getRIB :: PrefixTable -> [(RouteExport, Prefix)]
+getRIB pt = map (\(k, pte) -> (PT.pteBest pte, toPrefix k)) (PT.ptList pt)
+
+-- where
+--   f [] = []
+--   f ((k, pte) : ax)
+--     | PT.pteNull pte = f ax
+--     | otherwise = (PT.pteBest pte, toPrefix k) : f ax
 
 -- f (pfx,routes) = (fromJust $ PT.pteBest routes, toPrefix pfx)
 
 getFIB :: PrefixTable -> [(Prefix, IPv4)]
 getFIB pt = map f (getRIB pt)
   where
-    f (route, pfx) = (pfx, nextHop (path route))
+    f (route, pfx) = (pfx, nextHop (exportPath route))
 
-getAdjRIBOut :: PrefixTable -> [(RouteData, [Prefix])]
+getAdjRIBOut :: PrefixTable -> [(RouteExport, [Prefix])]
 getAdjRIBOut = groupBy_ . getRIB
 
 showPrefixTable :: PrefixTable -> String
 showPrefixTable pt = unlines $ map showPrefixTableItem (getDB pt)
   where
     showPrefixTableItem (k, v) = show k ++ " [" ++ Data.List.intercalate " , " (showRoutes v) ++ "]"
-    showRoutes = map (\route -> (show . nextHop . path) route ++ " (" ++ (show . pathLength . path) route ++ ")")
+    showRoutes = map (\route -> (show . nextHop . ribPath) route ++ " (" ++ (show . pathLength . ribPath) route ++ ")")
 
 showPrefixTableByRoute :: PrefixTable -> String
 showPrefixTableByRoute = showPrefixTableByRoute' show

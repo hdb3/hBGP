@@ -29,7 +29,7 @@ instance {-# OVERLAPPING #-} Show PrefixTable where
 newPrefixTable :: PrefixTable
 newPrefixTable = PT.ptNew
 
-update :: PrefixTable -> [Prefix] -> RouteData -> (PrefixTable, [(Prefix, RouteData)])
+update :: PrefixTable -> [Prefix] -> RouteData -> (PrefixTable, [(Prefix, RouteExport)])
 update pt pfxs route = Data.List.foldl' f (pt, []) pfxs
   where
     f (pt', acc) pfx = (pt'', acc')
@@ -37,14 +37,14 @@ update pt pfxs route = Data.List.foldl' f (pt, []) pfxs
         acc' = if PT.pteBest new == PT.pteBest old then acc else (pfx, PT.pteBest new) : acc
         (old, new, pt'') = PT.ptUpdate (fromPrefix pfx) route pt'
 
-queryPrefixTable :: PrefixTable -> Prefix -> RouteData
+queryPrefixTable :: PrefixTable -> Prefix -> RouteExport
 queryPrefixTable table pfx = PT.pteBest $ PT.ptQuery (fromPrefix pfx) table
 
 showRibAt :: PrefixTable -> Prefix -> String
 showRibAt table pfx = show (PT.ptQuery (fromPrefix pfx) table)
 
 -- TODO merge update and withdraw by using a route value of Withdraw {..}
-withdraw :: PrefixTable -> [Prefix] -> PeerData -> (PrefixTable, [(Prefix, RouteData)])
+withdraw :: PrefixTable -> [Prefix] -> PeerData -> (PrefixTable, [(Prefix, RouteExport)])
 withdraw pt pfxs peerData = update pt pfxs (Withdraw peerData)
 
 -- withdraw pt pfxs pd = Data.List.foldl' f (pt,[]) pfxs where
@@ -54,5 +54,5 @@ withdraw pt pfxs peerData = update pt pfxs (Withdraw peerData)
 
 -- withdrawPrefix :: PrefixTable -> [Prefix] -> PeerData -> (PrefixTable,[(Prefix,RouteData)])
 
-withdrawPeer :: PrefixTable -> PeerData -> (PrefixTable, [(Prefix, RouteData)])
+withdrawPeer :: PrefixTable -> PeerData -> (PrefixTable, [(Prefix, RouteExport)])
 withdrawPeer pt = withdraw pt (map toPrefix $ PT.ptKeys pt)

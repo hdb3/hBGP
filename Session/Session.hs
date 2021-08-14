@@ -150,6 +150,7 @@ wrap State {..} app sock = do
   peerAddress <- NS.getPeerName sock
   let ip = fromPeerAddress peerAddress
       fromPeerAddress (NS.SockAddrInet _ ip) = fromHostAddress ip
+      fromPeerAddress _ = error "only IPv4 socket supported"
   catchIOError
     ( do
         void $ app (sock, peerAddress)

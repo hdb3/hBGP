@@ -43,10 +43,22 @@ exportPathID :: RouteExport -> Int
 exportPathID RouteExportUpdate {..} = routeHash exportPath
 exportPathID RouteExportWithdraw = -1
 
-data Route = Route
-  { routePeer :: PeerData,
-    routePath :: PathData
+ribExport :: RibRoute -> RouteExport
+ribExport RibRoute {..} = RouteExportUpdate {exportSourcePeer = ribPeer, exportPath = ribPath}
+
+data RibRoute = RibRoute
+  { ribPeer :: PeerData,
+    ribPath :: PathData
   }
+  deriving (Show, Eq)
+
+instance Hashable RibRoute where
+  hashWithSalt _ = routeHash . ribPath
+
+-- instance Show RibRoute where show RibRoute {..} = show path ++ show sourcePeer
+ribRoute :: RouteData -> RibRoute
+ribRoute Update {..} = RibRoute {ribPeer = sourcePeer, ribPath = path}
+ribRoute _ = error "the rib can only contain an explicit route"
 
 data RouteData
   = Update
@@ -62,7 +74,14 @@ data RouteExport
         exportPath :: PathData
       }
   | RouteExportWithdraw
-  deriving (Eq)
+  deriving (Eq, Show)
+
+exportRouteNextHop :: RouteExport -> IPv4
+exportRouteNextHop RouteExportUpdate {..} = nextHop exportPath
+exportRouteNextHop _ = error "cant get next hop for withdraw"
+
+instance Hashable RouteExport where
+  hashWithSalt _ = routeHash . exportPath
 
 data PathData = PathData
   { pathAttributes :: [PathAttribute],
@@ -77,11 +96,14 @@ data PathData = PathData
     lastAS :: Word32
   }
 
+instance Show PathData where
+  show PathData {..} = "Path {" ++ getASPathList pathAttributes ++ " nexthop: " ++ show nextHop ++ ",  pref " ++ show localPref ++ "}"
+
 instance Eq PathData where (==) a@PathData {} b@PathData {} = routeHash a == routeHash b
 
-getRouteNextHop :: RouteData -> Maybe IPv4
-getRouteNextHop rd@Update {} = Just $ nextHop $ path rd
-getRouteNextHop _ = Nothing
+-- getRouteNextHop :: RouteData -> Maybe IPv4
+-- getRouteNextHop rd@Update {} = Just $ nextHop $ path rd
+-- getRouteNextHop _ = Nothing
 
 routeId :: RouteData -> Int
 routeId NullRoute = 0
@@ -117,9 +139,8 @@ dummyGlobalData = GlobalData 64512 "127.0.0.1"
 instance Show PeerData where
   show pd = " peer AS: " ++ show (peerAS pd) ++ ",  peer addr: " ++ show (peerIPv4 pd)
 
--- TDOD make first class instances for Path and derive the Route instances from them
 instance Show RouteData where
-  show rd@Update {..} = getASPathList (pathAttributes path) ++ " nexthop: " ++ show (nextHop path) ++ ",  peer ID: " ++ show (peerBGPid sourcePeer) ++ ",  pref " ++ show (localPref path)
+  show rd@Update {..} = show path ++ show sourcePeer
   show NullRoute = "NullRoute"
   show (Withdraw peer) = "Withdraw " ++ show peer
 
@@ -137,14 +158,22 @@ instance Eq PeerData where
 instance Ord PeerData where
   compare p1 p2 = compare (peerBGPid p1) (peerBGPid p2)
 
--- note only defined for case where neither parameter is Withdraw (that constructor should never be found in the wild)
-instance Ord RouteData where
-  compare up1@Update {} up2@Update {} =
-    let rd1 = path up1; rd2 = path up2; peer1 = sourcePeer up1; peer2 = sourcePeer up2
-     in compare
-          (localPref rd1, pathLength rd2, origin rd2, fromEBGP rd1, peerBGPid peer2, peerIPv4 peer2)
-          (localPref rd2, pathLength rd1, origin rd1, fromEBGP rd2, peerBGPid peer1, peerIPv4 peer1)
-  compare _ _ = error "should never order unmatched route sorts"
+-- -- note only defined for case where neither parameter is Withdraw (that constructor should never be found in the wild)
+-- instance Ord RouteData where
+--   compare up1@Update {} up2@Update {} =
+--     let rd1 = path up1; rd2 = path up2; peer1 = sourcePeer up1; peer2 = sourcePeer up2
+--      in compare
+--           (localPref rd1, pathLength rd2, origin rd2, fromEBGP rd1, peerBGPid peer2, peerIPv4 peer2)
+--           (localPref rd2, pathLength rd1, origin rd1, fromEBGP rd2, peerBGPid peer1, peerIPv4 peer1)
+--   compare _ _ = error "should never order unmatched route sorts"
 
 -- rank as higher some parameters when lower - these are Origin, Path Length, peer BGPID, peer address
 -- ## TODO ## MED comparison is slightly tricky - only applies when adjacent AS is equal, and needs to accomodate missing Meds in either or both routes
+
+-- note only defined for case where neither parameter is Withdraw (that constructor should never be found in the wild)
+instance Ord RibRoute where
+  compare up1@RibRoute {} up2@RibRoute {} =
+    let rd1 = ribPath up1; rd2 = ribPath up2; peer1 = ribPeer up1; peer2 = ribPeer up2
+     in compare
+          (localPref rd1, pathLength rd2, origin rd2, fromEBGP rd1, peerBGPid peer2, peerIPv4 peer2)
+          (localPref rd2, pathLength rd1, origin rd1, fromEBGP rd2, peerBGPid peer1, peerIPv4 peer1)
