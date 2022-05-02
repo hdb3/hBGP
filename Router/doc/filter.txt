@@ -1,0 +1,26 @@
+Aspects of filter logic - Design Notes
+
+filtering returned routes to an originator
+
+Ideally, no route should be readvertised back to its source,
+  and the correct behaviour when a new route is received is to send nothing back to the source;
+  otherwise, if the new best route replaces an existing route from a different source peer, then a withdraw should be sent.
+Complementarily, if a route is withdrawn (rib is now empty at that prefix),
+  then the withdraw is suppressed for the originating peer of the route which was removed.
+
+The full precise logic is:
+ A~( withdraw or new best route source peer) B~( empty or previous route source peer) P~(target peer) ->
+   A /= P: send update
+   A == P & B == P : no action *
+   A == P & B == empty : no action *
+   A == P & B /= P : send withdraw *
+   A == withdraw  & B == P : no action *
+   A == withdraw  & B /= P : send withdraw
+   A == withdraw  & B == empty : invalid (no action) 
+
+Observation / Insight
+Whenever a new best route is detected the source of any of the prior RIB entry is required,
+  unless the per peer state carries its own list of previously announced prefixes.
+The only strictly consistent alternative behaviour is to always relay back all route updates.
+A non-damaging alternative is to translate to withdrawal all updates for a peer which sourced the route.
+This has the potential of generating spurious withdraw messages, and it is not clear that it would have any benefit over transparent operation.
