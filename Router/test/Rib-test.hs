@@ -71,7 +71,7 @@ main = do
   pr rib
 
   putStrLn "\nupdate internalPeer prefixes1"
-  --print("XXZZ",( makeUpdateSimple attrs1 prefixes1 [] ))
+  -- print("XXZZ",( makeUpdateSimple attrs1 prefixes1 [] ))
   ribPush rib internalPeer (makeUpdateSimple attrs1 prefixes1 [])
   -- ribPush rib internalPeer ( makeUpdateSimple attrs2 prefixes2 [] )
   pr rib

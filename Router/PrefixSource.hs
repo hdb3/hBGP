@@ -23,7 +23,7 @@ prefixes startPrefix tableSize groupSize n = (n `div` tableSize, n `mod` tableSi
     (ip, prefixLength) = addrRangePair startPrefix
     ip4 = flip makeAddrRange prefixLength . fromHostAddress . byteSwap32 . flip shiftL (32 - prefixLength)
     ip4' = flip shiftR (32 - prefixLength) . byteSwap32 . toHostAddress
-    seeds base groupSize index = map (base + index * groupSize +) [0 .. groupSize -1]
+    seeds base groupSize index = map (base + index * groupSize +) [0 .. groupSize - 1]
 
 main = do
   s <- initSource "192.168.0.0/24" 8 3

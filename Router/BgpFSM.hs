@@ -7,7 +7,7 @@ import Control.Applicative ((<|>))
 import Control.Concurrent
 import Control.Exception
 -- TODO = move some or all of BGPData, from bgprib to bgplib, so that bgprib does not need to be imported here.....
---import qualified Router.CustomRib as Rib
+-- import qualified Router.CustomRib as Rib
 
 import Control.Logger.Simple
 import Control.Monad (void)
@@ -333,15 +333,15 @@ startFSM g@Global {..} socketName peerName handle =
     keepaliveLoop handle timer
       | timer == 0 = return ()
       | otherwise =
-        catch
-          ( do
-              threadDelay (1000000 * timer)
-              trace "keepaliveLoop send"
-              bgpSnd BGPKeepalive
-              keepaliveLoop handle timer
-          )
-          ( \(BGPIOException _) -> do
-              -- this is the standard way to close down this thread
-              trace "keepaliveLoop exit"
-              return ()
-          )
+          catch
+            ( do
+                threadDelay (1000000 * timer)
+                trace "keepaliveLoop send"
+                bgpSnd BGPKeepalive
+                keepaliveLoop handle timer
+            )
+            ( \(BGPIOException _) -> do
+                -- this is the standard way to close down this thread
+                trace "keepaliveLoop exit"
+                return ()
+            )

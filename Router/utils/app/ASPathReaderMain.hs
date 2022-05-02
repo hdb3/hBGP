@@ -4,7 +4,7 @@ import BGPReader
 import BGPlib
 import BGPutils (reportPaths)
 
---import ASPathReader(reportPaths)
+-- import ASPathReader(reportPaths)
 
 main :: IO ()
 main = do

@@ -40,9 +40,9 @@ clientConnect port peer local = do
             Errno errno <- getErrno
             if
                 | elem errno [2, 103, 115] -> do
-                  putStrLn $ ioe_description e ++ "(" ++ show errno ++ ") retrying in 10 seconds"
-                  threadDelay 10000000 -- 10 seconds
-                  connect' sock port peer
+                    putStrLn $ ioe_description e ++ "(" ++ show errno ++ ") retrying in 10 seconds"
+                    threadDelay 10000000 -- 10 seconds
+                    connect' sock port peer
                 | otherwise -> unknownSocketErrorHandler e errno
         )
     bind :: Socket -> IPv4 -> IO ()
@@ -76,17 +76,17 @@ openServerSocket port address = do
             Errno errno <- getErrno
             if
                 | errno == 13 ->
-                  die
-                    "permission error binding port (are you su?) (or try: sysctl net.ipv4.ip_unprivileged_port_start=179?)"
+                    die
+                      "permission error binding port (are you su?) (or try: sysctl net.ipv4.ip_unprivileged_port_start=179?)"
                 | errno == 99 ->
-                  die "address error binding port - host configuration mismatch?"
+                    die "address error binding port - host configuration mismatch?"
                 | errno == 98 ->
-                  if retryOnBusy
-                    then do
-                      hPutStrLn stderr "waiting to bind port"
-                      threadDelay 10000000 -- 10 seconds
-                      serverBind sock port address
-                    else die "port already in use"
+                    if retryOnBusy
+                      then do
+                        hPutStrLn stderr "waiting to bind port"
+                        threadDelay 10000000 -- 10 seconds
+                        serverBind sock port address
+                      else die "port already in use"
                 | otherwise -> unknownSocketErrorHandler e errno
         )
 

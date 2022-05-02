@@ -36,13 +36,13 @@ report prefixes = do
       coverage (Prefix (a, _)) = 2 ^ (32 - a)
       fullCoverage =
         2 ^ 32 - 2 * (2 ^ (32 - 4))
-          - 3 * (2 ^ (32 -8))
-          - 1 * (2 ^ (32 -10))
-          - 1 * (2 ^ (32 -12))
-          - 1 * (2 ^ (32 -15))
-          - 2 * (2 ^ (32 -16))
-          - 8 * (2 ^ (32 -24))
-          - 6 * (2 ^ (32 -32))
+          - 3 * (2 ^ (32 - 8))
+          - 1 * (2 ^ (32 - 10))
+          - 1 * (2 ^ (32 - 12))
+          - 1 * (2 ^ (32 - 15))
+          - 2 * (2 ^ (32 - 16))
+          - 8 * (2 ^ (32 - 24))
+          - 6 * (2 ^ (32 - 32))
       -- list compiled from RFC https://www.iana.org/assignments/iana-ipv4-special-registry/iana-ipv4-special-registry.xhtml
       --                        https://www.iana.org/assignments/iana-ipv4-special-registry/iana-ipv4-special-registry-1.csv
       -- and adding a /4 for multicast (224.0.0.0/4)

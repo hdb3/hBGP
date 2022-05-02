@@ -24,7 +24,7 @@ analyseMessageTypes msgs = do
 
 analysePrefixes msgs = do
   let prefixes = foldl f (0, 0) msgs
-      --prefixCount bs = length (decode bs :: [Prefix])
+      -- prefixCount bs = length (decode bs :: [Prefix])
       f (u, w) BGPUpdate {..} = (u + length nlri, w + length withdrawn)
       f (u, w) _ = (u, w)
   putStrLn $ "count (update,withdrawn) = " ++ show prefixes

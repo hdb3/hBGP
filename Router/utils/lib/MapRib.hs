@@ -101,7 +101,7 @@ instance Rib MapRib where
       newLocRib = if bestRouteChanged then updatedLocRib else oldLocRib
         where
           updatedLocRib = maybe (Map.delete prefix oldLocRib) (\newRoute -> Map.insert prefix newRoute oldLocRib) newBestRoute
-      --locRib' = if bestRouteChanged then Map.insert prefix newBestRoute (locRib rib) else (locRib rib)
+      -- locRib' = if bestRouteChanged then Map.insert prefix newBestRoute (locRib rib) else (locRib rib)
 
       -- we are now done building the update Rib values and need to construct the 'result' value which is a '(Maybe (Peer,Route),(Peer,Route))'
       action = if bestRouteChanged then (prefix', oldBestRoute, newBestRoute) else (prefix', Nothing, Nothing)

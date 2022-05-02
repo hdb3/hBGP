@@ -29,8 +29,8 @@ main = do
       passive = elem "--listen" optargs
   if
       | (elem Nothing addresses) -> do
-        putStrLn "could not parse addresses"
-        usage
+          putStrLn "could not parse addresses"
+          usage
       | null args -> usage
       | (length args == 1) -> go passive (fromJust (addresses !! 0)) "0.0.0.0"
       | otherwise -> go passive (fromJust (addresses !! 0)) (fromJust (addresses !! 1))

@@ -39,7 +39,7 @@ getRoutes = do
   putStrLn $ "got " ++ show (length rib) ++ " routes"
   return $ map parseRibRoute rib
 
---query :: ([(RibDef.Prefix, (Peer, Route))], MapRib) -> IO ()
+-- query :: ([(RibDef.Prefix, (Peer, Route))], MapRib) -> IO ()
 query rib = query' ([], rib)
 
 query' (updates, rib) = do
@@ -67,8 +67,8 @@ test5 = do
   let grouped = RIBData.group shuffledRoutes
   -- let grouped = groupBy (\(_,a) (_, b) -> a == b) shuffledRoutes
   print $ "route count = " ++ show (length grouped)
-  --print $ last $ last grouped
-  --putStrLn $ unlines $ map show grouped
+  -- print $ last $ last grouped
+  -- putStrLn $ unlines $ map show grouped
   t3 <- stopwatch "done" t0 t2
   print $ "ungrouped prefix count = " ++ show (length $ ungroup grouped)
   stopwatch "done" t0 t3
@@ -150,9 +150,9 @@ test1 = do
   rib <- readRib
   let routes = map parseRibRoute rib
   t1 <- stopwatch "loaded rib" t0 t0
-  --shuffledRoutes <- shuffle rib
-  --t2 <- stopwatch "shuffled rib" t0 t1
-  --putStrLn $ "loaded rib in " ++ show (diffSystemTime t0 t1)
+  -- shuffledRoutes <- shuffle rib
+  -- t2 <- stopwatch "shuffled rib" t0 t1
+  -- putStrLn $ "loaded rib in " ++ show (diffSystemTime t0 t1)
   putStrLn $ "got " ++ show (length rib) ++ " routes"
   print (last rib)
   stopwatch "printed from rib" t0 t1

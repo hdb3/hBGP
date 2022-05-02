@@ -1,0 +1,4 @@
+this is branch 'refactor2', branched from refactor from master in May 2022.
+It is hoped to become the main development branch.
+The fisrt goal is to make the format cnsistent with current ormolu and then enable compilation with ghc 9.2.
+The ghc9.2 goal may require some rework of data definiions due to chang in record filed disambiguation in ghc

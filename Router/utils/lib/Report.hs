@@ -5,18 +5,18 @@ import BGPlib
 import Data.Word
 import System.IO
 
---import Common
---import BGPparse
---import GetBGPMsg
---import Update
---import PathAttributes
---import PathAttributeUtils
---import Prefixes
---import Rib
---import BGPData
---import PrefixTable
---import PrefixTableUtils
---import AdjRIBOut
+-- import Common
+-- import BGPparse
+-- import GetBGPMsg
+-- import Update
+-- import PathAttributes
+-- import PathAttributeUtils
+-- import Prefixes
+-- import Rib
+-- import BGPData
+-- import PrefixTable
+-- import PrefixTableUtils
+-- import AdjRIBOut
 
 report :: (PrefixTable, [AdjRIBEntry]) -> IO ()
 report (rib, adjrib) = do

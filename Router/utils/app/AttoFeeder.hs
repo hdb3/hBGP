@@ -32,9 +32,9 @@ main = do
 
       timeIO "parseCheck terminatingBGPParser" $ parseCheck eosBGPParser bgpParser1 h ior
 
---timeIO "parseCheck terminatingBGPParser" $ parseCheck eosBGPParser terminatingBGPParser h ior
+-- timeIO "parseCheck terminatingBGPParser" $ parseCheck eosBGPParser terminatingBGPParser h ior
 
---getBuf h = B.hGetNonBlocking h 1024
+-- getBuf h = B.hGetNonBlocking h 1024
 getBuf h = B.hGetNonBlocking h (1024 * 1024)
 
 nullStatus :: [a] -> IO (([String], String), [a])
@@ -60,7 +60,7 @@ getNext p stream ioref = do
     (Done i r) -> do
       if B.null newBuf then writeIORef ioref undefined else writeIORef ioref i
       evaluate $ Right r
-    --return $ Right r
+    -- return $ Right r
     (Partial cont) -> error "Partial has been removed already by `g`"
     (Fail _ s sx) -> return $ Left (s, sx)
   where

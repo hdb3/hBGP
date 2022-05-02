@@ -16,4 +16,4 @@ main = do
   putStrLn $ unlines $ map show routes
   putStrLn $ unlines $ map show origins
 
---print $ getASPathOrigin attributes
+-- print $ getASPathOrigin attributes

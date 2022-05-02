@@ -47,7 +47,7 @@ initSource peer startPrefix tableSize groupSize burstSize burstDelay oneShotMode
                 if n < tableSize
                   then do
                     when (burstDelay /= 0) (threadDelay $ 10 ^ 3 * burstDelay)
-                    let burst = concatMap (update peer startPrefix tableSize groupSize) [n .. min tableSize (n + burstSize) -1]
+                    let burst = concatMap (update peer startPrefix tableSize groupSize) [n .. min tableSize (n + burstSize) - 1]
 
                         burst' = if n == 0 then markFirst burst else burst
                         burst'' = if n + burstSize >= tableSize then markLast burst' else burst'
@@ -68,13 +68,13 @@ initSource peer startPrefix tableSize groupSize burstSize burstDelay oneShotMode
                         threadDelay $ 10 ^ 6 * repeatDelay
                         -- this is not going to work for small values of hold timer
                         f mv
-                      else --return []
+                      else -- return []
 
                       -- empty list tells CustomRib that the update stream is now empty
                         return []
               else do
                 when (burstDelay /= 0) (threadDelay $ 10 ^ 3 * burstDelay)
-                return $ encodeUpdates $ concatMap (update peer startPrefix tableSize groupSize) [n .. n + burstSize -1]
+                return $ encodeUpdates $ concatMap (update peer startPrefix tableSize groupSize) [n .. n + burstSize - 1]
 
   return (f mv)
 
@@ -84,7 +84,7 @@ group startPrefix groupSize index = map ip4 $ seeds (ip4' ip) groupSize index
     (ip, prefixLength) = addrRangePair startPrefix
     ip4 = flip makeAddrRange prefixLength . fromHostAddress . byteSwap32 . flip shiftL (32 - prefixLength)
     ip4' = flip shiftR (32 - prefixLength) . byteSwap32 . toHostAddress
-    seeds base groupSize index = map (base + index * groupSize +) [0 .. groupSize -1]
+    seeds base groupSize index = map (base + index * groupSize +) [0 .. groupSize - 1]
 
 main = do
   s <- initSource dummyPeerData "192.168.0.0/24" 8 2 4 0 True 0

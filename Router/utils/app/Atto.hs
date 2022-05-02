@@ -19,7 +19,7 @@ main' = do
   parseCheck wireParser bs
 
 parseCheck p bs = do
-  --result <- return $ parseOnly p bs
+  -- result <- return $ parseOnly p bs
   result <- evaluate $ parseOnly p bs
   either
     (\s -> putStrLn $ "parse failed: " ++ s)
@@ -68,7 +68,7 @@ recodeCheck bs = do
       )
       (return)
       (parseOnly bgpParser1 wireMessage)
-  --let parsedMessage = fromRight undefined $ parseOnly bgpParser1 bs
+  -- let parsedMessage = fromRight undefined $ parseOnly bgpParser1 bs
   let recodedMessage = toStrict $ encode parsedMessage
   if bs == recodedMessage
     then return ()
@@ -86,21 +86,21 @@ main = do
   args <- getArgs
   if null args
     then do
-      --test "custom" $ mkUpdate [] [] [ "192.168.0.0/16"
+      -- test "custom" $ mkUpdate [] [] [ "192.168.0.0/16"
       test "update1" update1
       test "update2" update2
       test "update3" update3
       test "update4" update4
       test "update5" update5
-    else --test "eor" eor
-    --test "msg" msg
-    --test "update1" update1
-    --test "update2" update2
-    --test "update3" update3
-    --test "update4" update4
-    --test "update5" update4
-    --test "update7" update4
-    --test "update7" update4
+    else -- test "eor" eor
+    -- test "msg" msg
+    -- test "update1" update1
+    -- test "update2" update2
+    -- test "update3" update3
+    -- test "update4" update4
+    -- test "update5" update4
+    -- test "update7" update4
+    -- test "update7" update4
 
       if 1 == length args
         then do
@@ -130,5 +130,5 @@ main = do
       parseCheck wireParser bs
       parseCheck bgpParser bs
 
---timeIO "parseCheck wireParser" $ parseCheck wireParser bs
---timeIO "parseCheck bgpParser" $ parseCheck bgpParser bs
+-- timeIO "parseCheck wireParser" $ parseCheck wireParser bs
+-- timeIO "parseCheck bgpParser" $ parseCheck bgpParser bs

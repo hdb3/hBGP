@@ -49,8 +49,8 @@ showRibChange (prefix, Just a, Just b) = "Chg " ++ show prefix ++ " via " ++ pee
 showRibChange (prefix, Just a, Nothing) = "Del " ++ show prefix ++ " via " ++ peerName (fst a)
 
 -- wanted  - generic definintion for emptyRib
---emptyRib = mkRib compare :: MapRib
---emptyRib' = ([], emptyRib)
+-- emptyRib = mkRib compare :: MapRib
+-- emptyRib' = ([], emptyRib)
 buildUpdateSequence peer routes = RibDef.sequence $ map (makeUpdateAction peer) routes
   where
     makeUpdateAction peer (route, prefix) = update prefix peer route
