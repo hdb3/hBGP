@@ -1,93 +1,115 @@
-{-#LANGUAGE DuplicateRecordFields, RecordWildCards, OverloadedStrings #-}
-module ZServ.ZServ ( module ZServ.ZServ
-                   , module ZServ.ZMsg
-                   , module ZServ.ZMsgBinary
-                   , module ZServ.ZSpec
-                   , module ZServ.WireFormat
-                   , module ZServ.Debug ) where
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+
+module ZServ.ZServ
+  ( module ZServ.ZServ,
+    module ZServ.ZMsg,
+    module ZServ.ZMsgBinary,
+    module ZServ.ZSpec,
+    module ZServ.WireFormat,
+    module ZServ.Debug,
+  )
+where
+
 -- consider exporting some functions from System.IO.Streams, (as Streams?)
 
-import ZServ.ZMsg
-import ZServ.Debug
-import ZServ.ZSpec
-import ZServ.ZMsgBinary
-import ZServ.WireFormat
-
-import qualified System.IO.Streams as Streams
+import Data.Binary
 import qualified Data.ByteString.Lazy as L
-
+import Data.IP
 import Network.Socket
 import System.IO
-import Data.IP
+import qualified System.IO.Streams as Streams
 import System.IO.Streams.Attoparsec.ByteString
-import Data.Binary
+import ZServ.Debug
+import ZServ.WireFormat
+import ZServ.ZMsg
+import ZServ.ZMsgBinary
+import ZServ.ZSpec
 
-getZStreamInet address = getZStream ZClient ( SockAddrInet 2600 (toHostAddress address), AF_INET )
-getZStreamUnix path = getZStream ZClient ( SockAddrUnix path , AF_UNIX )
-getZServerStreamInet address = getZStream ZServer ( SockAddrInet 2600 (toHostAddress address), AF_INET )
-getZServerStreamUnix path = getZStream ZServer ( SockAddrUnix path , AF_UNIX )
+getZStreamInet address = getZStream ZClient (SockAddrInet 2600 (toHostAddress address), AF_INET)
 
-getZStream role (address,family) = do
-    sock <- socket family Stream defaultProtocol
-    connect sock address
-    putStrLn "connected"
-    handle <- socketToHandle sock ReadWriteMode
-    inputStream <- Streams.handleToInputStream handle
-    zStream <- parserToInputStream (zMessageParser role) inputStream
-    outputStream <- Streams.makeOutputStream $ \m -> case m of
-            Just zmsg -> L.hPut handle $ encode (ZMsgRaw 0 zmsg)
-            Nothing -> return () -- could close the handle/socket?
-    return (zStream,outputStream)
+getZStreamUnix path = getZStream ZClient (SockAddrUnix path, AF_UNIX)
 
-toIPv4Range ZPrefixV4{..} = makeAddrRange v4address (fromIntegral plen) 
+getZServerStreamInet address = getZStream ZServer (SockAddrInet 2600 (toHostAddress address), AF_INET)
 
-fromIPv4Range ipv4range = let (v4address, plen') = addrRangePair ipv4range 
-                              plen = fromIntegral plen' in ZPrefixV4{..}
+getZServerStreamUnix path = getZStream ZServer (SockAddrUnix path, AF_UNIX)
 
-routeBase = ZRoute { zrType = 9
-                   , zrFlags = 9
-                   , zrSafi = 1
-                   , zrPrefix = undefined
-                   , zrNextHops = []
-                   , zrDistance = Nothing
-                   , zrMetric = Nothing
-                   , zrMtu = Nothing
-                   , zrTag = Nothing
-                   }
+getZStream role (address, family) = do
+  sock <- socket family Stream defaultProtocol
+  connect sock address
+  putStrLn "connected"
+  handle <- socketToHandle sock ReadWriteMode
+  inputStream <- Streams.handleToInputStream handle
+  zStream <- parserToInputStream (zMessageParser role) inputStream
+  outputStream <- Streams.makeOutputStream $ \m -> case m of
+    Just zmsg -> L.hPut handle $ encode (ZMsgRaw 0 zmsg)
+    Nothing -> return () -- could close the handle/socket?
+  return (zStream, outputStream)
 
-addRoute stream pfx nh = let route = routeBase { zrPrefix = fromIPv4Range pfx, zrNextHops = [ZNHIPv4 nh] } :: ZRoute
-                         in Streams.write (Just $ ZMIPV4RouteAdd route ) stream
+toIPv4Range ZPrefixV4 {..} = makeAddrRange v4address (fromIntegral plen)
 
-delRoute stream pfx = let route = routeBase { zrPrefix = fromIPv4Range pfx } :: ZRoute
-                         in Streams.write (Just $ ZMIPV4RouteDelete route ) stream
+fromIPv4Range ipv4range =
+  let (v4address, plen') = addrRangePair ipv4range
+      plen = fromIntegral plen'
+   in ZPrefixV4 {..}
 
-zservRegister stream protocol = Streams.write (Just $ ZMHello protocol ) stream
-zservRequestRouterId = Streams.write (Just ZMQRouterIdAdd )
-zservRequestInterface = Streams.write (Just ZMQInterfaceAdd )
-zservRequestRedistributeSystem = Streams.write (Just $ ZMRedistributeAdd _ZEBRA_ROUTE_SYSTEM )
-zservRequestRedistributeKernel = Streams.write (Just $ ZMRedistributeAdd _ZEBRA_ROUTE_KERNEL )
+routeBase =
+  ZRoute
+    { zrType = 9,
+      zrFlags = 9,
+      zrSafi = 1,
+      zrPrefix = undefined,
+      zrNextHops = [],
+      zrDistance = Nothing,
+      zrMetric = Nothing,
+      zrMtu = Nothing,
+      zrTag = Nothing
+    }
+
+addRoute stream pfx nh =
+  let route = routeBase {zrPrefix = fromIPv4Range pfx, zrNextHops = [ZNHIPv4 nh]} :: ZRoute
+   in Streams.write (Just $ ZMIPV4RouteAdd route) stream
+
+delRoute stream pfx =
+  let route = routeBase {zrPrefix = fromIPv4Range pfx} :: ZRoute
+   in Streams.write (Just $ ZMIPV4RouteDelete route) stream
+
+zservRegister stream protocol = Streams.write (Just $ ZMHello protocol) stream
+
+zservRequestRouterId = Streams.write (Just ZMQRouterIdAdd)
+
+zservRequestInterface = Streams.write (Just ZMQInterfaceAdd)
+
+zservRequestRedistributeSystem = Streams.write (Just $ ZMRedistributeAdd _ZEBRA_ROUTE_SYSTEM)
+
+zservRequestRedistributeKernel = Streams.write (Just $ ZMRedistributeAdd _ZEBRA_ROUTE_KERNEL)
+
 zservRequestRedistributeConnected = Streams.write (Just $ ZMRedistributeAdd _ZEBRA_ROUTE_CONNECT)
-zservRequestRedistributeStatic = Streams.write (Just $ ZMRedistributeAdd _ZEBRA_ROUTE_STATIC )
-zservRequestRedistributeAll stream = zservRequestRedistributeSystem stream
-                                   >> zservRequestRedistributeKernel stream
-                                   >> zservRequestRedistributeConnected stream
-                                   >> zservRequestRedistributeStatic stream
 
+zservRequestRedistributeStatic = Streams.write (Just $ ZMRedistributeAdd _ZEBRA_ROUTE_STATIC)
 
-getZRoute :: ZMsg -> Maybe (AddrRange IPv4 , Maybe IPv4)
-getZRoute (ZMIPV4ServerRouteAdd ZServerRoute{..}) = Just (toIPv4Range zrPrefix, nextHop zrNextHops) where
-    nextHop ((ZNHIPv4Ifindex ip _):_) = Just ip
+zservRequestRedistributeAll stream =
+  zservRequestRedistributeSystem stream
+    >> zservRequestRedistributeKernel stream
+    >> zservRequestRedistributeConnected stream
+    >> zservRequestRedistributeStatic stream
+
+getZRoute :: ZMsg -> Maybe (AddrRange IPv4, Maybe IPv4)
+getZRoute (ZMIPV4ServerRouteAdd ZServerRoute {..}) = Just (toIPv4Range zrPrefix, nextHop zrNextHops)
+  where
+    nextHop ((ZNHIPv4Ifindex ip _) : _) = Just ip
     nextHop ([]) = Nothing
-
-getZRoute (ZMIPV4ServerRouteDelete ZServerRoute{..}) = Just (toIPv4Range zrPrefix, Nothing) where
-
-getZRoute (ZMInterfaceAddressAdd ZInterfaceAddressV4{..}) = Just ( makeAddrRange addressA (fromIntegral plen), Just "127.0.0.1")
- 
+getZRoute (ZMIPV4ServerRouteDelete ZServerRoute {..}) = Just (toIPv4Range zrPrefix, Nothing) where
+getZRoute (ZMInterfaceAddressAdd ZInterfaceAddressV4 {..}) = Just (makeAddrRange addressA (fromIntegral plen), Just "127.0.0.1")
 getZRoute _ = Nothing
 
 zservReadLoop stream = do
-    msg <- Streams.read stream
-    maybe ( putStrLn "end of messages")
-          ( \zMsg -> do print zMsg
-                        zservReadLoop stream )
-          msg
+  msg <- Streams.read stream
+  maybe
+    (putStrLn "end of messages")
+    ( \zMsg -> do
+        print zMsg
+        zservReadLoop stream
+    )
+    msg

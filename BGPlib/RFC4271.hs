@@ -1,8 +1,10 @@
-{-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+
 module BGPlib.RFC4271 where
-import Data.Word
 
 import BGPlib.LibCommon
+import Data.Word
 
 {-
          Name                       Value      Definition
@@ -16,37 +18,41 @@ import BGPlib.LibCommon
 -}
 
 _BGP_ORIGIN_IGP = 0 :: Word8
+
 _BGP_ORIGIN_EGP = 1 :: Word8
+
 _BGP_ORIGIN_INCOMPLETE = 2 :: Word8
 
-data EnumNotificationCode = InvalidNotificationError |
-                            NotificationMessageHeaderError |
-                            NotificationOPENMessageError |
-                            NotificationUPDATEMessageError |
-                            NotificationHoldTimerExpired |
-                            NotificationFiniteStateMachineError |
-                            NotificationCease
-                            deriving (Show, Eq, Generic, NFData)
+data EnumNotificationCode
+  = InvalidNotificationError
+  | NotificationMessageHeaderError
+  | NotificationOPENMessageError
+  | NotificationUPDATEMessageError
+  | NotificationHoldTimerExpired
+  | NotificationFiniteStateMachineError
+  | NotificationCease
+  deriving (Show, Eq, Generic, NFData)
 
 instance Enum EnumNotificationCode where
-    toEnum n | n == 0 = InvalidNotificationError
-             | n == 1 = NotificationMessageHeaderError
-             | n == 2 = NotificationOPENMessageError
-             | n == 3 = NotificationUPDATEMessageError
-             | n == 4 = NotificationHoldTimerExpired
-             | n == 5 = NotificationFiniteStateMachineError
-             | n == 6 = NotificationCease
+  toEnum n
+    | n == 0 = InvalidNotificationError
+    | n == 1 = NotificationMessageHeaderError
+    | n == 2 = NotificationOPENMessageError
+    | n == 3 = NotificationUPDATEMessageError
+    | n == 4 = NotificationHoldTimerExpired
+    | n == 5 = NotificationFiniteStateMachineError
+    | n == 6 = NotificationCease
 
-    fromEnum e | e == InvalidNotificationError = 0
-               | e == NotificationMessageHeaderError = 1
-               | e == NotificationOPENMessageError = 2
-               | e == NotificationUPDATEMessageError = 3
-               | e == NotificationHoldTimerExpired = 4
-               | e == NotificationFiniteStateMachineError = 5
-               | e == NotificationCease = 6
+  fromEnum e
+    | e == InvalidNotificationError = 0
+    | e == NotificationMessageHeaderError = 1
+    | e == NotificationOPENMessageError = 2
+    | e == NotificationUPDATEMessageError = 3
+    | e == NotificationHoldTimerExpired = 4
+    | e == NotificationFiniteStateMachineError = 5
+    | e == NotificationCease = 6
 
-instance EnumWord8 EnumNotificationCode where
-
+instance EnumWord8 EnumNotificationCode
 
 {-
 
@@ -87,7 +93,6 @@ instance EnumWord8 EnumNotificationCode where
 
 -}
 
-
 {-
 RFC4486:
 
@@ -106,29 +111,36 @@ RFC4486:
          8        Out of Resources
 -}
 
-_NotificationHeaderSubcodeConnectionNotSynchronized      = 1 :: Word8
-_NotificationHeaderSubcodeBadMessageLength               = 2 :: Word8
-_NotificationHeaderSubcodeBadMessageType                 = 3 :: Word8
+_NotificationHeaderSubcodeConnectionNotSynchronized = 1 :: Word8
 
-_NotificationCeaseSubcodeConnectionRejected              = 5 :: Word8
-_NotificationCeaseSubcodeConnectionCollisionResolution   = 7 :: Word8
+_NotificationHeaderSubcodeBadMessageLength = 2 :: Word8
+
+_NotificationHeaderSubcodeBadMessageType = 3 :: Word8
+
+_NotificationCeaseSubcodeConnectionRejected = 5 :: Word8
+
+_NotificationCeaseSubcodeConnectionCollisionResolution = 7 :: Word8
 
 type NotificationSubcode = Word8
+
 data EnumNotificationOpenSubcode = InvalidOpenSubcode | UnsupportedVersionNumber | BadPeerAS | BadBGPIdentifier | UnsupportedOptionalParameter | UnacceptableHoldTime
-                            deriving (Show,Eq)
+  deriving (Show, Eq)
+
 instance Enum EnumNotificationOpenSubcode where
-    toEnum n | n == 0 = InvalidOpenSubcode
-             | n == 1 = UnsupportedVersionNumber
-             | n == 2 = BadPeerAS
-             | n == 3 = BadBGPIdentifier
-             | n == 4 = UnsupportedOptionalParameter
-             | n == 6 = UnacceptableHoldTime
+  toEnum n
+    | n == 0 = InvalidOpenSubcode
+    | n == 1 = UnsupportedVersionNumber
+    | n == 2 = BadPeerAS
+    | n == 3 = BadBGPIdentifier
+    | n == 4 = UnsupportedOptionalParameter
+    | n == 6 = UnacceptableHoldTime
 
-    fromEnum e | e == InvalidOpenSubcode = 0
-               | e == UnsupportedVersionNumber = 1
-               | e == BadPeerAS = 2
-               | e == BadBGPIdentifier = 3
-               | e == UnsupportedOptionalParameter = 4
-               | e == UnacceptableHoldTime = 6
+  fromEnum e
+    | e == InvalidOpenSubcode = 0
+    | e == UnsupportedVersionNumber = 1
+    | e == BadPeerAS = 2
+    | e == BadBGPIdentifier = 3
+    | e == UnsupportedOptionalParameter = 4
+    | e == UnacceptableHoldTime = 6
 
-instance EnumWord8 EnumNotificationOpenSubcode where
+instance EnumWord8 EnumNotificationOpenSubcode

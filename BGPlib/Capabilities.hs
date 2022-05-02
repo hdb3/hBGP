@@ -146,49 +146,50 @@ parseOptionalParameters n
   | n == 0 = return []
   | n == 1 = error "parseOptionalParameters: invalid length: 1"
   | otherwise = do
-    t <- A.anyWord8
-    l <- A.anyWord8
-    if n < l + 2
-      then error $ "parseOptionalParameters: invalid length n=" ++ show n ++ " l=" ++ show l ++ " t=" ++ show t
-      else do
-        p <-
-          if 2 == t
-            then parseCaps l
-            else do
-              _ <- A.take (fromIntegral l)
-              return []
-        px <- parseOptionalParameters (n -2 - l)
-        return (p ++ px)
+      t <- A.anyWord8
+      l <- A.anyWord8
+      if n < l + 2
+        then error $ "parseOptionalParameters: invalid length n=" ++ show n ++ " l=" ++ show l ++ " t=" ++ show t
+        else do
+          p <-
+            if 2 == t
+              then parseCaps l
+              else do
+                _ <- A.take (fromIntegral l)
+                return []
+          px <- parseOptionalParameters (n - 2 - l)
+          return (p ++ px)
   where
     parseCaps :: Word8 -> A.Parser [Capability]
     parseCaps 0 = return []
     parseCaps n
       | n == 1 = error "parseCaps: invalid length: 1"
       | otherwise = do
-        t <- A.anyWord8
-        l <- A.anyWord8
-        if n < l + 2
-          then error $ "parseCaps: invalid length n=" ++ show n ++ " l=" ++ show l ++ " t=" ++ show t
-          else do
-            cap <- parseCapability t l
-            caps <- parseCaps (n -2 - l)
-            return $ cap : caps
+          t <- A.anyWord8
+          l <- A.anyWord8
+          if n < l + 2
+            then error $ "parseCaps: invalid length n=" ++ show n ++ " l=" ++ show l ++ " t=" ++ show t
+            else do
+              cap <- parseCapability t l
+              caps <- parseCaps (n - 2 - l)
+              return $ cap : caps
     parseCapability :: Word8 -> Word8 -> A.Parser Capability
     parseCapability t l =
-      if  | t == _CapCodeMultiprotocol -> do
-            afi <- A.anyWord16be
-            _ <- A.anyWord8
-            CapMultiprotocol afi <$> A.anyWord8
+      if
+          | t == _CapCodeMultiprotocol -> do
+              afi <- A.anyWord16be
+              _ <- A.anyWord8
+              CapMultiprotocol afi <$> A.anyWord8
           | t == _CapCodeGracefulRestart -> do
-            word0 <- A.anyWord16be
-            let rFlag = testBit word0 15
-                restartTime = word0 .&. 0x0fff
-            return (CapGracefulRestart rFlag restartTime)
+              word0 <- A.anyWord16be
+              let rFlag = testBit word0 15
+                  restartTime = word0 .&. 0x0fff
+              return (CapGracefulRestart rFlag restartTime)
           | t == _CapCodeAS4 -> CapAS4 <$> A.anyWord32be
           | t == _CapCodeAddPath -> do
-            afi <- A.anyWord16be
-            safi <- A.anyWord8
-            CapAddPath afi safi <$> A.anyWord8
+              afi <- A.anyWord16be
+              safi <- A.anyWord8
+              CapAddPath afi safi <$> A.anyWord8
           | t == _CapCodeRouteRefresh -> return CapRouteRefresh
           | t == _CapCodeEnhancedRouteRefresh -> return CapEnhancedRouteRefresh
           | t == _CapCodeCiscoRefresh -> return CapCiscoRefresh

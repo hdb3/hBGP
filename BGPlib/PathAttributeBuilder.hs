@@ -12,8 +12,8 @@ import BGPlib.Prefixes ()
 import ByteString.StrictBuilder
 import Control.Monad (unless)
 import qualified Data.Attoparsec.Binary as A
-import qualified Data.Attoparsec.ByteString as A
 import Data.Attoparsec.ByteString (Parser)
+import qualified Data.Attoparsec.ByteString as A
 import qualified Data.ByteString as B
 import Data.Word
 
@@ -70,52 +70,55 @@ attributesParser n
   | n == 0 = return []
   | n < 3 = error $ "attributesParser: invalid length: " ++ show n
   | otherwise = do
-    flags <- A.anyWord8
-    code' <- A.anyWord8
-    let code = decode8 code'
-    (hdrLen, len) <-
-      if extendedBitTest flags
-        then (4,) <$> A.anyWord16be
-        else (3,) . fromIntegral <$> A.anyWord8
-    unless (flagCheck flags code) (error $ "Bad Flags - flags=" ++ show flags ++ " code=" ++ show code' ++ " (" ++ show code ++ ")")
-    if n < len + hdrLen
-      then error $ "attributesParser: invalid length n=" ++ show n ++ " len=" ++ show len ++ " code=" ++ show code
-      else do
-        attr <- attributeParser len code
-        attrs <- attributesParser (n - hdrLen - len)
-        return $ attr : attrs
+      flags <- A.anyWord8
+      code' <- A.anyWord8
+      let code = decode8 code'
+      (hdrLen, len) <-
+        if extendedBitTest flags
+          then (4,) <$> A.anyWord16be
+          else (3,) . fromIntegral <$> A.anyWord8
+      unless (flagCheck flags code) (error $ "Bad Flags - flags=" ++ show flags ++ " code=" ++ show code' ++ " (" ++ show code ++ ")")
+      if n < len + hdrLen
+        then error $ "attributesParser: invalid length n=" ++ show n ++ " len=" ++ show len ++ " code=" ++ show code
+        else do
+          attr <- attributeParser len code
+          attrs <- attributesParser (n - hdrLen - len)
+          return $ attr : attrs
   where
     {-# INLINE attributeParser #-}
     attributeParser :: Word16 -> PathAttributeTypeCode -> Parser PathAttribute
     attributeParser len code =
-      if  | TypeCodePathAttributeOrigin == code -> do
-            unless (len == 1) (error "Bad Length")
-            v <- A.anyWord8
-            unless (v < 3) (error "Bad Origin Code")
-            return $ PathAttributeOrigin v
+      if
+          | TypeCodePathAttributeOrigin == code -> do
+              unless (len == 1) (error "Bad Length")
+              v <- A.anyWord8
+              unless (v < 3) (error "Bad Origin Code")
+              return $ PathAttributeOrigin v
           | TypeCodePathAttributeASPath == code -> PathAttributeASPath <$> parseASPath len
           | TypeCodePathAttributeNextHop == code -> PathAttributeNextHop . fromHostAddress <$> A.anyWord32le
           | TypeCodePathAttributeMultiExitDisc == code ->
-            PathAttributeMultiExitDisc <$> A.anyWord32be
+              PathAttributeMultiExitDisc <$> A.anyWord32be
           | TypeCodePathAttributeLocalPref == code ->
-            PathAttributeLocalPref <$> A.anyWord32be
+              PathAttributeLocalPref <$> A.anyWord32be
           | TypeCodePathAttributeAtomicAggregate == code -> return PathAttributeAtomicAggregate
           | TypeCodePathAttributeAggregator == code -> do
-            as <-
-              if  | len == 6 -> fromIntegral <$> A.anyWord16be
-                  | len == 8 -> A.anyWord32be
-                  | otherwise -> error $ "Bad length in PathAttributeAggregator: " ++ show len
-            bgpid <- A.anyWord32be
-            return $ PathAttributeAggregator (as, fromHostAddress bgpid)
+              as <-
+                if
+                    | len == 6 -> fromIntegral <$> A.anyWord16be
+                    | len == 8 -> A.anyWord32be
+                    | otherwise -> error $ "Bad length in PathAttributeAggregator: " ++ show len
+              bgpid <- A.anyWord32be
+              return $ PathAttributeAggregator (as, fromHostAddress bgpid)
           | TypeCodePathAttributeCommunities == code -> PathAttributeCommunities <$> A.count (fromIntegral $ len `div` 4) A.anyWord32be
           | TypeCodePathAttributeMPREachNLRI == code -> PathAttributeMPREachNLRI <$> A.take (fromIntegral len)
           | TypeCodePathAttributeMPUnreachNLRI == code -> PathAttributeMPUnreachNLRI <$> A.take (fromIntegral len)
           | TypeCodePathAttributeExtendedCommunities == code -> PathAttributeExtendedCommunities <$> A.count (fromIntegral $ len `div` 8) A.anyWord64be
           | TypeCodePathAttributeAS4Path == code -> PathAttributeAS4Path <$> parseASPath len
-          | TypeCodePathAttributeAS4Aggregator == code -> PathAttributeAS4Aggregator <$> do
-            w0 <- A.anyWord32be
-            w1 <- A.anyWord32be
-            return (w0, w1)
+          | TypeCodePathAttributeAS4Aggregator == code ->
+              PathAttributeAS4Aggregator <$> do
+                w0 <- A.anyWord32be
+                w1 <- A.anyWord32be
+                return (w0, w1)
           | TypeCodePathAttributeConnector == code -> PathAttributeConnector <$> A.take (fromIntegral len)
           | TypeCodePathAttributeASPathlimit == code -> PathAttributeASPathlimit <$> A.take (fromIntegral len)
           | TypeCodePathAttributeLargeCommunity == code -> PathAttributeLargeCommunity <$> A.count (fromIntegral $ len `div` 12) get3word32be

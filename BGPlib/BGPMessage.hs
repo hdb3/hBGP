@@ -40,7 +40,8 @@ data BGPMessage
 instance Show BGPMessage where
   show BGPOpen {..} = "Open {AS: " ++ show myAutonomousSystem ++ " Hold-time: " ++ show holdTime ++ " BGPID: " ++ show bgpID ++ " Caps: " ++ show caps ++ "}"
   show BGPUpdate {..} =
-    if  | null attributes -> "Update {}"
+    if
+        | null attributes -> "Update {}"
         | null nlri -> "Update {attributes = " ++ show attributes ++ "}"
         | null withdrawn -> "Update {nlri = " ++ show nlri ++ ", attributes = " ++ show attributes ++ "}"
         | otherwise -> "Update {withdrawn = " ++ show withdrawn ++ ", nlri = " ++ show nlri ++ ", attributes = " ++ show attributes ++ "}"

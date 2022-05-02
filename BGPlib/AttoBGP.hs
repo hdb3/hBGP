@@ -5,11 +5,11 @@ import BGPlib.Capabilities (parseOptionalParameters)
 import BGPlib.LibCommon (decode8, fromHostAddress)
 import BGPlib.PathAttributeBuilder (attributesParser)
 import BGPlib.Prefixes
-import Control.Applicative ((<|>), Alternative, liftA2)
+import Control.Applicative (Alternative, liftA2, (<|>))
 import Control.Monad (unless)
 import qualified Data.Attoparsec.Binary as A
-import qualified Data.Attoparsec.ByteString as A
 import Data.Attoparsec.ByteString (Parser)
+import qualified Data.Attoparsec.ByteString as A
 import Data.Bits
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
@@ -37,7 +37,7 @@ wireParser1 = do
             then fail $ "invalid type code (" ++ show typeCode ++ ")"
             else A.take (length - 18)
 
---bgpParser = A.many1 bgpParser1 A.<?>  "BGP intermediate format Parser"
+-- bgpParser = A.many1 bgpParser1 A.<?>  "BGP intermediate format Parser"
 
 bgpParser :: Parser [BGPMessage]
 bgpParser = many1Till bgpParser1 A.atEnd
@@ -92,9 +92,9 @@ bgpParser1 = do
 
 -- choosing different versions of the prefix parser via parseX:
 
---parseX = inline parse1 -- this is the original recursive parser
+-- parseX = inline parse1 -- this is the original recursive parser
 parseX = parse2 -- this is the case statement parser
-  --parseX = inline parse3 -- this is the simplified version of parse2
+-- parseX = inline parse3 -- this is the simplified version of parse2
 
 prefixBuilder (a, b) = mkPrefix a b
 
@@ -104,12 +104,12 @@ prefixBuilder (a, b) = mkPrefix a b
 -- Implementation
 -- The signature of a recursive parser is thus: -}
 
---parsePrefixes :: Int -> Parser [Prefix]
+-- parsePrefixes :: Int -> Parser [Prefix]
 {-# INLINE parsePrefixes' #-}
 
 parsePrefixes n = parsePrefixes' n []
 
---parsePrefixes' :: Int -> [Prefix] -> Parser [Prefix]
+-- parsePrefixes' :: Int -> [Prefix] -> Parser [Prefix]
 -- The parser is initialized with an empty list and the buffer size.
 -- The recursion terminates when the available buffer is ==0
 
@@ -119,7 +119,7 @@ parsePrefixes' n prefixes = do
   prefixBitLen <- A.anyWord8
   let prefixByteLen = fromIntegral $ (prefixBitLen + 7) `div` 8
   prefix <- parseX prefixByteLen
-  parsePrefixes' (n - prefixByteLen -1) (prefixBuilder (prefixBitLen, prefix) : prefixes)
+  parsePrefixes' (n - prefixByteLen - 1) (prefixBuilder (prefixBitLen, prefix) : prefixes)
 
 -- This leaves it to define parse1:
 --     parse1 :: Int -> Parser Word32
@@ -131,14 +131,14 @@ parsePrefixes' n prefixes = do
 
 {-# INLINE parse1a #-}
 parse1a :: Word32 -> Int -> Parser Word32
---The first parmeter is the accumulator, the second reflects the remaining byte count.
+-- The first parmeter is the accumulator, the second reflects the remaining byte count.
 
 parse1a acc 0 = return acc
 parse1a acc byteIndex = do
   next <- fromIntegral <$> A.anyWord8
-  parse1a (unsafeShiftL acc 8 .|. next) (byteIndex -1)
+  parse1a (unsafeShiftL acc 8 .|. next) (byteIndex - 1)
 
---The full prefix parser is thus
+-- The full prefix parser is thus
 {-# INLINE parse1 #-}
 parse1 :: Int -> Parser Word32
 parse1 byteLength = flip unsafeShiftL (8 * (4 - byteLength)) <$> parse1a 0 byteLength

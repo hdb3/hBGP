@@ -1,9 +1,9 @@
 module MRTBuilder (hPutUpdates) where
 
+import ByteString.StrictBuilder
 import Data.Bits (unsafeShiftR)
 import qualified Data.ByteString as B
-import ByteString.StrictBuilder
-import Data.ByteString.Builder(hPutBuilder)
+import Data.ByteString.Builder (hPutBuilder)
 import Data.IP (toHostAddress)
 import Data.Word
 import MRTlib
@@ -13,7 +13,7 @@ byteStringCopy :: B.ByteString -> Builder
 byteStringCopy = bytes
 
 hPutUpdates :: Handle -> [(BGPAttributes, IP4PrefixList)] -> IO ()
-hPutUpdates handle routes = hPutBuilder handle $  builderChunksBuilder (updatesBuilder routes)
+hPutUpdates handle routes = hPutBuilder handle $ builderChunksBuilder (updatesBuilder routes)
 
 updatesBuilder :: [(BGPAttributes, IP4PrefixList)] -> Builder
 updatesBuilder = foldr (\(a1, a2) b -> updateBuilder 4096 a1 a2 <> b) mempty
@@ -91,24 +91,24 @@ prefixBuilder :: IP4Prefix -> Builder
 prefixBuilder (ipV4, subnet)
   --
   | subnet == 0 =
-    word8 0
+      word8 0
   --
   | subnet < 9 =
-    word8 subnet <> word8 (fromIntegral $ unsafeShiftR ip 24)
+      word8 subnet <> word8 (fromIntegral $ unsafeShiftR ip 24)
   --
   | subnet < 17 =
-    word8 subnet <> word16BE (fromIntegral $ unsafeShiftR ip 16)
+      word8 subnet <> word16BE (fromIntegral $ unsafeShiftR ip 16)
   --
   | subnet < 25 =
-    word8 subnet <> word16BE (fromIntegral $ unsafeShiftR ip 16)
-      <> word8
-        (fromIntegral $ unsafeShiftR ip 8)
+      word8 subnet <> word16BE (fromIntegral $ unsafeShiftR ip 16)
+        <> word8
+          (fromIntegral $ unsafeShiftR ip 8)
   --
   | subnet < 33 =
-    word8 subnet <> word32BE ip
+      word8 subnet <> word32BE ip
   --
   | otherwise =
-    error "unreasonable subnet length > 32"
+      error "unreasonable subnet length > 32"
   where
     --
 

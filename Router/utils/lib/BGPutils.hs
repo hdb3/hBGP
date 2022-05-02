@@ -1,3 +1,3 @@
-module BGPutils(reportPaths) where
+module BGPutils (reportPaths) where
 
-import ASPathReader(reportPaths)
+import ASPathReader (reportPaths)
