@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiWayIf #-}
+
 {-# LANGUAGE OverloadedStrings #-}
 
 module Router.BGPPingParser

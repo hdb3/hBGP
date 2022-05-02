@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiWayIf #-}
+
 
 module Main where
 

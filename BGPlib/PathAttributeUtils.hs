@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiWayIf #-}
+
 {-# LANGUAGE OverloadedStrings #-}
 
 module BGPlib.PathAttributeUtils where
