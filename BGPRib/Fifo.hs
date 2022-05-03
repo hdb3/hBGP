@@ -1,7 +1,10 @@
 module BGPRib.Fifo where
 
 import Control.Concurrent
+import Control.Exception
+import Control.Logger.Simple
 import Data.Maybe (fromMaybe)
+import qualified Data.Text as T
 
 type Fifo t = MVar ([t], [t])
 
@@ -18,14 +21,23 @@ enqueueN mvar items = do
   maybeFifo <- tryTakeMVar mvar
   let (h, t) = fromMaybe ([], []) maybeFifo
       cat [] bx = bx
-      cat (a : []) bx = a : bx
+      cat [a] bx = a : bx
       cat (a : ax) bx = cat ax (a : ax)
   putMVar mvar (cat items h, t)
 
 dequeue :: MVar ([a], [a]) -> IO [a]
-dequeue mvar = do
-  (h, t) <- takeMVar mvar
-  return (t ++ reverse h)
+dequeue mvar =
+  catch
+    ( do
+        (h, t) <- takeMVar mvar
+        return (t ++ reverse h)
+    )
+    ( \BlockedIndefinitelyOnMVar -> do
+        logTrace "dequeue exit on BlockedIndefinitelyOnMVar"
+        return []
+        -- since the empty list is never returned under normal operation,
+        -- an empty list is used to signal that the MVar peer thread has exited and the stream has closed
+    )
 
 -- this is a non-blocking call which will return an empty list when there are no items in the queue
 -- WARNING - this function UNTESTED

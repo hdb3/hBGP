@@ -1,0 +1,26 @@
+I changed the display colours for simple logger (https://github.com/agrafix/simple-logger) because the Trace messages were black-on-black.
+In order to use the local version I added the following line in cabal.project:
+
+packages: hbgp.cabal
+          /home/nic/src/simple-logger
+
+The patch I made is this:
+
+diff --git a/src/Control/Logger/Simple.hs b/src/Control/Logger/Simple.hs
+index 3adf3d2..2407183 100644
+--- a/src/Control/Logger/Simple.hs
++++ b/src/Control/Logger/Simple.hs
+@@ -141,9 +141,9 @@ doLog ll loc txt =
+             "\o33[0;0m"
+         renderColor =
+             case ll of
+-              LogTrace -> "\o33[0;34m"
+-              LogDebug -> "\o33[0;35m"
+-              LogInfo -> "\o33[0;36m"
++              LogTrace -> "\o33[0;30m"
++              LogDebug -> "\o33[0;34m"
++              LogInfo -> "\o33[0;34m"
+               LogNote -> "\o33[1;32m"
+               LogWarn -> "\o33[0;33m"
+               LogError -> "\o33[1;31m"
+

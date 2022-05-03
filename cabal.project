@@ -1,8 +1,9 @@
 packages: hbgp.cabal
+          /home/nic/src/simple-logger
 optimization:        2
-profiling: False
+profiling: True
 jobs: 4
-executable-stripping: True
+executable-stripping: False
 package hbgp
   ghc-options: -threaded -with-rtsopts="-N"
 --   ghc-options: -threaded -with-rtsopts="-N" -prof -fprof-auto  -fexternal-interpreter -rtsopts

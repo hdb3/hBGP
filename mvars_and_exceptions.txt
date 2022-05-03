@@ -1,0 +1,15 @@
+MVar can become dead when the 'sender' exits.
+In this case an exception is raised if an attempt is made to read the MVar which can never complete.
+The code in Fifo.hs handles this.
+As a side note, the exception is still raised and is shown when running with profiling etc:
+the profiling is enabled in this case by using the cabal file setting in cabal.project: "profiling: True",
+and at run time adding " +RTS -xc".
+A general exceptin handler looks like this:
+
+dequeueAll mvar =
+  catch
+    (dequeue mvar)
+    ( \(e) -> do
+        logTrace $ T.pack $ "unexpected exception" ++ show (e :: SomeException)
+        return []
+    )
