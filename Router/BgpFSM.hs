@@ -36,10 +36,6 @@ data BGPState = St
 
 type F = BGPState -> IO (FSMState, BGPState)
 
-trace = logTrace . T.pack
-
-warn = logWarn . T.pack
-
 data FSMState = StateConnected | StateOpenSent | StateOpenConfirm | ToEstablished | Established | Idle deriving (Show, Eq)
 
 bgpFSM :: Global -> (Socket, SockAddr) -> IO ()
@@ -72,8 +68,8 @@ bgpFSM global@Global {..} (sock, peerName) =
     deregister collisionDetector
     Rib.delPeerByAddress rib (fromIntegral remotePort) (fromHostAddress remoteIP)
     either
-      (\s -> warn $ "BGPfsm exception exit" ++ s)
-      (\s -> trace $ "BGPfsm normal exit" ++ s)
+      (\s -> logWarn . T.pack $ "BGPfsm exception exit" ++ s)
+      (\s -> logTrace $ T.pack $ "BGPfsm normal exit" ++ s)
       fsmExitStatus
 
 initialiseOSM :: Global -> PeerConfig -> OpenStateMachine
@@ -129,7 +125,7 @@ startFSM g@Global {..} socketName peerName handle =
                 }
         exitState <- actions (StateConnected, initBGPState)
         maybe
-          (warn "FSM exit without defined peer")
+          (logWarn "FSM exit without defined peer")
           (writeChan monitorChannel . Left)
           (maybePD exitState)
         return $ Right "FSM normal exit"
@@ -153,14 +149,14 @@ startFSM g@Global {..} socketName peerName handle =
       msg <- bgpRcv handle delayOpenTimer
       case msg of
         BGPTimeout -> do
-          trace "stateConnected - event: delay open expiry"
+          logTrace "stateConnected - event: delay open expiry"
           bgpSnd (localOffer osm)
-          trace "stateConnected -> stateOpenSent"
+          logTrace "stateConnected -> stateOpenSent"
           return (StateOpenSent, st)
         open@BGPOpen {} -> do
           let osm' = updateOpenStateMachine osm open
               resp = getResponse osm'
-          trace "stateConnected - event: rcv open"
+          logTrace "stateConnected - event: rcv open"
           collision <- collisionCheck collisionDetector (myBGPid gd) (bgpID open)
           if isJust collision
             then do
@@ -169,7 +165,7 @@ startFSM g@Global {..} socketName peerName handle =
             else
               if isKeepalive resp
                 then do
-                  trace "stateConnected -> stateOpenConfirm"
+                  logTrace "stateConnected -> stateOpenConfirm"
                   bgpSnd (localOffer osm)
                   bgpSnd resp
                   return (StateOpenConfirm, st {osm = osm'})
@@ -195,7 +191,7 @@ startFSM g@Global {..} socketName peerName handle =
         open@BGPOpen {} -> do
           let osm' = updateOpenStateMachine osm open
               resp = getResponse osm'
-          trace "stateOpenSent - rcv open"
+          logTrace "stateOpenSent - rcv open"
           collision <- collisionCheck collisionDetector (myBGPid gd) (bgpID open)
           if isJust collision
             then do
@@ -205,7 +201,7 @@ startFSM g@Global {..} socketName peerName handle =
               if isKeepalive resp
                 then do
                   bgpSnd resp
-                  trace "stateOpenSent -> stateOpenConfirm"
+                  logTrace "stateOpenSent -> stateOpenConfirm"
                   return (StateOpenConfirm, st {osm = osm'})
                 else do
                   bgpSnd resp
@@ -224,7 +220,7 @@ startFSM g@Global {..} socketName peerName handle =
           bgpSnd $ BGPNotify NotificationHoldTimerExpired 0 L.empty
           idle st "stateOpenConfirm - error Hold Timer expiry"
         BGPKeepalive -> do
-          trace "stateOpenConfirm - rcv keepalive"
+          logTrace "stateOpenConfirm - rcv keepalive"
           return (ToEstablished, st)
         BGPNotify {} -> idle st "stateOpenConfirm - rcv notify"
         _ -> do
@@ -234,8 +230,8 @@ startFSM g@Global {..} socketName peerName handle =
     -- ToEstablished
     --
     action (ToEstablished, st@St {..}) = do
-      trace "transition -> established"
-      trace $ "hold timer: " ++ show (getNegotiatedHoldTime osm) ++ " keep alive timer: " ++ show (getKeepAliveTimer osm)
+      logTrace "transition -> established"
+      logTrace $ T.pack $ "hold timer: " ++ show (getNegotiatedHoldTime osm) ++ " keep alive timer: " ++ show (getKeepAliveTimer osm)
       -- only now can we create the peer data record becasue we have the remote AS/BGPID available and confirmed
 
       let globalData = gd
@@ -269,7 +265,7 @@ startFSM g@Global {..} socketName peerName handle =
           void $ Rib.ribPush (fromJust ribHandle) NullUpdate
           return (Established, st)
         update@BGPUpdate {} -> do
-          trace "established: BGPUpdate"
+          logTrace "established: BGPUpdate"
           Rib.ribPush (fromJust ribHandle) (parseUpdate update)
           return (Established, st)
         BGPNotify {} -> idle st "established - rcv notify"
@@ -282,7 +278,7 @@ startFSM g@Global {..} socketName peerName handle =
           idle st $ "established - FSM error (" ++ show msg ++ ")"
 
     idle st s = do
-      trace $ "IDLE - reason: " ++ s
+      logTrace $ T.pack $ "IDLE - reason: " ++ s
       return (Idle, st)
     -- collisionCheck
     -- manage cases where there is an established connection (always reject)
@@ -322,7 +318,7 @@ startFSM g@Global {..} socketName peerName handle =
               -- The empty list represents a failure to find the peer in the list of current peers
               -- Which transient condition arises when the parent process has exited.
               _ -> do
-                trace $ "sendloop: updates (" ++ show (length updates) ++ ")"
+                logTrace $ T.pack $ "sendloop: updates (" ++ show (length updates) ++ ")"
                 bgpSndAll updates
                 sendLoop rh modifiedFilterState
         )
@@ -336,12 +332,12 @@ startFSM g@Global {..} socketName peerName handle =
           catch
             ( do
                 threadDelay (1000000 * timer)
-                trace "keepaliveLoop send"
+                logTrace "keepaliveLoop send"
                 bgpSnd BGPKeepalive
                 keepaliveLoop handle timer
             )
             ( \(BGPIOException _) -> do
                 -- this is the standard way to close down this thread
-                trace "keepaliveLoop exit"
+                logTrace "keepaliveLoop exit"
                 return ()
             )
