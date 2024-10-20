@@ -5,7 +5,7 @@ import Control.Monad.Extra(when)
 import System.Timeout(timeout)
 import Data.Maybe(fromMaybe,catMaybes)
 import Data.Word
-import BGPlib.BGPlib hiding (nlri,withdrawn)
+import BGPlib.BGPlib (ParsedUpdate(..),BGPOutput,Prefix,makeUpdate,sortPathAttributes,setOrigin,setNextHop,setLocalPref,prePendAS,delLocalPref)
 import BGPRib.BGPRib
 import qualified BGPRib.BGPRib as BGPRib
 import Router.Log
@@ -90,8 +90,8 @@ buildUpdate target prefixes RouteData{..} = if isExternal target then egpUpdate 
                            )
 
 updateFromAdjRibEntrys :: Rib -> PeerData -> [AdjRIBEntry] -> IO [BGPOutput]
-updateFromAdjRibEntrys rib target xs = catMaybes <$> mapM updateFromAdjRibEntry xs 
+updateFromAdjRibEntrys rib target xs = catMaybes <$> mapM updateFromAdjRibEntry xs
     where
     updateFromAdjRibEntry :: AdjRIBEntry -> IO (Maybe BGPOutput)
-    updateFromAdjRibEntry (prefixes,routeHash) = 
+    updateFromAdjRibEntry (prefixes,routeHash) =
         fmap (\(route,prefixes') -> buildUpdate target prefixes' route) <$> lookupRoutes rib (prefixes,routeHash)
