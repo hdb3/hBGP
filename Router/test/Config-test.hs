@@ -1,30 +1,36 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
-
-import Capabilities
-import Config
-
+import BGPlib.BGPlib
+import Router.Config
 main = do
-    
+
     let config = Config { configAS = 200
                         , configBGPID = "192.168.122.1"
+                        , configListenAddress  = "192.168.122.1"
                         , configEnabledPeers = [ "192.168.122.236" ]
                         , configConfiguredPeers = [ peerConfig ]
                         , configDelayOpenTimer = 10
                         , configInitialHoldTimer = 300
                         , configAllowDynamicPeers = True
+                        , configEnableDataPlane = False
+                        , configEnableRedistribution= False
+                        , configTestRoutePath = ""
+                        , configTestRouteCount = 0
                         , configOfferedCapabilities = [ CapAS4 0 ]
                         , configRequiredCapabilities = [ CapAS4 0 ]
                         , configOfferedHoldTime = 120
                         }
 
-        peerConfig = PeerConfig { peerConfigIPv4 = "192.168.122.60"
+        peerConfig = PeerConfig { peerConfigIPv4 = ("192.168.122.60","192.168.122.1")
                                 , peerConfigAS = Just 200
                                 , peerConfigBGPID = Just "192.168.122.60"
+                                , peerConfigLocalAS = Nothing
+                                , peerConfigLocalBGPID = Nothing
                                 , peerConfigEnableOutbound = True
                                 , peerConfigEnableInbound = True
                                 , peerConfigOfferedCapabilities = [ CapAS4 0 ]
                                 , peerConfigRequiredCapabilities = [ CapAS4 0 ]
+                                , peerConfigLocalPref = 100
                                 }
 
     putStrLn "\nConfig:"

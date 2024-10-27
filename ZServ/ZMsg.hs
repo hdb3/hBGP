@@ -42,7 +42,7 @@ instance Show HexByteString where
 data ZNextHopRegister = ZNextHopRegister { connected :: Bool
                                          , prefix :: ZPrefix
                                          } deriving (Eq,Show,Read)
-  
+
 -- TODO better done as a single constructir with varian type fileds in IP4/6
 data ZInterfaceAddress = ZInterfaceAddressV4 { ifindex :: Word32
                                              , flags :: Word8
@@ -87,20 +87,6 @@ data ZNextHop = ZNHBlackhole
               | ZNHIPv6Ifindex IPv6 Word32
                 deriving (Eq,Show,Read)
 
--- ZServRoute exists because the protocol is not symmetric between client and server
--- when zserv sends routes it does it differently
-data ZServRoute = ZServRoute { zrType :: Word8
-                     , zrFlags :: Word8
-                     -- , zrSafi :: Word16
-                     , zrPrefix :: ZPrefix
-                     , zrNextHops :: [ZNextHop]
-                     , zrDistance :: Maybe Word8
-                     , zrMetric :: Maybe Word32
-                     , zrMtu :: Maybe Word32
-                     , zrTag :: Maybe Word32
-                     } deriving (Eq,Show,Read)
-
-
 data ZRoute = ZRoute { zrType :: Word8
                      , zrFlags :: Word8
                      , zrSafi :: Word16
@@ -114,7 +100,6 @@ data ZRoute = ZRoute { zrType :: Word8
 
 data ZServerRoute = ZServerRoute { zrType :: Word8
                      , zrFlags :: Word8
-                     -- , zrSafi :: Word16
                      , zrPrefix :: ZPrefix
                      , zrNextHops :: [ZNextHop]
                      , zrDistance :: Maybe Word8

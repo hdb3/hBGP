@@ -1,4 +1,4 @@
-cabal-version:       3.4
+cabal-version:       3.12
 name:                hbgp
 version:             3.0.0.2
 license:             Apache-2.0
@@ -13,17 +13,28 @@ build-type:          Simple
 common base
   other-extensions:   DataKinds, DuplicateRecordFields, RecordWildCards, MultiWayIf, OverloadedStrings, FlexibleInstances, TupleSections, Strict, MultiParamTypeClasses, FunctionalDependencies, ForeignFunctionInterface, TypeSynonymInstances, FlexibleContexts, DeriveGeneric, BangPatterns, ConstrainedClassMethods
   build-depends:      filepath, gitrev, transformers, haskeline, base , bytestring , iproute , attoparsec , attoparsec-binary , base16-bytestring , pretty-hex , io-streams , network , binary , containers , time , unix , sorted-list , hashable , unordered-containers , sorted-list , murmur-hash , extra , deepseq
-  default-language:   Haskell2010
+  default-language:   GHC2021
+  -- note - there is a lot of scope for linting, hence -Wno-x-partial
+  --      - -Wno-ambiguous-fields because the zserv module uses record update 
+  ghc-options:      -Wno-x-partial -Wno-ambiguous-fields
 
 common bgprib
   other-modules:      BGPRib.PT, BGPRib.AdjRIBOut , BGPRib.BGPData , BGPRib.BGPReader , BGPRib.BGPRib , BGPRib.BogonFilter , BGPRib.Common , BGPRib.Fifo , BGPRib.PathFilter , BGPRib.PrefixTable , BGPRib.PrefixTableUtils , BGPRib.Rib
+  default-language:   GHC2021
 
 common bgplib
   build-depends:	    base, binary, deepseq, iproute, network, bytestring, attoparsec, attoparsec-binary, hashable, base16-bytestring, bytestring-strict-builder, murmur-hash
   other-modules:      BGPlib.Update, BGPlib.PrefixBuilder, BGPlib.BGPHandle, BGPlib.AttoBGP , BGPlib.BGPMessage, BGPlib.ASPath, BGPlib.AttoBGP, BGPlib.BGPlib, BGPlib.Capabilities, BGPlib.Codes, BGPlib.LibCommon, BGPlib.PathAttributeUtils, BGPlib.PathAttributes, BGPlib.Prefixes, BGPlib.RFC4271, BGPlib.PathAttributeBuilder
-  default-language:   Haskell2010
+  default-language:   GHC2021
 
 executable hbgp
   import:             base , bgplib , bgprib
   other-modules:      Paths_hbgp , Router.Monitor, Router.Console, Router.BgpFSM , Router.Collision , Router.Config , Router.Global , Router.Log , Router.Open , Router.Redistributor , Router.StdRib , Session.Session , ZServ.Debug , ZServ.WireFormat , ZServ.ZMsg , ZServ.ZMsgBinary , ZServ.ZServ , ZServ.ZSpec
   main-is:            Router/Router.hs
+  default-language:   GHC2021
+
+executable config
+  import:             base , bgplib , bgprib
+  other-modules:      Paths_hbgp , Router.Monitor, Router.Console, Router.BgpFSM , Router.Collision , Router.Config , Router.Global , Router.Log , Router.Open , Router.Redistributor , Router.StdRib , Session.Session , ZServ.Debug , ZServ.WireFormat , ZServ.ZMsg , ZServ.ZMsgBinary , ZServ.ZServ , ZServ.ZSpec
+  main-is:            Router/test/Config-test.hs
+  default-language:   GHC2021

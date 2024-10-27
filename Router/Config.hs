@@ -5,7 +5,7 @@ module Router.Config where
 --         objective - allow concise specification of peers with default attributes
 --                     whilst distinguishing active and passive roles
 --                   - allow complete flexibility on attributes as required
---                   - reconsider the config defintion (JSON?), and whether
+--                   - reconsider the config definition (JSON?), and whether
 --                     the 'raw' config should be made available 'anonymously' from Global
 --                     (possibly yes, so that extensions can use custom configuration
 --                      without modifying top level code)
