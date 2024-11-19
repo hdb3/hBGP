@@ -17,8 +17,8 @@ hex32 x = zpad 8 $ Numeric.showHex x ""
 hex :: Int -> String
 hex x = Numeric.showHex x' "" where
   x' = fromIntegral x :: Word64
-fromHex = fst . Base16.decode
-fromHex' = L.fromStrict . fst . Base16.decode
+fromHex = Base16.decodeLenient
+fromHex' = L.fromStrict .  Base16.decodeLenient
 toHex = C8.unpack . Base16.encode
 toHex' = toHex . L.toStrict
 simpleHex' = simpleHex . L.toStrict
