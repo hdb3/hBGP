@@ -27,6 +27,7 @@ import Router.Log
 main :: IO ()
 main = do
     info banner
+    say $ "log level is " ++ (show logMode)
 
     (rawConfig, fileBaseName) <- getConfig
     config <- checkCapabilities rawConfig >>= fixCapabilities
