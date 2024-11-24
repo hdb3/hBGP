@@ -22,6 +22,15 @@ common bgplib
   build-depends:	    base, binary, deepseq, iproute, network, bytestring, attoparsec, attoparsec-binary, hashable, base16-bytestring, bytestring-strict-builder, murmur-hash
   other-modules:      BGPlib.Update, BGPlib.PrefixBuilder, BGPlib.BGPHandle, BGPlib.AttoBGP , BGPlib.BGPMessage, BGPlib.ASPath, BGPlib.AttoBGP, BGPlib.BGPlib, BGPlib.Capabilities, BGPlib.Codes, BGPlib.LibCommon, BGPlib.PathAttributeUtils, BGPlib.PathAttributes, BGPlib.Prefixes, BGPlib.RFC4271, BGPlib.PathAttributeBuilder
   default-language:   Haskell2010
+  cpp-options:         -DLOGMODE=Warn
+
+
+executable hbgp.event
+  import:             base , bgplib , bgprib
+  other-modules:      Paths_hbgp , Router.Monitor, Router.Console, Router.BgpFSM , Router.Collision , Router.Config , Router.Global , Router.Log , Router.Open , Router.Redistributor , Router.StdRib , Session.Session , ZServ.Debug , ZServ.WireFormat , ZServ.ZMsg , ZServ.ZMsgBinary , ZServ.ZServ , ZServ.ZSpec
+  main-is:            Router/Router.hs
+  default-language:   Haskell2010
+  cpp-options:         -DLOGMODE=Event
 
 executable hbgp
   import:             base , bgplib , bgprib
