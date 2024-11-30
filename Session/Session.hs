@@ -50,7 +50,7 @@ session port defaultApp localIPv4 peers enableInbound = do
     mapM_ ( forkIO . run state ) peers
     if enableInbound then
         listener state
-    else 
+    else
         forever (threadDelay $ 10^12)
     where
 
@@ -106,7 +106,7 @@ listener state@State{..} = do
                    if | errno == 13 -> die "permission error binding port (are you su?) (or try: sysctl net.ipv4.ip_unprivileged_port_start=179?)"
                       | errno == 99 -> die "address error binding port - host configuration mismatch?"
                       | errno `elem` [98] -> do hPutStrLn stderr "waiting to bind port"
-                                                threadDelay (10 * seconds)
+                                                threadDelay (1 * seconds)
                                                 listener state
                       | otherwise -> error $ errReport' errno e )
         ( \(listeningSocket,_) -> forever ( do s <- NS.accept listeningSocket

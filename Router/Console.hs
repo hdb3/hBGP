@@ -7,7 +7,7 @@ import Control.Monad(void)
 import Data.Maybe(fromMaybe)
 import Data.IP
 import Text.Read hiding (lift)
-import System.IO(hFlush,stdout)
+import System.IO(hFlush,stdout,stdin,hIsTerminalDevice)
 import Data.Char(toLower)
 import Data.Word(Word32)
 import System.Console.Haskeline
@@ -20,10 +20,15 @@ import Router.Global
 
 startConsole :: Global -> IO ()
 startConsole global = do
-   let push v = lift $ ribPush (rib global) (localPeer $ gd global) v
-       exit = lift $ putMVar (exitFlag global) ()
-       consoleThread = runInputT defaultSettings $ console $ CState push exit global [] [] "0.0.0.0" 100 (routerName global ++ " # ")
-   void $ forkIO consoleThread
+    isTTY <- hIsTerminalDevice stdin
+    if isTTY
+        then do
+            let push v = lift $ ribPush (rib global) (localPeer $ gd global) v
+                exit = lift $ putMVar (exitFlag global) ()
+                consoleThread = runInputT defaultSettings $ console $ CState push exit global [] [] "0.0.0.0" 100 (routerName global ++ " # ")
+            void $ forkIO consoleThread
+        else
+            putStrLn "Console closed, stdin is not TTY"
 
 data CState = CState { push :: ParsedUpdate -> InputT IO ()
                      , exit :: InputT IO ()
@@ -51,7 +56,7 @@ withdrawFrom CState{..} = push ( bgpWithdraw csNlri )
 
 console :: CState -> InputT IO ()
 console cstate@CState{..} = do
-    
+
     inputM <- getInputLine csPrompt
     let input = fromMaybe "" inputM
         (command:px) = words input ++ repeat ""
@@ -83,7 +88,7 @@ console cstate@CState{..} = do
                                console cstate {csPath = p}
                      )
                      (parsePath $ px !! 0)
-        
+
         "n" -> maybe (outputStrLn "couldn't parse prefixes")
                      (\p -> do outputStrLn $ "nlri: " ++ show p
                                console cstate {csNlri = p}
@@ -96,7 +101,7 @@ console cstate@CState{..} = do
                      )
                      (parseWord32 $ px !! 0)
 
-        "x" -> outputStrLn "goodbye" >> exit                  
+        "x" -> outputStrLn "goodbye" >> exit
 
         _   -> outputStrLn "couldn't parse a command - try Show / Path / nH / Nlri / Local preference / Update / Withdraw / Quit"
 
