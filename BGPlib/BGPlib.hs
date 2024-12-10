@@ -1,3 +1,4 @@
+{-# LANGUAGE DuplicateRecordFields #-}
 module BGPlib.BGPlib
   ( module BGPlib.BGPMessage,
     module BGPlib.BGPHandle,

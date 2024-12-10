@@ -1,6 +1,9 @@
 {-# LANGUAGE DuplicateRecordFields,RecordWildCards,TemplateHaskell #-}
 module Main where
 
+import Data.Yaml
+import qualified Data.ByteString as B
+import Text.Read(readEither)
 import Development.GitRev
 import Paths_hbgp(version)
 import Data.Version(showVersion)
@@ -29,40 +32,48 @@ main = do
     info banner
     say $ "log level is " ++ (show logMode)
 
-    (rawConfig, fileBaseName) <- getConfig
-    config <- checkCapabilities rawConfig >>= fixCapabilities
+    getConfig >>=  maybe
+        exitFailure
+        (\(rawConfig, fileBaseName) -> do
+            config <- checkCapabilities rawConfig >>= fixCapabilities
+            global <- buildGlobal config fileBaseName
+            _ <- forkIO (redistribute global)
+            _ <- forkIO (startConsole global)
+            _ <- forkIO (startMonitor global)
 
-    global <- buildGlobal config fileBaseName
+            let
+                app = bgpFSM global
 
+            debug $ "connecting to " ++ show (activePeers config)
+            debug $ "activeOnly = " ++ show (activeOnly config)
+            _ <- forkIO $ Session.session 179 app (configListenAddress config) (activePeers config) (not $ activeOnly config)
+            info $ "Router " ++ fileBaseName ++ " ready"
+            takeMVar (exitFlag global))
+            -- graceful cleanup would have to be called here
+            -- currently, sessions just fall of a cliff edge (TCP reset)
 
-    _ <- forkIO (redistribute global)
-    _ <- forkIO (startConsole global)
-    _ <- forkIO (startMonitor global)
-
-    let
-        app = bgpFSM global
-
-    debug $ "connecting to " ++ show (activePeers config)
-    debug $ "activeOnly = " ++ show (activeOnly config)
-    _ <- forkIO $ Session.session 179 app (configListenAddress config) (activePeers config) (not $ activeOnly config)
-    info $ "Router " ++ fileBaseName ++ " ready"
-    takeMVar (exitFlag global)
-    -- gracefull cleanup would have to be called here
-    -- currently, sessions just fall of a cliff edge (TCP reset)
 
 banner = "hbgp " ++ showVersion version
          ++ if "master" == $(gitBranch) then "" else " (" ++ $(gitBranch)++ ")"
 
-getConfig :: IO (Config, String)
+getConfig :: IO (Maybe (Config, String))
 getConfig = do
     args <- getArgs
     unless (null $ intersect args ["--version","-V","-v"]) exitSuccess
 
     let (configPath,configName) = if null args then ("bgp.conf","Router") else (head args, takeBaseName $ head args)
-    
-    configString <- readFile configPath
-    let rawConfig = read configString :: Config
-    return (buildPeerConfigs rawConfig,configName)
+
+    configString <- B.readFile configPath
+
+    let config = decodeEither' configString :: Either ParseException Config
+
+    either
+        (\errMsg -> do putStrLn $ "failed to read config from "++ configPath ++ " " ++ show errMsg
+                       return Nothing)
+        (\config -> do putStrLn $ "starting config from "++ configPath
+                       return $ Just (buildPeerConfigs config,configName))
+        config
+
 
 buildGlobal :: Config -> String -> IO Global
 buildGlobal c@Config{..} configName = do
@@ -75,7 +86,7 @@ buildGlobal c@Config{..} configName = do
         initialHoldTimer = configInitialHoldTimer
 
         -- TODO  - configure this in configuration file
-        listenAddress = SockAddrInet 179 0 -- listen on all intefaces by default...
+        listenAddress = SockAddrInet 179 0 -- listen on all interfaces by default...
 
         -- TODO the map creation should be in Config...
         peerMap = Data.Map.fromList $ map (\pc -> (peerConfigIPv4 pc,pc)) configConfiguredPeers

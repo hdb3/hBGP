@@ -1,6 +1,9 @@
-{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE MultiWayIf, DeriveGeneric #-}
 
 module BGPlib.Capabilities where
+
+import GHC.Generics
+import Data.Aeson
 
 import ByteString.StrictBuilder
 import qualified Data.Attoparsec.Binary as A
@@ -65,7 +68,7 @@ RFC5492:
          according to the value of the Capability Code field.
 
 An additional complexity for parsing is that an Open message may contain more than one Capability Optional Parameter.
-So an outer parser for Optional Parameters must collect Capabilities and assemple them into a single list.
+So an outer parser for Optional Parameters must collect Capabilities and assemble them into a single list.
 In the first instance this parser need only return Capabilities, even though in principle other parameters are possible.
 This should reflect the structure used for the Open variant of the (parsed) BGPMessage
 
@@ -81,8 +84,11 @@ data Capability
   | CapCiscoRefresh
   | CapEnhancedRouteRefresh
   | CapExtendedLength
-  | CapUnknown Word8 B.ByteString
-  deriving (Show, Eq, Read)
+  | CapUnknown Word8 [Word8] -- [Word8] in place of B.ByteString as temporary solution to allow JSON representation of config.  Probably more elegant solutions exist.
+  deriving (Generic,Show, Eq, Read)
+
+instance ToJSON Capability where
+instance FromJSON Capability where
 
 eq_ :: Capability -> Capability -> Bool
 eq_ (CapMultiprotocol _ _) (CapMultiprotocol _ _) = True
@@ -119,7 +125,7 @@ buildOptionalParameters = builderBytes . parameterBuilder
 
 {-
   Builder: the envelope for a capability list is an 'optional parameter TLV', holding a 'capability TLV'.
-  Both TLVs are limited to 255 byte payloads, but the scope to enode multiple parameters upto the BGP message size limit is available for very long sequences.
+  Both TLVs are limited to 255 byte payloads, but the scope to encode multiple parameters up to the BGP message size limit is available for very long sequences.
   Absent this need, a single nested structure is sufficient.
   The inner TLV is built by folding over each capability.
 -}
@@ -139,59 +145,62 @@ capabilityBuilder (CapAddPath afi safi bits) = word8 _CapCodeAddPath <> word8 4 
 capabilityBuilder (CapGracefulRestart rFlag restartTime) = word8 _CapCodeGracefulRestart <> word8 2 <> word16BE (if rFlag then setBit restartTime 15 else restartTime)
 capabilityBuilder (CapMultiprotocol afi safi) = word8 _CapCodeMultiprotocol <> word8 4 <> word16BE afi <> word8 0 <> word8 safi
 capabilityBuilder CapExtendedLength = word8 _CapCodeExtendedLength <> word8 0
-capabilityBuilder (CapUnknown t bs) = word8 t <> word8 (fromIntegral (B.length bs)) <> bytes bs
+capabilityBuilder (CapUnknown t w8s) = word8 t <> word8 (fromIntegral (length w8s)) <> bytes (B.pack w8s)
 
 parseOptionalParameters :: Word8 -> A.Parser [Capability]
 parseOptionalParameters n
   | n == 0 = return []
   | n == 1 = error "parseOptionalParameters: invalid length: 1"
   | otherwise = do
-    t <- A.anyWord8
-    l <- A.anyWord8
-    if n < l + 2
-      then error $ "parseOptionalParameters: invalid length n=" ++ show n ++ " l=" ++ show l ++ " t=" ++ show t
-      else do
-        p <-
-          if 2 == t
-            then parseCaps l
-            else do
-              _ <- A.take (fromIntegral l)
-              return []
-        px <- parseOptionalParameters (n -2 - l)
-        return (p ++ px)
+      t <- A.anyWord8
+      l <- A.anyWord8
+      if n < l + 2
+        then error $ "parseOptionalParameters: invalid length n=" ++ show n ++ " l=" ++ show l ++ " t=" ++ show t
+        else do
+          p <-
+            if 2 == t
+              then parseCaps l
+              else do
+                _ <- A.take (fromIntegral l)
+                return []
+          px <- parseOptionalParameters (n - 2 - l)
+          return (p ++ px)
   where
     parseCaps :: Word8 -> A.Parser [Capability]
     parseCaps 0 = return []
     parseCaps n
       | n == 1 = error "parseCaps: invalid length: 1"
       | otherwise = do
-        t <- A.anyWord8
-        l <- A.anyWord8
-        if n < l + 2
-          then error $ "parseCaps: invalid length n=" ++ show n ++ " l=" ++ show l ++ " t=" ++ show t
-          else do
-            cap <- parseCapability t l
-            caps <- parseCaps (n -2 - l)
-            return $ cap : caps
+          t <- A.anyWord8
+          l <- A.anyWord8
+          if n < l + 2
+            then error $ "parseCaps: invalid length n=" ++ show n ++ " l=" ++ show l ++ " t=" ++ show t
+            else do
+              cap <- parseCapability t l
+              caps <- parseCaps (n - 2 - l)
+              return $ cap : caps
     parseCapability :: Word8 -> Word8 -> A.Parser Capability
     parseCapability t l =
-      if  | t == _CapCodeMultiprotocol -> do
+      if
+        | t == _CapCodeMultiprotocol -> do
             afi <- A.anyWord16be
             _ <- A.anyWord8
             CapMultiprotocol afi <$> A.anyWord8
-          | t == _CapCodeGracefulRestart -> do
+        | t == _CapCodeGracefulRestart -> do
             word0 <- A.anyWord16be
             let rFlag = testBit word0 15
                 restartTime = word0 .&. 0x0fff
             return (CapGracefulRestart rFlag restartTime)
-          | t == _CapCodeAS4 -> CapAS4 <$> A.anyWord32be
-          | t == _CapCodeAddPath -> do
+        | t == _CapCodeAS4 -> CapAS4 <$> A.anyWord32be
+        | t == _CapCodeAddPath -> do
             afi <- A.anyWord16be
             safi <- A.anyWord8
             CapAddPath afi safi <$> A.anyWord8
-          | t == _CapCodeRouteRefresh -> return CapRouteRefresh
-          | t == _CapCodeEnhancedRouteRefresh -> return CapEnhancedRouteRefresh
-          | t == _CapCodeCiscoRefresh -> return CapCiscoRefresh
-          | t == _CapCodeLLGR -> if l == 0 then return CapLLGR else error "LLGR with non null payload not handled"
-          | t == _CapCodeExtendedLength -> return CapExtendedLength
-          | otherwise -> CapUnknown t <$> A.take (fromIntegral l)
+        | t == _CapCodeRouteRefresh -> return CapRouteRefresh
+        | t == _CapCodeEnhancedRouteRefresh -> return CapEnhancedRouteRefresh
+        | t == _CapCodeCiscoRefresh -> return CapCiscoRefresh
+        | t == _CapCodeLLGR -> if l == 0 then return CapLLGR else error "LLGR with non null payload not handled"
+        | t == _CapCodeExtendedLength -> return CapExtendedLength
+        | otherwise -> do
+            bx <- A.take (fromIntegral l)
+            return $ CapUnknown t (B.unpack bx)

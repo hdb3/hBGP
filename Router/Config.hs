@@ -1,11 +1,11 @@
-{-# LANGUAGE OverloadedStrings, RecordWildCards #-}
+{-# LANGUAGE OverloadedStrings, RecordWildCards, DeriveGeneric #-}
 module Router.Config where
 
 -- ## TODO rework the whole Config concept of 'enabled' peers
 --         objective - allow concise specification of peers with default attributes
 --                     whilst distinguishing active and passive roles
 --                   - allow complete flexibility on attributes as required
---                   - reconsider the config defintion (JSON?), and whether
+--                   - reconsider the config definition (JSON?), and whether
 --                     the 'raw' config should be made available 'anonymously' from Global
 --                     (possibly yes, so that extensions can use custom configuration
 --                      without modifying top level code)
@@ -14,15 +14,19 @@ module Router.Config where
 --    the 'offer' consists of both, the response check consists of merely required
 
 -- define the configuration which is passed to the main program
-
+import GHC.Generics
+import Data.Aeson
 import Data.List(foldl',nub,(\\))
 import Data.IP
+import Data.Text(pack,unpack)
+import Text.Read (readMaybe)
 import Data.Word
 import Data.Maybe(fromMaybe)
 import System.Exit(die)
 import Control.Monad(unless)
 import BGPlib.BGPlib
 import Router.Log
+import Control.Applicative (Alternative(empty))
 
 data Config = Config { configAS :: Word32
                      , configBGPID :: IPv4
@@ -40,7 +44,22 @@ data Config = Config { configAS :: Word32
                      , configRequiredCapabilities :: [ Capability ]
                      , configOfferedHoldTime :: Word16
                      }
-                     deriving (Show,Read)
+                     deriving (Generic,Show,Read,Eq)
+instance ToJSON PeerConfig where
+instance FromJSON PeerConfig where
+instance ToJSON Config where
+instance FromJSON Config where
+instance ToJSON IPv4 where
+    toJSON ipv4 = String $ pack $ show ipv4
+instance FromJSON IPv4 where
+
+    parseJSON (String s) = do
+        let ipv4 = readMaybe (unpack s) :: Maybe IPv4
+        maybe
+            empty
+            return
+            ipv4
+    parseJSON _ = empty
 
 -- TODO take all of this capability munging out of IO
 -- It should either return an Either or just error.....
@@ -144,7 +163,7 @@ data PeerConfig = PeerConfig { peerConfigIPv4 :: (IPv4,IPv4)
                              , peerConfigRequiredCapabilities :: [ Capability ]
                              , peerConfigLocalPref :: Word32
                              }
-                             deriving (Eq,Show,Read)
+                             deriving (Generic,Eq,Show,Read)
 
 defaultPeerConfig = PeerConfig { peerConfigIPv4 = undefined
                                , peerConfigAS = Nothing

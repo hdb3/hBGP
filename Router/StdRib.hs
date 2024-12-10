@@ -5,7 +5,7 @@ import Control.Monad.Extra(when)
 import System.Timeout(timeout)
 import Data.Maybe(fromMaybe,catMaybes)
 import Data.Word
-import BGPlib.BGPlib hiding (nlri,withdrawn)
+import BGPlib.BGPlib (ParsedUpdate(..),BGPOutput,Prefix,makeUpdate,sortPathAttributes,setOrigin,setNextHop,setLocalPref,prePendAS,delLocalPref)
 import BGPRib.BGPRib
 import qualified BGPRib.BGPRib as BGPRib
 import Router.Log
@@ -34,7 +34,7 @@ delPeerByAddress rib port ip = do
     if null peers then
         warn $ "delPeerByAddress failed for " ++ show ip ++ ":" ++ show port
     else do
-        when ( length peers > 1 ) $ warn $ "delPeerByAddress failed for (multiplepeers!) " ++ show ip ++ ":" ++ show port
+        when ( length peers > 1 ) $ warn $ "delPeerByAddress failed for (multiple peers!) " ++ show ip ++ ":" ++ show port
         mapM_ (delPeer rib) peers
 
 ribPull :: RibHandle -> IO [BGPOutput]
@@ -57,7 +57,7 @@ buildUpdate :: PeerData -> [Prefix] -> RouteData -> BGPOutput
 --     the peer which will receive this update ('target')
 --     the local 'peer' (not used)
 --
--- the relavant peers / cases are:
+-- the relevant peers / cases are:
 --     for the iBGP/eBGP choice - the peer which will receive this update ('target')
 --     for the onward NextHop attribute - the peer which will receive this update ('target')
 --     for localPref (iBGP only) - the setting is a policy one, but should be the same regardless of target,
@@ -90,8 +90,8 @@ buildUpdate target prefixes RouteData{..} = if isExternal target then egpUpdate 
                            )
 
 updateFromAdjRibEntrys :: Rib -> PeerData -> [AdjRIBEntry] -> IO [BGPOutput]
-updateFromAdjRibEntrys rib target xs = catMaybes <$> mapM updateFromAdjRibEntry xs 
+updateFromAdjRibEntrys rib target xs = catMaybes <$> mapM updateFromAdjRibEntry xs
     where
     updateFromAdjRibEntry :: AdjRIBEntry -> IO (Maybe BGPOutput)
-    updateFromAdjRibEntry (prefixes,routeHash) = 
+    updateFromAdjRibEntry (prefixes,routeHash) =
         fmap (\(route,prefixes') -> buildUpdate target prefixes' route) <$> lookupRoutes rib (prefixes,routeHash)
