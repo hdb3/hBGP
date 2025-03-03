@@ -1,9 +1,5 @@
-<<<<<<< HEAD
-resolver: lts-14.27
-=======
-resolver: lts-15.9
->>>>>>> master
+resolver: lts-18.28
 packages:
 - .
 ghc-options:
-    "$everything": -O3 -threaded -Wunused-imports
+    "$everything": -O3 -threaded

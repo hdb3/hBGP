@@ -39,39 +39,3 @@ executable hbgp
   main-is:            Router/Router.hs
   cpp-options:        -DLOGMODE=Info
 
-executable mrtdump
-  main-is:		        MRTrib-dump.hs
-  hs-source-dirs:	    MRT/lib , MRT/app
-  default-language:	  Haskell2010
-  build-depends:	    base, iproute, bytestring, zlib, base16-bytestring, attoparsec, attoparsec-binary, hashable, murmur-hash, array, containers, unix, bytestring-strict-builder
-  other-modules:	    MRTBuilder, MRTPrefixes, MRTformat, MRTlib, MRTrib, BogonFilter
-
-executable parsetest
-  import:             bgplib
-  main-is:            Router/ParserTest.hs
-  build-depends:	    base
-  other-modules:      Router.BGPPingParser
-
-executable bgpping
-  import:             bgplib
-  main-is:            Router/BGPPing.hs
-  build-depends:	    extra
-  other-modules:      Router.BGPPingParser, Router.BGPConnect
-
-executable bgpclient
-  import:             bgplib
-  main-is:            Router/BGPClient.hs
-  build-depends:      extra
-  other-modules:      Router.BGPConnect
-
-executable bgpserv
-  import:             bgplib
-  main-is:            Router/BGPServer.hs
-  build-depends:      extra
-  other-modules:      Router.BGPConnect
-
-executable bgprelay
-  import:             bgplib
-  main-is:            Router/BGPRelay.hs
-  build-depends:      extra
-  other-modules:      Router.BGPConnect, Router.BGPPingParser
