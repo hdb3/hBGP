@@ -2,7 +2,6 @@ module ZServ.Debug where
 
 import qualified Data.ByteString.Base16 as Base16 -- from package base16-bytestring
 -- from package pretty-hex
-
 import qualified Data.ByteString.Char8 as C8
 import qualified Data.ByteString.Lazy as L
 import Data.Word

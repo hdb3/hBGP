@@ -1,12 +1,12 @@
 {-# LANGUAGE CPP #-}
 
-module Router.Log (LogMode (), logMode, debug, trace, event, info, warn, ifTrace) where
+module Router.Log (LogMode (), logMode, debug, trace, event, info, warn, ifTrace, say) where
 
 import qualified Data.ByteString.Char8 as BS
 import System.IO
 import Prelude hiding (log)
 
-data LogMode = Debug | Trace | Event | Info | Warn | Silent deriving (Eq, Ord)
+data LogMode = Debug | Trace | Event | Info | Warn | Silent deriving (Eq, Ord, Show)
 
 outputStream = stdout
 
