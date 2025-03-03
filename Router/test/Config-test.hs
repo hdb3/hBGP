@@ -13,26 +13,26 @@ import Text.Pretty.Simple (pShow)
 import Text.RawString.QQ
 
 main = do
-    putStrLn "\nConfig:"
-    T.putStr $ pShow config
+  putStrLn "\nConfig:"
+  T.putStr $ pShow config
 
-    putStrLn "\nYAML:\n>>>>>>>"
-    B.putStr $ encode config
-    putStrLn "<<<<<<<\nend YAML:\n"
+  putStrLn "\nYAML:\n>>>>>>>"
+  B.putStr $ encode config
+  putStrLn "<<<<<<<\nend YAML:\n"
 
-    putStr "decode yamlCfg: "
-    putStrLn $
-        either
-            (\errMsg -> "failed decode" ++ show errMsg)
-            (\decoded -> if decoded == config then "success" else "failed comparison")
-            (decodeEither' yamlCfg :: Either ParseException Config)
+  putStr "decode yamlCfg: "
+  putStrLn $
+    either
+      (\errMsg -> "failed decode" ++ show errMsg)
+      (\decoded -> if decoded == config then "success" else "failed comparison")
+      (decodeEither' yamlCfg :: Either ParseException Config)
 
-    putStr "decode jsonCfg: "
-    putStrLn $
-        either
-            (\errMsg -> "failed decode" ++ show errMsg)
-            (\decoded -> if decoded == config then "success" else "failed comparison")
-            (decodeEither' jsonCfg :: Either ParseException Config)
+  putStr "decode jsonCfg: "
+  putStrLn $
+    either
+      (\errMsg -> "failed decode" ++ show errMsg)
+      (\decoded -> if decoded == config then "success" else "failed comparison")
+      (decodeEither' jsonCfg :: Either ParseException Config)
 
 {-
 
@@ -41,41 +41,41 @@ sample literal and YAML forms which are expected to align
 -}
 
 config =
-    Config
-        { configAS = 200
-        , configBGPID = "192.168.122.1"
-        , configListenAddress = "192.168.122.1"
-        , configEnabledPeers = ["192.168.122.236"]
-        , configConfiguredPeers = [peerConfig]
-        , configDelayOpenTimer = 10
-        , configInitialHoldTimer = 300
-        , configAllowDynamicPeers = True
-        , configEnableDataPlane = False
-        , configEnableRedistribution = False
-        , configTestRoutePath = ""
-        , configTestRouteCount = 0
-        , configOfferedCapabilities = [CapAS4 0, CapMultiprotocol 1 1]
-        , configRequiredCapabilities = [CapAS4 0]
-        , configOfferedHoldTime = 120
-        }
+  Config
+    { configAS = 200,
+      configBGPID = "192.168.122.1",
+      configListenAddress = "192.168.122.1",
+      configEnabledPeers = ["192.168.122.236"],
+      configConfiguredPeers = [peerConfig],
+      configDelayOpenTimer = 10,
+      configInitialHoldTimer = 300,
+      configAllowDynamicPeers = True,
+      configEnableDataPlane = False,
+      configEnableRedistribution = False,
+      configTestRoutePath = "",
+      configTestRouteCount = 0,
+      configOfferedCapabilities = [CapAS4 0, CapMultiprotocol 1 1],
+      configRequiredCapabilities = [CapAS4 0],
+      configOfferedHoldTime = 120
+    }
 
 peerConfig =
-    PeerConfig
-        { peerConfigIPv4 = ("192.168.122.60", "192.168.122.1")
-        , peerConfigAS = Just 200
-        , peerConfigBGPID = Just "192.168.122.60"
-        , peerConfigLocalAS = Nothing
-        , peerConfigLocalBGPID = Nothing
-        , peerConfigEnableOutbound = True
-        , peerConfigEnableInbound = True
-        , peerConfigOfferedCapabilities = [CapAS4 0, CapMultiprotocol 1 1]
-        , peerConfigRequiredCapabilities = [CapAS4 0]
-        , peerConfigLocalPref = 100
-        }
+  PeerConfig
+    { peerConfigIPv4 = ("192.168.122.60", "192.168.122.1"),
+      peerConfigAS = Just 200,
+      peerConfigBGPID = Just "192.168.122.60",
+      peerConfigLocalAS = Nothing,
+      peerConfigLocalBGPID = Nothing,
+      peerConfigEnableOutbound = True,
+      peerConfigEnableInbound = True,
+      peerConfigOfferedCapabilities = [CapAS4 0, CapMultiprotocol 1 1],
+      peerConfigRequiredCapabilities = [CapAS4 0],
+      peerConfigLocalPref = 100
+    }
 
 -- Note: _layout_ of this embedded example is different from the default YAML generated above
 yamlCfg =
-    [r|configAS: 200
+  [r|configAS: 200
 configAllowDynamicPeers: true
 configBGPID: 192.168.122.1
 configConfiguredPeers:
@@ -122,7 +122,7 @@ configTestRoutePath: ''
 |]
 
 jsonCfg =
-    [r|{
+  [r|{
   "configAS": 200,
   "configAllowDynamicPeers": true,
   "configBGPID": "192.168.122.1",

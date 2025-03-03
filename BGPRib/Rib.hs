@@ -4,7 +4,7 @@
 
 module BGPRib.Rib (Rib, ribPush, newRib, getLocRib, addPeer, delPeer, getPeersInRib, lookupRoutes, pullAllUpdates, getNextHops) where
 
---import Debug.Trace
+-- import Debug.Trace
 
 import BGPRib.AdjRIBOut
 import BGPRib.BGPData
@@ -83,7 +83,6 @@ addPeer rib peer = modifyMVar_ rib (addPeer' peer)
        takes routeIDs and returns full RouteData objects
        checks that the route did not change since the update was originally scheduled
        drops the update for the case where it has changed.
-
 
     redux -
 
@@ -172,20 +171,20 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
     ribUpdateManyC peerData pathAttributes routeId pfxs (Rib' prefixTable adjRibOutTables)
       | null pfxs = return (Rib' prefixTable adjRibOutTables)
       | otherwise = do
-        localPref <- evalLocalPref peerData pathAttributes pfxs
-        poisoned <- checkPoison peerData pathAttributes pfxs
-        when poisoned (putStrLn ("poisoned route detected " ++ show peerData ++ " " ++ show pfxs))
-        let routeData = makeRouteData peerData pathAttributes routeId 100 poisoned
-            routeData' = if importFilter routeData then trace "importFilter: filtered" $ Withdraw peerData else routeData
-            (!prefixTable', !updates) = BGPRib.PrefixTable.updateC prefixTable pfxs routeData
-            reducedUpdates = reduce updates
+          localPref <- evalLocalPref peerData pathAttributes pfxs
+          poisoned <- checkPoison peerData pathAttributes pfxs
+          when poisoned (putStrLn ("poisoned route detected " ++ show peerData ++ " " ++ show pfxs))
+          let routeData = makeRouteData peerData pathAttributes routeId 100 poisoned
+              routeData' = if importFilter routeData then trace "importFilter: filtered" $ Withdraw peerData else routeData
+              (!prefixTable', !updates) = BGPRib.PrefixTable.updateC prefixTable pfxs routeData
+              reducedUpdates = reduce updates
 
-        -- this version is the minimal update applicable in the ADDPATH case
-        -- mapM_ (updatePeer adjRibOutTables) updates
+          -- this version is the minimal update applicable in the ADDPATH case
+          -- mapM_ (updatePeer adjRibOutTables) updates
 
-        -- this version is the promicuous update applicable in the best-external case
-        mapM_ (updateAllPeers adjRibOutTables) reducedUpdates
-        return $ Rib' prefixTable' adjRibOutTables
+          -- this version is the promicuous update applicable in the best-external case
+          mapM_ (updateAllPeers adjRibOutTables) reducedUpdates
+          return $ Rib' prefixTable' adjRibOutTables
       where
         --
         -- reduce simply discards the per-peer updates
@@ -197,7 +196,7 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
         --
         makeRouteData :: PeerData -> [PathAttribute] -> Int -> Word32 -> Bool -> RouteData
         makeRouteData peerData pathAttributes routeHash overrideLocalPref poisoned = RouteData {..}
-            where
+          where
             (pathLength, originAS, lastAS) = getASPathDetail pathAttributes
             fromEBGP = isExternal peerData
             med = getMED pathAttributes -- currently not used for tiebreak -- only present value is for forwarding on IBGP
@@ -216,9 +215,9 @@ ribPush rib routeData update = modifyMVar_ rib (ribPush' routeData update)
     ribWithdrawManyC peerData pfxs (Rib' prefixTable adjRibOutTables)
       | null pfxs = return (Rib' prefixTable adjRibOutTables)
       | otherwise = do
-        let (!prefixTable', !withdraws) = BGPRib.PrefixTable.updateC prefixTable pfxs (Withdraw peerData)
-        mapM_ (updatePeer adjRibOutTables) withdraws
-        return $ Rib' prefixTable' adjRibOutTables
+          let (!prefixTable', !withdraws) = BGPRib.PrefixTable.updateC prefixTable pfxs (Withdraw peerData)
+          mapM_ (updatePeer adjRibOutTables) withdraws
+          return $ Rib' prefixTable' adjRibOutTables
 
 -- CONTROLLER
 updatePeer :: AdjRIB -> (PeerData, RouteData, [Prefix]) -> IO ()

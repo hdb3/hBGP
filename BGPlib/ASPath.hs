@@ -54,16 +54,17 @@ parseASPath 0 = return []
 parseASPath n
   | n < 2 = error $ "parseASPath: invalid length: " ++ show n
   | otherwise = do
-    t <- A.anyWord8
-    l <- A.anyWord8
-    let calculatedByteCount = fromIntegral $ 2 + 4 * l
-    when (n < calculatedByteCount) (error $ "parseASPath: invalid length n=" ++ show n ++ " l=" ++ show l ++ " t=" ++ show t)
-    segment <-
-      if  | t == enumASSequence -> ASSequence <$> A.count (fromIntegral l) A.anyWord32be
+      t <- A.anyWord8
+      l <- A.anyWord8
+      let calculatedByteCount = fromIntegral $ 2 + 4 * l
+      when (n < calculatedByteCount) (error $ "parseASPath: invalid length n=" ++ show n ++ " l=" ++ show l ++ " t=" ++ show t)
+      segment <-
+        if
+          | t == enumASSequence -> ASSequence <$> A.count (fromIntegral l) A.anyWord32be
           | t == enumASSet -> ASSet <$> A.count (fromIntegral l) A.anyWord32be
           | otherwise -> error $ "parseASPath: invalid type = " ++ show t
-    segments <- parseASPath (n - calculatedByteCount)
-    return $ segment : segments
+      segments <- parseASPath (n - calculatedByteCount)
+      return $ segment : segments
 
 -- binary format for AS path is a sequence of AS path segments
 -- AS path segments are TLVs, however the 'length' is not a byte count

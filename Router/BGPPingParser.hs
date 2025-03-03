@@ -54,6 +54,7 @@ getNextIORef getter parser ioref = do
 -- this can be initialised into a simple genrator as follows:
 getGenerator :: IO BS -> Parser a -> IO (IO (Maybe a))
 getGenerator getter parser = getNextIORef getter parser <$> newIORef ByteString.empty
+
 -- example = do
 --   putStrLn "start of function"
 --   gen <- getGenerator getter parser

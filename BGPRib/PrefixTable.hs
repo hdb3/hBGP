@@ -20,7 +20,7 @@ import BGPRib.BGPData
 -- import qualified BGPRib.PT as PT
 import BGPlib.BGPlib (Prefix, fromPrefix, toPrefix)
 import qualified Data.IntMap.Strict as IntMap
-import Data.List ((\\), foldl')
+import Data.List (foldl', (\\))
 import qualified Data.List
 import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe)
@@ -34,14 +34,14 @@ trace _ = id
 -- type PrefixTable = PT.PT
 
 type PrefixTableEntry = [RouteData]
+
 type PrefixTable = IntMap.IntMap PrefixTableEntry
 
 instance {-# OVERLAPPING #-} Show PrefixTable where
-    show = show . map (\(k,v) -> (toPrefix k,v)) . IntMap.toList
+  show = show . map (\(k, v) -> (toPrefix k, v)) . IntMap.toList
 
 newPrefixTable :: PrefixTable
 newPrefixTable = IntMap.empty
-
 
 -- instance {-# OVERLAPPING #-} Show PrefixTable where
 --   show = unlines . map showPTE . PT.ptList
@@ -112,7 +112,8 @@ updateC pt pfxs route = (pt', trace (show updates) updates)
           (False, False) -> (initialRemediated \\ finalRemediable, finalRemediable)
         (withdrawTargets, updateTargets) = (map peerData withdraw, map peerData update)
         traceData =
-          "\n(initialRemediated,initialOther )" ++ show (initialRemediated, initialOther)
+          "\n(initialRemediated,initialOther )"
+            ++ show (initialRemediated, initialOther)
             ++ "\n(finalRemediable,finalOther)     "
             ++ show (finalRemediable, finalOther)
             ++ "\n(withdrawTargets, updateTargets) "

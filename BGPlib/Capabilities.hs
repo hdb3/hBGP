@@ -1,17 +1,17 @@
-{-# LANGUAGE MultiWayIf, DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE MultiWayIf #-}
 
 module BGPlib.Capabilities where
 
-import GHC.Generics
-import Data.Aeson
-
 import ByteString.StrictBuilder
+import Data.Aeson
 import qualified Data.Attoparsec.Binary as A
 import qualified Data.Attoparsec.ByteString as A
 import Data.Bits
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
 import Data.Word
+import GHC.Generics
 
 type CapCode = Word8
 
@@ -85,10 +85,11 @@ data Capability
   | CapEnhancedRouteRefresh
   | CapExtendedLength
   | CapUnknown Word8 [Word8] -- [Word8] in place of B.ByteString as temporary solution to allow JSON representation of config.  Probably more elegant solutions exist.
-  deriving (Generic,Show, Eq, Read)
+  deriving (Generic, Show, Eq, Read)
 
-instance ToJSON Capability where
-instance FromJSON Capability where
+instance ToJSON Capability
+
+instance FromJSON Capability
 
 eq_ :: Capability -> Capability -> Bool
 eq_ (CapMultiprotocol _ _) (CapMultiprotocol _ _) = True

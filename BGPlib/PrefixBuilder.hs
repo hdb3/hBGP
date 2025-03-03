@@ -29,7 +29,6 @@ when a new builder is started.
 
 The kernel function assuming that the limit value is in scope, has signature
 
-
   go :: accumulator -> Int -> [Prefix] -> Builders
   go acc freespace prefixes = builders
 
@@ -93,24 +92,25 @@ encode :: Word32 -> Word8 -> Builder
 encode ip subnet
   --
   | subnet == 0 =
-    word8 0
+      word8 0
   --
   | subnet < 9 =
-    word8 subnet <> word8 (fromIntegral $ unsafeShiftR ip 24)
+      word8 subnet <> word8 (fromIntegral $ unsafeShiftR ip 24)
   --
   | subnet < 17 =
-    word8 subnet <> word16BE (fromIntegral $ unsafeShiftR ip 16)
+      word8 subnet <> word16BE (fromIntegral $ unsafeShiftR ip 16)
   --
   | subnet < 25 =
-    word8 subnet <> word16BE (fromIntegral $ unsafeShiftR ip 16)
-      <> word8
-        (fromIntegral $ unsafeShiftR ip 8)
+      word8 subnet
+        <> word16BE (fromIntegral $ unsafeShiftR ip 16)
+        <> word8
+          (fromIntegral $ unsafeShiftR ip 8)
   --
   | subnet < 33 =
-    word8 subnet <> word32BE ip
+      word8 subnet <> word32BE ip
   --
   | otherwise =
-    error "unreasonable subnet length > 32"
+      error "unreasonable subnet length > 32"
 
 {-
 
@@ -149,11 +149,10 @@ extUpdateBuilder limit withdrawn attributeBuilder nlri =
           <> withdrawBuilder
           <> word16BE 0
    in if limit >= baseSize + attributeLength + withdrawnLength + nlriLength
-        then-- common / simple case  - all will fit in one message......
+        then -- common / simple case  - all will fit in one message......
         -- NB - this inlcludes the null case (EndOfRIB), and multiprtotocol cases which have only attributes
         --      though the latter will likely require a similar segmentation capability to ensure that the attribute
         --      bytesize remains under the message limit.
-
           marker
             <> word16BE (fromIntegral (baseSize + attributeLength + withdrawnLength + nlriLength))
             <> word8 2
@@ -167,6 +166,6 @@ extUpdateBuilder limit withdrawn attributeBuilder nlri =
             <> word16BE (fromIntegral attributeLength)
             <> attributeBuilder
             <> if null nlriBuilders then mempty else head nlriBuilders
-        else-- there is enough stuff that more than one message is needed
+        else -- there is enough stuff that more than one message is needed
         -- most likely not both nlri and withdrawn, but even if both present it is near enough optimal to simply split the two types and send seprately rather than attempt to cram both sorts in a single message
           foldMap buildWithdraw withdrawnBuilders <> foldMap buildNLRI nlriBuilders

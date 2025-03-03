@@ -1,4 +1,4 @@
-module BGPRib.AdjRIBOut(module BGPRib.Fifo, module BGPRib.AdjRIBOut) where
+module BGPRib.AdjRIBOut (module BGPRib.Fifo, module BGPRib.AdjRIBOut) where
 
 {-
  - AdjRIBTable provdes a list structure to support route dissemination
@@ -12,24 +12,24 @@ module BGPRib.AdjRIBOut(module BGPRib.Fifo, module BGPRib.AdjRIBOut) where
  - when an entire route table must be exchanged
 -}
 
+import BGPRib.Fifo
+import BGPlib.BGPlib
 import qualified Data.IntMap.Strict
 import qualified Data.Tuple
-
-import BGPlib.BGPlib
-import BGPRib.Fifo
 
 -- TODO
 -- bite this bullet? - the AdjRIBEntry should simply carry the RouteData itself rather than the proxy Int which is a hash over the original
 -- Update Path Attributes
 --
 
-type AdjRIBEntry = ( [Prefix], Int )
+type AdjRIBEntry = ([Prefix], Int)
+
 type AdjRIBTable = Fifo AdjRIBEntry
 
 showAdjRIBTable :: AdjRIBTable -> IO String
 showAdjRIBTable = showFifo
 
-newAdjRIBTable  ::  IO AdjRIBTable
+newAdjRIBTable :: IO AdjRIBTable
 newAdjRIBTable = emptyFifo
 
 insertAdjRIBTable :: AdjRIBEntry -> AdjRIBTable -> IO ()
