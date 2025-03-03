@@ -1,4 +1,4 @@
-module BGPRib.AdjRIBOut(module BGPRib.Fifo, module BGPRib.AdjRIBOut) where
+module BGPRib.AdjRIBOut (module BGPRib.Fifo, module BGPRib.AdjRIBOut) where
 
 {-
  - AdjRIBTable provdes a list structure to support route dissemination
@@ -12,20 +12,20 @@ module BGPRib.AdjRIBOut(module BGPRib.Fifo, module BGPRib.AdjRIBOut) where
  - when an entire route table must be exchanged
 -}
 
+import BGPRib.Fifo
+import BGPlib.BGPlib
 import qualified Data.IntMap.Strict
 import qualified Data.Tuple
 
-import BGPlib.BGPlib
-import BGPRib.Fifo
+type AdjRIBEntry = ([Prefix], Int)
 
-type AdjRIBEntry = ( [Prefix], Int )
 -- type AdjRIBTable = Fifo AdjRIBEntry
 data AdjRIBTable = AdjRIBTable {fifo :: Fifo AdjRIBEntry}
 
 showAdjRIBTable :: AdjRIBTable -> IO String
 showAdjRIBTable = showFifo . fifo
 
-newAdjRIBTable  ::  IO AdjRIBTable
+newAdjRIBTable :: IO AdjRIBTable
 newAdjRIBTable = fmap AdjRIBTable emptyFifo
 
 insertAdjRIBTable :: AdjRIBEntry -> AdjRIBTable -> IO ()

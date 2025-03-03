@@ -18,7 +18,7 @@ import Data.Word
 import Foreign.C.Error
 import Foreign.C.Types (CInt)
 import GHC.IO.Exception (ioe_description)
-import Network.Socket (Socket, gracefulClose, close,socketToHandle)
+import Network.Socket (Socket, close, gracefulClose, socketToHandle)
 import qualified Network.Socket as NS
 import System.Exit (die)
 import System.IO
@@ -40,11 +40,12 @@ clientConnect port peer local = do
         (NS.connect sock (NS.SockAddrInet port (toHostAddress peer)))
         ( \e -> do
             Errno errno <- getErrno
-            if  | elem errno [2, 103,115] -> do
+            if
+              | elem errno [2, 103, 115] -> do
                   putStrLn $ ioe_description e ++ "(" ++ show errno ++ ") retrying in 10 seconds"
                   threadDelay 10000000 -- 10 seconds
                   connect' sock port peer
-                | otherwise -> unknownSocketErrorHandler e errno
+              | otherwise -> unknownSocketErrorHandler e errno
         )
     bind :: Socket -> IPv4 -> IO ()
     bind sock addr =
@@ -52,8 +53,9 @@ clientConnect port peer local = do
         (NS.bind sock (NS.SockAddrInet 0 $ toHostAddress addr))
         ( \e -> do
             Errno errno <- getErrno
-            if  | errno == 99 -> die "address error binding port - host configuration mismatch?"
-                | otherwise -> unknownSocketErrorHandler e errno
+            if
+              | errno == 99 -> die "address error binding port - host configuration mismatch?"
+              | otherwise -> unknownSocketErrorHandler e errno
         )
 
 getServerSession :: Socket -> IO Socket
@@ -74,19 +76,20 @@ openServerSocket port address = do
         (NS.bind sock (NS.SockAddrInet port (toHostAddress ip)))
         ( \e -> do
             Errno errno <- getErrno
-            if  | errno == 13 ->
+            if
+              | errno == 13 ->
                   die
                     "permission error binding port (are you su?) (or try: sysctl net.ipv4.ip_unprivileged_port_start=179?)"
-                | errno == 99 ->
+              | errno == 99 ->
                   die "address error binding port - host configuration mismatch?"
-                | errno == 98 ->
+              | errno == 98 ->
                   if retryOnBusy
                     then do
                       hPutStrLn stderr "waiting to bind port"
                       threadDelay 10000000 -- 10 seconds
                       serverBind sock port address
                     else die "port already in use"
-                | otherwise -> unknownSocketErrorHandler e errno
+              | otherwise -> unknownSocketErrorHandler e errno
         )
 
 unknownSocketErrorHandler :: IOError -> CInt -> IO ()
