@@ -25,3 +25,4 @@ update*
 open*bin
 *.qcow2
 hbgp
+bin/
