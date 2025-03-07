@@ -64,10 +64,11 @@ parser = bgpParser
 
 display m = putChar $ case m of
   BGPUpdate {..} ->
-    if  | null attributes -> 'E'
-        | null nlri -> 'A'
-        | null withdrawn -> 'u'
-        | otherwise -> 'U'
+    if
+      | null attributes -> 'E'
+      | null nlri -> 'A'
+      | null withdrawn -> 'u'
+      | otherwise -> 'U'
   BGPNotify {} -> 'N'
   BGPKeepalive -> 'K'
   BGPTimeout -> 'T'

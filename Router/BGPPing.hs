@@ -30,12 +30,13 @@ main = do
   let (optargs, posargs) = partition (('-' ==) . head) args
       addresses = map getIPv4 posargs
       passive = elem "--listen" optargs
-  if  | (elem Nothing addresses) -> do
+  if
+    | (elem Nothing addresses) -> do
         putStrLn "could not parse addresses"
         usage
-      | null args -> usage
-      | (length args == 1) -> go passive (fromJust (addresses !! 0)) "0.0.0.0"
-      | otherwise -> go passive (fromJust (addresses !! 0)) (fromJust (addresses !! 1))
+    | null args -> usage
+    | (length args == 1) -> go passive (fromJust (addresses !! 0)) "0.0.0.0"
+    | otherwise -> go passive (fromJust (addresses !! 0)) (fromJust (addresses !! 1))
   where
     go True = listener 179
     go False = talker 179
@@ -69,7 +70,7 @@ talker port peer local = do
 
 common :: Socket -> IPv4 -> IPv4 -> IO Bool
 common sock expectedPeerAddress expectedLocalAddress = do
-  ((_,receivedLocalAddress),(_,receivedPeerAddress)) <- getSockAddresses sock
+  ((_, receivedLocalAddress), (_, receivedPeerAddress)) <- getSockAddresses sock
   if (expectedPeerAddress, expectedLocalAddress) == (receivedPeerAddress, receivedLocalAddress)
     then do
       putStrLn $ "got expected connection with " ++ show receivedPeerAddress

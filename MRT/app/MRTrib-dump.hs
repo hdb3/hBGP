@@ -26,7 +26,7 @@ main = do
   dumpRoutes handle sample
 
 restrict :: Int -> [(BGPAttributes, IP4PrefixList)] -> [(BGPAttributes, IP4PrefixList)]
---restrict limit = filter ((limit > ) . length . snd)
+-- restrict limit = filter ((limit > ) . length . snd)
 restrict limit = map (\(attrs, prefixes) -> (attrs, take limit prefixes))
 
 selectRoutes allRoutes = do
