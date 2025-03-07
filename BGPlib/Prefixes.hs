@@ -29,6 +29,7 @@ import Data.Word
 -- internally on x86 but get/putWord32be is required to interwork with network order protocols
 
 -- *** HOWEVER *** ...
+
 -- The 'HostAddress' type from Network.Socket, via Data.IP, is a 32 bit word holding IPv4
 -- addresses IN REVERSE ORDER !!!
 -- Therefore conversions between our Prefix type and HostAddress require byteSwap32
@@ -93,6 +94,7 @@ fromAddrRange :: AddrRange IPv4 -> Prefix
 fromAddrRange ar = mkPrefix (fromIntegral subnet) (byteSwap32 $ toHostAddress ip)
   where
     (ip, subnet) = addrRangePair ar
+
 -- binary format for attributes is 1 byte flags, 1 byte type code, 1 or 2 byte length value depending on a flag bit, then payload
 {-RFC4271 page 20:
  -

@@ -1,9 +1,10 @@
 {-# LANGUAGE RecordWildCards #-}
+
 module Router.Open where
-import qualified Data.ByteString.Lazy as L
-import Data.Maybe(isJust,fromJust)
 
 import BGPlib.BGPlib
+import qualified Data.ByteString.Lazy as L
+import Data.Maybe (fromJust, isJust)
 
 -- parse/deparse the Open message, especially the optional parametes//capabilities
 -- the optional parameter field has a (8bit) length sub-field followed by 0 or more 'parameters
@@ -52,28 +53,31 @@ import BGPlib.BGPlib
 -- which is reported is determined by the orser of checks in the getResponse function
 --
 -- note: zero values are used to denote unenforced constraints in the 'required' section...
-data OpenStateMachine = OpenStateMachine {localOffer :: BGPMessage
-                                         , remoteOffer :: Maybe BGPMessage
-                                         , required :: BGPMessage
-                                         } deriving Show
+data OpenStateMachine = OpenStateMachine
+  { localOffer :: BGPMessage,
+    remoteOffer :: Maybe BGPMessage,
+    required :: BGPMessage
+  }
+  deriving (Show)
 
 makeOpenStateMachine :: BGPMessage -> BGPMessage -> OpenStateMachine
 makeOpenStateMachine local required | isOpen local = OpenStateMachine local Nothing required
 
 updateOpenStateMachine :: OpenStateMachine -> BGPMessage -> OpenStateMachine
-updateOpenStateMachine osm remoteOpen | isOpen remoteOpen = osm { remoteOffer = Just remoteOpen }
+updateOpenStateMachine osm remoteOpen | isOpen remoteOpen = osm {remoteOffer = Just remoteOpen}
 
 -- this might be better if it returned the Word16 values and allowed consumers to make the cast, but it would break the API for now...
 getNegotiatedHoldTime :: OpenStateMachine -> Int
-getNegotiatedHoldTime OpenStateMachine {..} = let nonZeroMin a b = if a > 0 && b > 0 then min a b else max a b in fromIntegral $ maybe 0 (nonZeroMin ( holdTime localOffer) . holdTime ) remoteOffer
+getNegotiatedHoldTime OpenStateMachine {..} = let nonZeroMin a b = if a > 0 && b > 0 then min a b else max a b in fromIntegral $ maybe 0 (nonZeroMin (holdTime localOffer) . holdTime) remoteOffer
 
 getKeepAliveTimer :: OpenStateMachine -> Int
-getKeepAliveTimer osm | getNegotiatedHoldTime osm > 0 = 1 + fromIntegral (getNegotiatedHoldTime osm) `div` 3
-                      | otherwise = 0
+getKeepAliveTimer osm
+  | getNegotiatedHoldTime osm > 0 = 1 + fromIntegral (getNegotiatedHoldTime osm) `div` 3
+  | otherwise = 0
 
 checkAS4Capability :: OpenStateMachine -> Bool
 checkAS4Capability OpenStateMachine {..} = hasAS4 (caps remoteOffer') && hasAS4 (caps localOffer)
-    where
+  where
     remoteOffer' = fromJust remoteOffer
     -- ugly - better done in Capabilities.hs
     hasAS4 = any (eq_ (CapAS4 0))
@@ -81,51 +85,56 @@ checkAS4Capability OpenStateMachine {..} = hasAS4 (caps remoteOffer') && hasAS4 
 -- getResponse should not be called before an OPEN message has been received
 
 getResponse :: OpenStateMachine -> BGPMessage
-getResponse osm@OpenStateMachine {..} | isJust remoteOffer = firstMaybe [checkmyAS , checkBgpID , checkHoldTime , checkOptionalCapabilities, keepalive] where
-        firstMaybe [] = undefined
-        firstMaybe (Just m : mx) = m
-        firstMaybe (Nothing : mx) = firstMaybe mx
+getResponse osm@OpenStateMachine {..} | isJust remoteOffer = firstMaybe [checkmyAS, checkBgpID, checkHoldTime, checkOptionalCapabilities, keepalive]
+  where
+    firstMaybe [] = undefined
+    firstMaybe (Just m : mx) = m
+    firstMaybe (Nothing : mx) = firstMaybe mx
 
-        remoteOffer' = fromJust remoteOffer
-        localBGPID = bgpID localOffer
-        remoteBGPID = bgpID remoteOffer'
-        requiredBGPID = bgpID required
-        nullBGPID = fromHostAddress 0
-        nullAS = 0
+    remoteOffer' = fromJust remoteOffer
+    localBGPID = bgpID localOffer
+    remoteBGPID = bgpID remoteOffer'
+    requiredBGPID = bgpID required
+    nullBGPID = fromHostAddress 0
+    nullAS = 0
 
-        keepalive = Just BGPKeepalive
+    keepalive = Just BGPKeepalive
 
-        checkBgpID :: Maybe BGPMessage
-        -- includes a sanity check that remote BGPID is different from the local value even if there is no explicit requirement
-        checkBgpID | remoteBGPID == localBGPID = Just (BGPNotify NotificationOPENMessageError (encode8 BadBGPIdentifier) L.empty)
-                   | requiredBGPID == nullBGPID || requiredBGPID == remoteBGPID = Nothing
-                   | otherwise = Just (BGPNotify NotificationOPENMessageError (encode8 BadBGPIdentifier) L.empty)
+    checkBgpID :: Maybe BGPMessage
+    -- includes a sanity check that remote BGPID is different from the local value even if there is no explicit requirement
+    checkBgpID
+      | remoteBGPID == localBGPID = Just (BGPNotify NotificationOPENMessageError (encode8 BadBGPIdentifier) L.empty)
+      | requiredBGPID == nullBGPID || requiredBGPID == remoteBGPID = Nothing
+      | otherwise = Just (BGPNotify NotificationOPENMessageError (encode8 BadBGPIdentifier) L.empty)
 
-        checkHoldTime :: Maybe BGPMessage
-        checkHoldTime = if fromIntegral (holdTime required) > getNegotiatedHoldTime osm
-                        then Just (BGPNotify NotificationOPENMessageError (encode8 UnacceptableHoldTime) L.empty)
-                        else Nothing
+    checkHoldTime :: Maybe BGPMessage
+    checkHoldTime =
+      if fromIntegral (holdTime required) > getNegotiatedHoldTime osm
+        then Just (BGPNotify NotificationOPENMessageError (encode8 UnacceptableHoldTime) L.empty)
+        else Nothing
 
-        checkmyAS :: Maybe BGPMessage
-        checkmyAS = if nullAS == myAutonomousSystem required || myAutonomousSystem remoteOffer' == myAutonomousSystem required
-                    then Nothing
-                    else Just (BGPNotify NotificationOPENMessageError (encode8 BadPeerAS) L.empty)
+    checkmyAS :: Maybe BGPMessage
+    checkmyAS =
+      if nullAS == myAutonomousSystem required || myAutonomousSystem remoteOffer' == myAutonomousSystem required
+        then Nothing
+        else Just (BGPNotify NotificationOPENMessageError (encode8 BadPeerAS) L.empty)
 
--- a naive check looks for identical values in capabilities,
--- which is how the RFC is worded
--- However, in practice the requirement differs for each specific case, and in fact is not
--- clearly defined in some cases.  The minimal requirement appears to be a check for simple presence, with no comparison
--- of value.  This is clearly true for two common cases; AS4/32-bit ASNs, and Graceful Restart.
--- Note - there is no negotiation concept for Optional capabilities, and the responsibility for rejecting a peering lies with the prposer of a capability
--- which should arise when the peer has not advertised a capability which is required.
--- The present implementation consists simply of a check that the remote offer contains at least the capabilities in the required list.
---
---
--- this is the mentioned check for presecnce in remote offer of required parameters
--- return a list of capabilities required but not found in the offer
-        checkOptionalCapabilities :: Maybe BGPMessage
-        checkOptionalCapabilities = if null missingCapabilities then Nothing else Just (BGPNotify NotificationOPENMessageError (encode8 UnsupportedOptionalParameter) (capsEncode missingCapabilities)) where
-            offered  = caps remoteOffer'
-            missingCapabilities = check (caps required)
-            check [] = []
-            check (c:cx) = if any (eq_ c) offered then check cx else c : check cx
+    -- a naive check looks for identical values in capabilities,
+    -- which is how the RFC is worded
+    -- However, in practice the requirement differs for each specific case, and in fact is not
+    -- clearly defined in some cases.  The minimal requirement appears to be a check for simple presence, with no comparison
+    -- of value.  This is clearly true for two common cases; AS4/32-bit ASNs, and Graceful Restart.
+    -- Note - there is no negotiation concept for Optional capabilities, and the responsibility for rejecting a peering lies with the prposer of a capability
+    -- which should arise when the peer has not advertised a capability which is required.
+    -- The present implementation consists simply of a check that the remote offer contains at least the capabilities in the required list.
+    --
+    --
+    -- this is the mentioned check for presecnce in remote offer of required parameters
+    -- return a list of capabilities required but not found in the offer
+    checkOptionalCapabilities :: Maybe BGPMessage
+    checkOptionalCapabilities = if null missingCapabilities then Nothing else Just (BGPNotify NotificationOPENMessageError (encode8 UnsupportedOptionalParameter) (capsEncode missingCapabilities))
+      where
+        offered = caps remoteOffer'
+        missingCapabilities = check (caps required)
+        check [] = []
+        check (c : cx) = if any (eq_ c) offered then check cx else c : check cx

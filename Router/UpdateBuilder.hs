@@ -3,7 +3,7 @@
 module Main where
 
 import BGPRib.Update (deparseBGPOutputs, endOfRib, originateUpdate)
-import BGPlib.BGPlib (ASPath (..), ASSegment (..), PathAttribute (..), _BGP_ORIGIN_IGP, fromAddrRange)
+import BGPlib.BGPlib (ASPath (..), ASSegment (..), PathAttribute (..), fromAddrRange, _BGP_ORIGIN_IGP)
 import Data.ByteString (hPut)
 import Data.ByteString.Char8 (pack)
 import Data.IP

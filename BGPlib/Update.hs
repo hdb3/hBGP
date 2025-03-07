@@ -23,9 +23,9 @@ import BGPlib.Prefixes
 import BGPlib.RFC4271
 import ByteString.StrictBuilder (builderBytes)
 import qualified Data.ByteString as B
+import Data.Digest.Murmur64
 import Data.IP
 import Data.Word
-import Data.Digest.Murmur64
 
 -- TODO - consistent regular naming to distinguish the 'in' and 'out' formats
 

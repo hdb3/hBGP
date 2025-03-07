@@ -1,8 +1,10 @@
 {-# LANGUAGE FlexibleInstances #-}
+
 module BGPRib.PT where
-import Data.IntMap.Strict as IntMap
-import Data.Maybe(fromMaybe)
+
 import BGPRib.BGPData
+import Data.IntMap.Strict as IntMap
+import Data.Maybe (fromMaybe)
 
 class PrefixTableEntry pte where
   pteNull :: pte a -> Bool
@@ -12,28 +14,28 @@ class PrefixTableEntry pte where
 
 ---And the instance for List is:
 instance PrefixTableEntry [] where
-
   pteNull = Prelude.null
 
   pteEmpty = []
 
   pteBest [] = BGPRib.PT.null
-  pteBest (a:_) = a
+  pteBest (a : _) = a
 
-  pteUpdate r0 rx = if isWithdraw r0 then f'' rx else f rx where
-    
-    f [] = [r0]
-    f (r:rx) | eq r0 r = f' rx -- remove first sibling
-             | gt r0 r = r0 : f'' (r:rx)
-             | otherwise = r : f rx
+  pteUpdate r0 rx = if isWithdraw r0 then f'' rx else f rx
+    where
+      f [] = [r0]
+      f (r : rx)
+        | eq r0 r = f' rx -- remove first sibling
+        | gt r0 r = r0 : f'' (r : rx)
+        | otherwise = r : f rx
 
-    -- simple ordered insertion without duplicate removal
-    f' [] = [r0]
-    f' (r:rx) = if gt r0 r then r0 : r : rx else r : f' rx
+      -- simple ordered insertion without duplicate removal
+      f' [] = [r0]
+      f' (r : rx) = if gt r0 r then r0 : r : rx else r : f' rx
 
-    -- one-shot duplicate removal - no need to ever insert
-    f'' [] = []
-    f'' (r:rx) = if eq r0 r then rx else r : f'' rx
+      -- one-shot duplicate removal - no need to ever insert
+      f'' [] = []
+      f'' (r : rx) = if eq r0 r then rx else r : f'' rx
 
 -- This exposes the minimal requirements on Route - an ‘equality’ function (shared source peer in practice, or (peer,pathID) for ADD-PATH) - and a ranking function.
 -- e.g.
@@ -77,20 +79,22 @@ instance PrefixTable ( IntMap [RouteData]) where
   -}
 
 type PTE = [RouteData]
+
 type PT = IntMap PTE
 
 ptUpdate :: Key -> RouteData -> PT -> (PTE, PTE, PT)
-ptUpdate k r pt = ( oldVal, newVal, IntMap.insert k newVal pt) where
-  oldVal = fromMaybe pteEmpty (IntMap.lookup k pt)
-  newVal = pteUpdate r oldVal
+ptUpdate k r pt = (oldVal, newVal, IntMap.insert k newVal pt)
+  where
+    oldVal = fromMaybe pteEmpty (IntMap.lookup k pt)
+    newVal = pteUpdate r oldVal
 
-ptQuery ::Key -> PT -> PTE
+ptQuery :: Key -> PT -> PTE
 ptQuery k pt = fromMaybe pteEmpty (IntMap.lookup k pt)
 
 ptNew :: PT
 ptNew = IntMap.empty
 
-ptList :: PT -> [(Key,PTE)]
+ptList :: PT -> [(Key, PTE)]
 ptList = IntMap.toList
 
 ptKeys :: PT -> [Key]
