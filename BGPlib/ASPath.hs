@@ -70,7 +70,7 @@ parseASPath n
 -- AS path segments are TLVs, however the 'length' is not a byte count
 -- it is the number of included AS numbers
 -- the type is 1 or two which codes either a Set or Sequence
--- note: 4 byte AS numbers may be used inthe AS PATH as well as in the AS4_PATH
+-- note: 4 byte AS numbers may be used in the AS PATH as well as in the AS4_PATH
 -- therefore decoding AS_PATH requires to know whether 2 or 4 byte AS numbers are in use.
 
 -- this function only encodes the path and returns the bytelength of the generated Builder

@@ -65,6 +65,7 @@ instance IsString Prefix where
 instance Read Prefix where
   readsPrec _ = readSpfx
     where
+      -- TDOD work out how to formulate this to avoid use of head
       readSpfx s = let (a, s') = head $ reads s in [(fromAddrRange a, s')]
 
 instance Hashable Prefix

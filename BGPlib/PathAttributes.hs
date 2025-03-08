@@ -36,7 +36,7 @@ sortPathAttributes :: [PathAttribute] -> [PathAttribute]
 sortPathAttributes = sortOn identify
 
 substitutePathAttribute :: PathAttribute -> [PathAttribute] -> [PathAttribute]
--- silently ignores request if attribute is missing, use insertPathAttribute if this is not waht is required
+-- silently ignores request if attribute is missing, use insertPathAttribute if this is not what is required
 substitutePathAttribute attr = map (f attr)
   where
     f a b = if sameSort a b then a else b

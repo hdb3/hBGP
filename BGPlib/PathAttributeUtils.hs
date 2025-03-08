@@ -21,7 +21,7 @@ getASPathLength pas =
     (\(PathAttributeASPath asPath) -> asPathLength asPath)
     (getPathAttribute TypeCodePathAttributeASPath pas)
 
--- normaliseASPath:  eliminate as4 path by replacing the original as2 path with the contens of the as4 path
+-- normaliseASPath:  eliminate as4 path by replacing the original as2 path with the contents of the as4 path
 -- should be a lossless conversion
 -- the reverse would be needed if talking to an as2 only peer...
 normaliseASPath pas =

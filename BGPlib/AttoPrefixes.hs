@@ -36,7 +36,7 @@ parsePrefixes n prefixes = do
 -- Note: the elegant approach extends to IPv6 naturally...  (when 128 bit registers are available!!)
 
 parse1a :: Word32 -> Int -> Parser Word32
--- The first parmeter is the accumulator, the second reflects the remaining byte count.
+-- The first parameter is the accumulator, the second reflects the remaining byte count.
 
 parse1a acc 0 = return acc
 parse1a acc byteIndex = do

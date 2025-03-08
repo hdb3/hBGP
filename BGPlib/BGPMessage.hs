@@ -23,7 +23,7 @@ _BGPKeepalive = 4 :: Word8
 
 _BGPVersion = 4 :: Word8
 
--- BGPMessage encodes network received inouts only, not messages which are intended for output
+-- BGPMessage encodes network received inputs only, not messages which are intended for output
 -- this is beceause a) it wraps input exceptions as record variants and b) it carries partially deparsed messages
 -- TODO - consider whether preserving the bytestring format for undecoded attributes is the best approach,
 -- rather than simply decoding at point of reception (and potentially improving parallelisation)

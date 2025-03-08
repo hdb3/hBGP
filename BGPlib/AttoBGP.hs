@@ -131,7 +131,7 @@ parsePrefixes' n prefixes = do
 
 {-# INLINE parse1a #-}
 parse1a :: Word32 -> Int -> Parser Word32
--- The first parmeter is the accumulator, the second reflects the remaining byte count.
+-- The first parameter is the accumulator, the second reflects the remaining byte count.
 
 parse1a acc 0 = return acc
 parse1a acc byteIndex = do

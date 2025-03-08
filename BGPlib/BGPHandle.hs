@@ -45,7 +45,7 @@ bgpRcv' (BGPHandle stream ioref) = do
           writeIORef ioref i
           evaluate r
     (Partial _) -> error "Partial has been removed already by `g`"
-    -- agressive debug version:
+    -- aggressive debug version:
     -- (Fail _ s sx) -> error $ "parse fail in getNext" ++ show (s, sx)
 
     -- 'production' version in the event that parse fails actually occur
