@@ -8,7 +8,7 @@ import Data.IP
 import Data.Word
 import ZServ.Debug
 
-data ZMsgRaw = ZMsgRaw Word16 ZMsg -- to support a wireformat encoder
+data ZMsgRaw = ZMsgRaw Word16 ZMsg
 
 data ZRole = ZClient | ZServer
 
@@ -34,8 +34,7 @@ data ZMsg
   | ZMNextHopRegister ZNextHopRegister
   | ZMNextHopUnregister ZNextHopRegister
   | ZMQRouterIdAdd
-  | -- | ZMRouterIdAdd
-    ZMUnknown
+  | ZMUnknown
       { cmd :: Word16,
         payload :: HexByteString
       }
@@ -52,7 +51,6 @@ data ZNextHopRegister = ZNextHopRegister
   }
   deriving (Eq, Show, Read)
 
--- TODO better done as a single constructir with varian type fileds in IP4/6
 data ZInterfaceAddress
   = ZInterfaceAddressV4
       { ifindex :: Word32,
@@ -82,11 +80,10 @@ data ZInterface = ZInterface
     linkLayerType :: Word32,
     hardwareAddress :: HexByteString
     -- there is a placeholder here for 'link params'
-    -- which is for TE - but it is really longwinded so won't bother doing it now
+    -- which is for TE - but it is really long-winded so won't bother doing it now
   }
   deriving (Eq, Show, Read)
 
--- data ZNextHopUpdate = ZNextHopUpdate {metric :: Word32 ,  prefix :: ZPrefix , nexthops :: [ZNextHop] } deriving (Eq,Show,Read)
 data ZNextHopUpdate = ZNextHopUpdate {flags :: Word8, metric :: Word32, prefix :: ZPrefix, nexthops :: [ZNextHop]} deriving (Eq, Show, Read)
 
 data ZPrefix
@@ -104,47 +101,42 @@ data ZNextHop
   deriving (Eq, Show, Read)
 
 -- ZServRoute exists because the protocol is not symmetric between client and server
--- when zserv sends routes it does it differently
-
--- TODO make all of the record fields zr? -> zsr?
+-- when zserv sends routes it does it differently to receiving them
 
 data ZServRoute = ZServRoute
-  { zrType :: Word8,
-    zrFlags :: Word8,
-    -- , zrSafi :: Word16
-    zsrPrefix :: ZPrefix,
-    zrNextHops :: [ZNextHop],
-    zrDistance :: Maybe Word8,
-    zrMetric :: Maybe Word32,
-    zrMtu :: Maybe Word32,
-    zrTag :: Maybe Word32
+  { zSRType :: Word8,
+    zSRFlags :: Word8,
+    zSRPrefix :: ZPrefix,
+    zSRNextHops :: [ZNextHop],
+    zSRDistance :: Maybe Word8,
+    zSRMetric :: Maybe Word32,
+    zSRMtu :: Maybe Word32,
+    zSRTag :: Maybe Word32
   }
   deriving (Eq, Show, Read)
 
 data ZRoute = ZRoute
-  { zrType :: Word8,
-    zrFlags :: Word8,
-    zrSafi :: Word16,
-    zrPrefix :: ZPrefix,
-    zrNextHops :: [ZNextHop],
-    zrDistance :: Maybe Word8,
-    zrMetric :: Maybe Word32,
-    zrMtu :: Maybe Word32,
-    zrTag :: Maybe Word32
+  { zRType :: Word8,
+    zRFlags :: Word8,
+    zRSafi :: Word16,
+    zRPrefix :: ZPrefix,
+    zRNextHops :: [ZNextHop],
+    zRDistance :: Maybe Word8,
+    zRMetric :: Maybe Word32,
+    zRMtu :: Maybe Word32,
+    zRTag :: Maybe Word32
   }
   deriving (Eq, Show, Read)
 
--- TODO make all of the record fields zr? -> zsrr?
 data ZServerRoute = ZServerRoute
-  { zrType :: Word8,
-    zrFlags :: Word8,
-    -- , zrSafi :: Word16
-    zsrrPrefix :: ZPrefix,
-    zrNextHops :: [ZNextHop],
-    zrDistance :: Maybe Word8,
-    zrMetric :: Maybe Word32,
-    zrMtu :: Maybe Word32,
-    zrTag :: Maybe Word32
+  { zSrRType :: Word8,
+    zSrRFlags :: Word8,
+    zSrRPrefix :: ZPrefix,
+    zSrRNextHops :: [ZNextHop],
+    zSrRDistance :: Maybe Word8,
+    zSrRMetric :: Maybe Word32,
+    zSrRMtu :: Maybe Word32,
+    zSrRTag :: Maybe Word32
   }
   deriving (Eq, Show, Read)
 

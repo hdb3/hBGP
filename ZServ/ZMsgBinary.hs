@@ -99,10 +99,6 @@ putzvPrefix ZPrefixV4 {..} = do
     | plen < 33 -> put v4address
     | otherwise -> error $ "putzvPrefix: invalid plen - " ++ show plen
 
--- putRoutePrefixV4 ZPrefixV6{..} = undefined -- TODO
--- putRoutePrefixV4 pfx@ZPrefixV4{..} = putWord16be 0x01 <> -- 'SAFI' for IPv4!?
---                                  putzvPrefix pfx
-
 instance Binary ZInterfaceAddress where
   get = undefined
   put ZInterfaceAddressV4 {..} = put ifindex <> put flags <> put _AF_INET <> put addressA <> put plen <> put addressB
@@ -144,38 +140,38 @@ instance Binary ZRoute where
   get = undefined
   put ZRoute {..} =
     do
-      let zrMsg = if null zrNextHops then 0 else bit _ZAPI_MESSAGE_NEXTHOP :: Word8
-          zrMsg' = zrMsg .|. if isJust zrDistance then bit _ZAPI_MESSAGE_DISTANCE else 0
-          zrMsg'' = zrMsg' .|. if isJust zrMetric then bit _ZAPI_MESSAGE_METRIC else 0
-          zrMsg''' = zrMsg'' .|. if isJust zrMtu then bit _ZAPI_MESSAGE_MTU else 0
-          zrMsg'''' = zrMsg''' .|. if isJust zrTag then bit _ZAPI_MESSAGE_TAG else 0
-      put zrType <> put zrFlags <> put zrMsg'''' <> putWord16be 0x01 <> putzvPrefix zrPrefix
+      let zRMsg = if null zRNextHops then 0 else bit _ZAPI_MESSAGE_NEXTHOP :: Word8
+          zRMsg' = zRMsg .|. if isJust zRDistance then bit _ZAPI_MESSAGE_DISTANCE else 0
+          zRMsg'' = zRMsg' .|. if isJust zRMetric then bit _ZAPI_MESSAGE_METRIC else 0
+          zRMsg''' = zRMsg'' .|. if isJust zRMtu then bit _ZAPI_MESSAGE_MTU else 0
+          zRMsg'''' = zRMsg''' .|. if isJust zRTag then bit _ZAPI_MESSAGE_TAG else 0
+      put zRType <> put zRFlags <> put zRMsg'''' <> putWord16be 0x01 <> putzvPrefix zRPrefix
       -- client side has to sent 'safi'
-      unless (null zrNextHops) (put zrNextHops)
-      forM_ zrDistance put
-      forM_ zrMetric put
-      forM_ zrMtu put
-      forM_ zrTag put
+      unless (null zRNextHops) (put zRNextHops)
+      forM_ zRDistance put
+      forM_ zRMetric put
+      forM_ zRMtu put
+      forM_ zRTag put
 
 instance Binary ZServerRoute where
   get = undefined
   put ZServerRoute {..} =
     do
-      let zrMsg = if null zrNextHops then 0 else bit _ZAPI_MESSAGE_NEXTHOP .|. bit _ZAPI_MESSAGE_IFINDEX :: Word8
-          zrMsg' = zrMsg .|. if isJust zrDistance then bit _ZAPI_MESSAGE_DISTANCE else 0
-          zrMsg'' = zrMsg' .|. if isJust zrMetric then bit _ZAPI_MESSAGE_METRIC else 0
-          zrMsg''' = zrMsg'' .|. if isJust zrMtu then bit _ZAPI_MESSAGE_MTU else 0
-          zrMsg'''' = zrMsg''' .|. if isJust zrTag then bit _ZAPI_MESSAGE_TAG else 0
+      let zSrRMsg = if null zSrRNextHops then 0 else bit _ZAPI_MESSAGE_NEXTHOP .|. bit _ZAPI_MESSAGE_IFINDEX :: Word8
+          zSrRMsg' = zSrRMsg .|. if isJust zSrRDistance then bit _ZAPI_MESSAGE_DISTANCE else 0
+          zSrRMsg'' = zSrRMsg' .|. if isJust zSrRMetric then bit _ZAPI_MESSAGE_METRIC else 0
+          zSrRMsg''' = zSrRMsg'' .|. if isJust zSrRMtu then bit _ZAPI_MESSAGE_MTU else 0
+          zSrRMsg'''' = zSrRMsg''' .|. if isJust zSrRTag then bit _ZAPI_MESSAGE_TAG else 0
           -- this is an ugly hack but then so is zserv.c: the documentation is entirely obscure
           -- my interprettaion is that the format for multiple hops is (1byte hop count) followed by (n x (ipv4, 0x01,ifindex) in the case of ipv4+ifindex
           -- a cleaner read would allow alternative nexthop formats, which would be flagged by the API_MESSAGE_NEXTHOP / ZAPI_MESSAGE_IFINDEX flag bits
           putServerNextHop (ZNHIPv4Ifindex ipv4 ifindex) = put ipv4 <> putWord8 0x01 <> put ifindex
           putServerNextHops hops = putWord8 (fromIntegral $ length hops) <> mapM_ putServerNextHop hops
 
-      put zrType <> put zrFlags <> put zrMsg'''' <> putzvPrefix zsrrPrefix
+      put zSrRType <> put zSrRFlags <> put zSrRMsg'''' <> putzvPrefix zSrRPrefix
       -- server side has not to sent 'safi'
-      unless (null zrNextHops) (putServerNextHops zrNextHops)
-      forM_ zrDistance put
-      forM_ zrMetric put
-      forM_ zrMtu put
-      forM_ zrTag put
+      unless (null zSrRNextHops) (putServerNextHops zSrRNextHops)
+      forM_ zSrRDistance put
+      forM_ zSrRMetric put
+      forM_ zSrRMtu put
+      forM_ zSrRTag put
