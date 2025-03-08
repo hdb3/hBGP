@@ -100,9 +100,9 @@ fixCapabilities :: Config -> IO Config
 --   ADDPATH code without addpath capability in offered and required
 --   non-ADDPATH code with addpath capability in offered or required
 
-fixCapabilities = fixCapabilitiesBase
+-- fixCapabilities = fixCapabilitiesBase
 
--- fixCapabilities = fixCapabilitiesAddPath
+fixCapabilities = fixCapabilitiesAddPath
 
 fixCapabilitiesBase :: Config -> IO Config
 fixCapabilitiesBase = removeCapabilities _CapCodeAddPath
@@ -168,7 +168,7 @@ removeCaps :: String -> CapCode -> [Capability] -> IO [Capability]
 removeCaps s cc caps = do
   unless
     (rval == caps)
-    (info $ "removed capability" ++ show (caps \\ rval))
+    (info $ "removed capability" ++ show (caps \\ rval) ++ " - " ++ s)
   return rval
   where
     rval = removeCaps_ cc caps

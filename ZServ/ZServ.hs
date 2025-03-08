@@ -12,8 +12,6 @@ module ZServ.ZServ
   )
 where
 
--- consider exporting some functions from System.IO.Streams, (as Streams?)
-
 import Data.Binary
 import qualified Data.ByteString.Lazy as L
 import Data.IP
@@ -56,23 +54,23 @@ fromIPv4Range ipv4range =
 
 routeBase =
   ZRoute
-    { zrType = 9,
-      zrFlags = 9,
-      zrSafi = 1,
-      zrPrefix = undefined,
-      zrNextHops = [],
-      zrDistance = Nothing,
-      zrMetric = Nothing,
-      zrMtu = Nothing,
-      zrTag = Nothing
+    { zRType = 9,
+      zRFlags = 9,
+      zRSafi = 1,
+      zRPrefix = undefined,
+      zRNextHops = [],
+      zRDistance = Nothing,
+      zRMetric = Nothing,
+      zRMtu = Nothing,
+      zRTag = Nothing
     }
 
 addRoute stream pfx nh =
-  let route = routeBase {zrPrefix = fromIPv4Range pfx, zrNextHops = [ZNHIPv4 nh]} :: ZRoute
+  let route = routeBase {zRPrefix = fromIPv4Range pfx, zRNextHops = [ZNHIPv4 nh]} :: ZRoute
    in Streams.write (Just $ ZMIPV4RouteAdd route) stream
 
 delRoute stream pfx =
-  let route = routeBase {zrPrefix = fromIPv4Range pfx} :: ZRoute
+  let route = routeBase {zRPrefix = fromIPv4Range pfx} :: ZRoute
    in Streams.write (Just $ ZMIPV4RouteDelete route) stream
 
 zservRegister stream protocol = Streams.write (Just $ ZMHello protocol) stream
@@ -96,11 +94,11 @@ zservRequestRedistributeAll stream =
     >> zservRequestRedistributeStatic stream
 
 getZRoute :: ZMsg -> Maybe (AddrRange IPv4, Maybe IPv4)
-getZRoute (ZMIPV4ServerRouteAdd ZServerRoute {..}) = Just (toIPv4Range zrPrefix, nextHop zrNextHops)
+getZRoute (ZMIPV4ServerRouteAdd ZServerRoute {..}) = Just (toIPv4Range zSrRPrefix, nextHop zSrRNextHops)
   where
     nextHop ((ZNHIPv4Ifindex ip _) : _) = Just ip
-    nextHop ([]) = Nothing
-getZRoute (ZMIPV4ServerRouteDelete ZServerRoute {..}) = Just (toIPv4Range zrPrefix, Nothing) where
+    nextHop [] = Nothing
+getZRoute (ZMIPV4ServerRouteDelete ZServerRoute {..}) = Just (toIPv4Range zSrRPrefix, Nothing) where
 getZRoute (ZMInterfaceAddressAdd ZInterfaceAddressV4 {..}) = Just (makeAddrRange addressA (fromIntegral plen), Just "127.0.0.1")
 getZRoute _ = Nothing
 

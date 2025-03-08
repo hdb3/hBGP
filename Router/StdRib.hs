@@ -2,11 +2,9 @@
 
 module Router.StdRib (ribPull, msgTimeout, addRouteRib, delRouteRib, updateFromAdjRibEntrys, delPeerByAddress, Router.StdRib.addPeer, Router.StdRib.ribPush, RibHandle) where
 
--- module Router.StdRib (ribPull,msgTimeout,addRouteRib,delRouteRib,updateFromAdjRibEntrys,delPeerByAddress,Router.StdRib.addPeer,Router.StdRib.ribPush,RibHandle) where
-
 import BGPRib.BGPRib
 import qualified BGPRib.BGPRib as BGPRib
-import BGPlib.BGPlib hiding (nlri, withdrawn)
+import BGPlib.BGPlib
 import Control.Monad.Extra (when)
 import Data.Maybe (catMaybes, fromMaybe)
 import Data.Word

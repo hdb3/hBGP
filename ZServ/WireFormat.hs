@@ -239,40 +239,40 @@ zIPv6Parser = do
 
 zServerRouteParser :: Parser ZServerRoute
 zServerRouteParser = do
-  zrType <- anyWord8
-  zrFlags <- anyWord8
-  zrMsg <- anyWord8
+  zSrRType <- anyWord8
+  zSrRFlags <- anyWord8
+  zSrRMsg <- anyWord8
   -- for zserv -> client there is no SAFI filed it seems...
-  zrPrefix <- zvPrefixIPv4Parser
-  zrNextHops <-
-    if testBit zrMsg _ZAPI_MESSAGE_NEXTHOP
+  zSrRPrefix <- zvPrefixIPv4Parser
+  zSrRNextHops <-
+    if testBit zSrRMsg _ZAPI_MESSAGE_NEXTHOP
       then do
         nextHopCount <- peekWord8' -- not sure if the route delete message will be parsed like this..
         count (fromIntegral nextHopCount) zRouteNextHopParser
       else return []
-  zrDistance <- if testBit zrMsg _ZAPI_MESSAGE_DISTANCE then fmap Just anyWord8 else return Nothing
-  zrMetric <- if testBit zrMsg _ZAPI_MESSAGE_METRIC then fmap Just anyWord32be else return Nothing
-  zrMtu <- if testBit zrMsg _ZAPI_MESSAGE_MTU then fmap Just anyWord32be else return Nothing
-  zrTag <- if testBit zrMsg _ZAPI_MESSAGE_TAG then fmap Just anyWord32be else return Nothing
+  zSrRDistance <- if testBit zSrRMsg _ZAPI_MESSAGE_DISTANCE then fmap Just anyWord8 else return Nothing
+  zSrRMetric <- if testBit zSrRMsg _ZAPI_MESSAGE_METRIC then fmap Just anyWord32be else return Nothing
+  zSrRMtu <- if testBit zSrRMsg _ZAPI_MESSAGE_MTU then fmap Just anyWord32be else return Nothing
+  zSrRTag <- if testBit zSrRMsg _ZAPI_MESSAGE_TAG then fmap Just anyWord32be else return Nothing
   return ZServerRoute {..}
 
 zRouteParser :: Parser ZRoute
 zRouteParser = do
-  zrType <- anyWord8
-  zrFlags <- anyWord8
-  zrMsg <- anyWord8
-  zrSafi <- anyWord16be
-  zrPrefix <- zvPrefixIPv4Parser
-  zrNextHops <-
-    if testBit zrMsg _ZAPI_MESSAGE_NEXTHOP
+  zRType <- anyWord8
+  zRFlags <- anyWord8
+  zRMsg <- anyWord8
+  zRSafi <- anyWord16be
+  zRPrefix <- zvPrefixIPv4Parser
+  zRNextHops <-
+    if testBit zRMsg _ZAPI_MESSAGE_NEXTHOP
       then do
         nextHopCount <- anyWord8
         count (fromIntegral nextHopCount) zNextHopParser
       else return []
-  zrDistance <- if testBit zrMsg _ZAPI_MESSAGE_DISTANCE then fmap Just anyWord8 else return Nothing
-  zrMetric <- if testBit zrMsg _ZAPI_MESSAGE_METRIC then fmap Just anyWord32be else return Nothing
-  zrMtu <- if testBit zrMsg _ZAPI_MESSAGE_MTU then fmap Just anyWord32be else return Nothing
-  zrTag <- if testBit zrMsg _ZAPI_MESSAGE_TAG then fmap Just anyWord32be else return Nothing
+  zRDistance <- if testBit zRMsg _ZAPI_MESSAGE_DISTANCE then fmap Just anyWord8 else return Nothing
+  zRMetric <- if testBit zRMsg _ZAPI_MESSAGE_METRIC then fmap Just anyWord32be else return Nothing
+  zRMtu <- if testBit zRMsg _ZAPI_MESSAGE_MTU then fmap Just anyWord32be else return Nothing
+  zRTag <- if testBit zRMsg _ZAPI_MESSAGE_TAG then fmap Just anyWord32be else return Nothing
   return ZRoute {..}
 
 -- refer to zclient.c for the specification of this structure

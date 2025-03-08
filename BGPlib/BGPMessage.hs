@@ -31,7 +31,7 @@ data BGPMessage
   = BGPOpen {myAutonomousSystem :: Word16, holdTime :: Word16, bgpID :: IPv4, caps :: [Capability]}
   | BGPKeepalive
   | BGPNotify {code :: EnumNotificationCode, subCode :: NotificationSubcode, errorData :: L.ByteString}
-  | BGPUpdate {withdrawn :: [Prefix], attributes :: [PathAttribute], nlri :: [Prefix]}
+  | BGPUpdate {withdraw :: [Prefix], attributes :: [PathAttribute], nlris :: [Prefix]}
   | BGPTimeout
   | BGPError String
   | BGPEndOfStream
@@ -42,9 +42,9 @@ instance Show BGPMessage where
   show BGPUpdate {..} =
     if
       | null attributes -> "Update {}"
-      | null nlri -> "Update {attributes = " ++ show attributes ++ "}"
-      | null withdrawn -> "Update {nlri = " ++ show nlri ++ ", attributes = " ++ show attributes ++ "}"
-      | otherwise -> "Update {withdrawn = " ++ show withdrawn ++ ", nlri = " ++ show nlri ++ ", attributes = " ++ show attributes ++ "}"
+      | null nlris -> "Update {attributes = " ++ show attributes ++ "}"
+      | null withdraw -> "Update {nlris = " ++ show nlris ++ ", attributes = " ++ show attributes ++ "}"
+      | otherwise -> "Update {withdraw = " ++ show withdraw ++ ", nlris = " ++ show nlris ++ ", attributes = " ++ show attributes ++ "}"
   show BGPNotify {..} = "Notify: " ++ show code ++ " / " ++ show subCode ++ " errorData " ++ toHex' errorData ++ "}"
   show BGPKeepalive = "Keepalive"
   show BGPTimeout = "Timeout"
