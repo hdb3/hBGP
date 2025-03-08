@@ -16,7 +16,7 @@ import Data.Word
 {-
 Using StrictBuilder sidesteps the problem of having to efficiently accumul;late the size of aggregates being built
 for the purpose of building container TLVs.  prefix Builders have another problem - the need to segment large lists to prevent them from
-exceeding protocl defined size limits.
+exceeding protocol defined size limits.
 The interface to this buildr therefore includes a target string byte length.
 The output could have variant forms - either a list of conforming Builders, or a single Builder and a remnant list of prefixes.
 The second form is more general and can be used to optimally build Updates which pack both advertsied and withdranw prefixes.
@@ -24,7 +24,7 @@ If this particular optimisation is not supported then the firs form is sufficien
 
 builder :: Int -> [Prefix] -> [Builder]
 
-The implmentation approach is simple - a fold which accumulates fragments of Builders until the next fragment would exceed the bounds,
+The implementation approach is simple - a fold which accumulates fragments of Builders until the next fragment would exceed the bounds,
 when a new builder is started.
 
 The kernel function assuming that the limit value is in scope, has signature
@@ -57,15 +57,14 @@ prefixBuilder :: Int -> [Prefix] -> [Builder]
 prefixBuilder limit prefixes = go mempty limit prefixes
   where
     go :: Builder -> Int -> [Prefix] -> [Builder]
-    go acc freespace prefixes
-      | null prefixes = [acc]
-      | byteLength (head prefixes) > freespace = acc : go mempty limit prefixes -- note, never calls go with empty prefix list AND mempty accumulator!
-      | otherwise = go (acc <> encode (head prefixes)) (freespace - byteLength (head prefixes)) (tail prefixes)
+    go acc freespace prefixes = case prefixes of
+      [] -> [acc]
+      (prefix : t) ->
+        if byteLength prefix > freespace
+          then acc : go mempty limit prefixes -- note, never calls go with empty prefix list AND mempty accumulator!
+          else go (acc <> encode prefix) (freespace - byteLength prefix) t
     encode = encodeIntPrefix
     byteLength = byteLengthIntPrefix
-
--- encode = encodeTuplePrefix
--- byteLength = byteLengthTuplePrefix
 
 {-# INLINE encodeIntPrefix #-}
 encodeIntPrefix :: BGPlib.Prefixes.Prefix -> Builder
@@ -128,9 +127,13 @@ extUpdateBuilder limit withdrawn attributeBuilder nlri =
       maxPayLoad = limit - baseSize
       attributeLength = builderLength attributeBuilder
       withdrawnBuilders = prefixBuilder maxPayLoad withdrawn
-      withdrawnLength = if null withdrawnBuilders then 0 else builderLength (head withdrawnBuilders)
+      withdrawnLength = case withdrawnBuilders of
+        [] -> 0
+        (a : _) -> builderLength a
       nlriBuilders = prefixBuilder (maxPayLoad - attributeLength) nlri
-      nlriLength = if null nlriBuilders then 0 else builderLength (head nlriBuilders)
+      nlriLength = case nlriBuilders of
+        [] -> 0
+        (a : _) -> builderLength a
       marker = bytes $ B.replicate 16 0xff
       -- marker = byteStringCopy ( "/255/255/255/255/255/255/255/255/255/255/255/255/255/255/255/255"  :: B.ByteString)
       buildNLRI nlriBuilder =
@@ -150,22 +153,21 @@ extUpdateBuilder limit withdrawn attributeBuilder nlri =
           <> word16BE 0
    in if limit >= baseSize + attributeLength + withdrawnLength + nlriLength
         then -- common / simple case  - all will fit in one message......
-        -- NB - this inlcludes the null case (EndOfRIB), and multiprtotocol cases which have only attributes
+        -- NB - this includes the null case (EndOfRIB), and multiprtotocol cases which have only attributes
         --      though the latter will likely require a similar segmentation capability to ensure that the attribute
         --      bytesize remains under the message limit.
           marker
             <> word16BE (fromIntegral (baseSize + attributeLength + withdrawnLength + nlriLength))
             <> word8 2
-            -- <> word16BE (fromIntegral withdrawnLength)
-            <> ( if null withdrawnBuilders
-                   then word16BE 0
-                   else
-                     word16BE (fromIntegral withdrawnLength)
-                       <> head withdrawnBuilders
+            <> ( case withdrawnBuilders of
+                   [] -> word16BE 0
+                   (a : _) -> word16BE (fromIntegral withdrawnLength) <> a
                ) -- there can be at most one withdrawn Builder in this case
             <> word16BE (fromIntegral attributeLength)
             <> attributeBuilder
-            <> if null nlriBuilders then mempty else head nlriBuilders
+            <> case nlriBuilders of
+              [] -> mempty
+              (a : _) -> a
         else -- there is enough stuff that more than one message is needed
         -- most likely not both nlri and withdrawn, but even if both present it is near enough optimal to simply split the two types and send seprately rather than attempt to cram both sorts in a single message
           foldMap buildWithdraw withdrawnBuilders <> foldMap buildNLRI nlriBuilders
