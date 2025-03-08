@@ -243,7 +243,7 @@ zServerRouteParser = do
   zrFlags <- anyWord8
   zrMsg <- anyWord8
   -- for zserv -> client there is no SAFI filed it seems...
-  zrPrefix <- zvPrefixIPv4Parser
+  zsrrPrefix <- zvPrefixIPv4Parser
   zrNextHops <-
     if testBit zrMsg _ZAPI_MESSAGE_NEXTHOP
       then do

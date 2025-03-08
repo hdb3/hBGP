@@ -172,7 +172,7 @@ instance Binary ZServerRoute where
           putServerNextHop (ZNHIPv4Ifindex ipv4 ifindex) = put ipv4 <> putWord8 0x01 <> put ifindex
           putServerNextHops hops = putWord8 (fromIntegral $ length hops) <> mapM_ putServerNextHop hops
 
-      put zrType <> put zrFlags <> put zrMsg'''' <> putzvPrefix zrPrefix
+      put zrType <> put zrFlags <> put zrMsg'''' <> putzvPrefix zsrrPrefix
       -- server side has not to sent 'safi'
       unless (null zrNextHops) (putServerNextHops zrNextHops)
       forM_ zrDistance put

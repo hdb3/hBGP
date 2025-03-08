@@ -1,6 +1,6 @@
 packages: hbgp.cabal
 optimization:        2
-jobs: 4
+jobs: 10
 executable-stripping: True
 package hbgp
   ghc-options: -threaded -with-rtsopts="-N"

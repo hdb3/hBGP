@@ -105,11 +105,14 @@ data ZNextHop
 
 -- ZServRoute exists because the protocol is not symmetric between client and server
 -- when zserv sends routes it does it differently
+
+-- TODO make all of the record fields zr? -> zsr?
+
 data ZServRoute = ZServRoute
   { zrType :: Word8,
     zrFlags :: Word8,
     -- , zrSafi :: Word16
-    zrPrefix :: ZPrefix,
+    zsrPrefix :: ZPrefix,
     zrNextHops :: [ZNextHop],
     zrDistance :: Maybe Word8,
     zrMetric :: Maybe Word32,
@@ -131,11 +134,12 @@ data ZRoute = ZRoute
   }
   deriving (Eq, Show, Read)
 
+-- TODO make all of the record fields zr? -> zsrr?
 data ZServerRoute = ZServerRoute
   { zrType :: Word8,
     zrFlags :: Word8,
     -- , zrSafi :: Word16
-    zrPrefix :: ZPrefix,
+    zsrrPrefix :: ZPrefix,
     zrNextHops :: [ZNextHop],
     zrDistance :: Maybe Word8,
     zrMetric :: Maybe Word32,
