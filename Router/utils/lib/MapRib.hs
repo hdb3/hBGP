@@ -124,7 +124,7 @@ instance Rib MapRib where
       -- insertLookupWithKey :: Ord k => (k -> a -> a -> a) -> k -> a -> Map k a -> (Maybe a, Map k a)
       -- where the first function parameter 'f' is shown as f key new_value old_value
       --  - so insertLookupWithKey enables a function over a value 'a' to generate the actual new stored value,
-      --    whereas we knwo that we just want to specify the new value as an input which will not be modified - so,
+      --    whereas we know that we just want to specify the new value as an input which will not be modified - so,
       --    our function is insertLookup :: Ord k => k -> a -> Map k a -> (Maybe a, Map k a), derived from insertLookupWithKey with the function
       --    f key new_value old_value = new_value
 

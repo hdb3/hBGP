@@ -27,9 +27,7 @@ parsePeerRecord :: MRTlib.MRTRecord -> (MRTlib.BGPid, String, [MRTlib.MRTPeer])
 parsePeerRecord MRTlib.MRTPeerIndexTable {..} = (tdBGPID, tdViewName, peerTable)
 
 getMRTTableDumpV2 :: IO (MRTlib.MRTRecord, [MRTlib.MRTRecord]) -- first member is guaranteed to be MRTlib.MRTPeerIndexTable
-getMRTTableDumpV2 = do
-  mrtList <- getMRT
-  return $ tableDump mrtList
+getMRTTableDumpV2 = do tableDump <$> getMRT
   where
     tableDump (peerTable : mrtx)
       | MRTPeerIndexTable == identify peerTable = (peerTable, mrtFilterN [RIBIPV4Unicast, RIBIPV6Unicast] mrtx)
@@ -77,7 +75,7 @@ mrtFilter t = filter ((t ==) . identify)
 mrtFilterN :: [MRTTypes] -> [MRTlib.MRTRecord] -> [MRTlib.MRTRecord]
 mrtFilterN types = filter p
   where
-    p mrtrec = elem (identify mrtrec) types
+    p mrtrec = identify mrtrec `elem` types
 
 mrtTypes :: [MRTlib.MRTRecord] -> [MRTTypes]
 mrtTypes = map identify

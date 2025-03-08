@@ -32,7 +32,7 @@ import Text.Read (readEither)
 main :: IO ()
 main = do
   info banner
-  say $ "log level is " ++ (show logMode)
+  say $ "log level is " ++ show logMode
 
   getConfig
     >>= maybe
@@ -66,7 +66,9 @@ getConfig = do
   args <- getArgs
   unless (null $ intersect args ["--version", "-V", "-v"]) exitSuccess
 
-  let (configPath, configName) = if null args then ("bgp.conf", "Router") else (head args, takeBaseName $ head args)
+  let (configPath, configName) = case args of
+        [] -> ("bgp.conf", "Router")
+        (a : _) -> (a, takeBaseName a)
 
   configString <- B.readFile configPath
 

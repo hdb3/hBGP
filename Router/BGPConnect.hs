@@ -39,13 +39,18 @@ clientConnect port peer local = do
       catchIOError
         (NS.connect sock (NS.SockAddrInet port (toHostAddress peer)))
         ( \e -> do
-            Errno errno <- getErrno
-            if
-              | elem errno [2, 103, 115] -> do
-                  putStrLn $ ioe_description e ++ "(" ++ show errno ++ ") retrying in 10 seconds"
-                  threadDelay 10000000 -- 10 seconds
-                  connect' sock port peer
-              | otherwise -> unknownSocketErrorHandler e errno
+            Errno errno <-
+              getErrno
+                ( if elem errno [2, 103, 115]
+                    then
+                      ( do
+                          putStrLn $ ioe_description e ++ "(" ++ show errno ++ ") retrying in 10 seconds"
+                          threadDelay 10000000
+                          connect' sock port peer
+                      )
+                    else
+                      unknownSocketErrorHandler e errno
+                )
         )
     bind :: Socket -> IPv4 -> IO ()
     bind sock addr =
@@ -53,9 +58,7 @@ clientConnect port peer local = do
         (NS.bind sock (NS.SockAddrInet 0 $ toHostAddress addr))
         ( \e -> do
             Errno errno <- getErrno
-            if
-              | errno == 99 -> die "address error binding port - host configuration mismatch?"
-              | otherwise -> unknownSocketErrorHandler e errno
+            (if errno == 99 then die "address error binding port - host configuration mismatch?" else unknownSocketErrorHandler e errno)
         )
 
 getServerSession :: Socket -> IO Socket

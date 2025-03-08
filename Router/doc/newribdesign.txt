@@ -25,7 +25,7 @@ files:
     holds the RouteData for each route
     indexed on a hash on the raw received path attributes
     referenced by the prefix table
-    routes for a specific peer can be identified by the refernced peerdatao
+    routes for a specific peer can be identified by the referenced peerdatao
 
   - AdjRIBOut.hs
     per peer structure for holding queuied updates

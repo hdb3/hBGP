@@ -54,7 +54,7 @@ processBMPMsg :: MVar BMPState -> BMPMsg -> IO ()
 processBMPMsg m (BMPPeerUP msg@BMPPeerUPMsg {..}) = do
   putStrLn $ "BMP Peer Up from " ++ show msg
   bmpState <- takeMVar m
-  let peers' = msg : (peers bmpState)
+  let peers' = msg : peers bmpState
   putMVar m bmpState {peers = peers'}
 processBMPMsg m (BMPRouteMonitoring (RouteMonitoring pph bgpMsg)) = do
   let updates = decodeAddrRange $ nlri $ fromBGP bgpMsg
@@ -64,7 +64,7 @@ processBMPMsg m (BMPRouteMonitoring (RouteMonitoring pph bgpMsg)) = do
       ++ " prefixes: "
       ++ show updates
   bmpState <- takeMVar m
-  let rib' = (rib bmpState) ++ updates
+  let rib' = rib bmpState ++ updates
   putStrLn $ "rIb size: " ++ show (length rib')
   putMVar m bmpState {rib = rib'}
 processBMPMsg m bmpMsg = print bmpMsg

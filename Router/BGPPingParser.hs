@@ -1,4 +1,3 @@
-{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Router.BGPPingParser
@@ -51,7 +50,7 @@ getNextIORef getter parser ioref = do
     )
     next
 
--- this can be initialised into a simple genrator as follows:
+-- this can be initialised into a simple generator as follows:
 getGenerator :: IO BS -> Parser a -> IO (IO (Maybe a))
 getGenerator getter parser = getNextIORef getter parser <$> newIORef ByteString.empty
 

@@ -10,7 +10,7 @@ import Data.Word
 -- it is made standalone and removes the Data.Binary encoding functions, arguably a proper sepration of concern
 -- the immediate purpose is to support seprate compilation of the 'Overlap' functions
 
-data Prefix = Prefix !(Word8, Word32) deriving (Eq)
+newtype Prefix = Prefix !(Word8, Word32) deriving (Eq)
 
 -- newtype Prefix = Prefix (Word8,Word32) deriving Eq
 -- type Prefix = (Word8,Word32)

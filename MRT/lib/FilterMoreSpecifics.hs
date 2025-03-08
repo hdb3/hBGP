@@ -37,7 +37,7 @@ filterSlash25to31 RIBIPV4Unicast {..} = (24 < re4Length) && (32 > re4Length)
 filterSlash25to31 _ = True
 
 filterSlash25 :: CustomFilter
-filterSlash25 RIBIPV4Unicast {..} = (25 > re4Length)
+filterSlash25 RIBIPV4Unicast {..} = 25 > re4Length
 -- filterSlash25 RIBIPV4Unicast{..} | (24 < re4Length) = True
 filterSlash25 _ = True
 
@@ -48,7 +48,7 @@ mrtToTree :: [MRTRecord] -> Tree [RIBEntry]
 mrtToTree = Overlap.fromList . mapMaybe mrtToLeaf
   where
     -- reject default route - otherwise the answer empty when it is present ;-)
-    mrtToLeaf RIBIPV4Unicast {..} | (0 < re4Length) = Just (Prefix (re4Length, byteSwap32 $ toHostAddress re4Address), re4RIB)
+    mrtToLeaf RIBIPV4Unicast {..} | 0 < re4Length = Just (Prefix (re4Length, byteSwap32 $ toHostAddress re4Address), re4RIB)
     mrtToLeaf _ = Nothing
 
 mrtFromTree :: Tree [RIBEntry] -> [MRTRecord]

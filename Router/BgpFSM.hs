@@ -51,7 +51,7 @@ bgpFSM global@Global {..} (sock, peerName) =
         (SockAddrInet _ localIP) = socketName
     handle <- getBGPHandle sock
 
-    -- lookup explicit local IP then failover to widlcard adn eventually, if allowed, a dynamic peer
+    -- lookup explicit local IP then failover to widlcard and eventually, if allowed, a dynamic peer
     let maybePeer =
           Data.Map.lookup (fromHostAddress localIP, fromHostAddress remoteIP) peerMap
             <|> Data.Map.lookup (fromHostAddress 0, fromHostAddress remoteIP) peerMap
@@ -236,7 +236,7 @@ runFSM g@Global {..} socketName peerName handle =
     toEstablished st@St {..} = do
       trace "transition -> established"
       trace $ "hold timer: " ++ show (getNegotiatedHoldTime osm) ++ " keep alive timer: " ++ show (getKeepAliveTimer osm)
-      -- only now can we create the peer data record becasue we have the remote AS/BGPID available and confirmed
+      -- only now can we create the peer data record because we have the remote AS/BGPID available and confirmed
 
       let globalData = gd
           peerAS = fromIntegral $ myAutonomousSystem $ fromJust $ remoteOffer osm
@@ -284,7 +284,7 @@ runFSM g@Global {..} socketName peerName handle =
     -- collisionCheck
     -- manage cases where there is an established connection (always reject)
     -- and where another connection is in openSent state (use tiebreaker)
-    -- and of couse where there is no other connection for this BGPID
+    -- and of course where there is no other connection for this BGPID
     collisionCheck :: CollisionDetector -> IPv4 -> IPv4 -> IO (Maybe String)
     collisionCheck c self peer = do
       -- TODO - work out whether keeping the socket info is valuable, since we never use it

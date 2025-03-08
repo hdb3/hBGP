@@ -177,10 +177,10 @@ showMRTRibV6 a =
     showMRTRibV6Entry (i, p, r) = show i ++ " " ++ show p ++ " " ++ showStatsRouteMap r
 
 sortRibsOnPathCount :: MRTRibV4 -> MRTRibV4
-sortRibsOnPathCount = sortOn ((\(_, _, a) -> pathCountRouteMap a))
+sortRibsOnPathCount = sortOn (\(_, _, a) -> pathCountRouteMap a)
 
 sortRibsOnPrefixCount :: MRTRibV4 -> MRTRibV4
-sortRibsOnPrefixCount = sortOn ((\(_, _, a) -> prefixCountRouteMap a))
+sortRibsOnPrefixCount = sortOn (\(_, _, a) -> prefixCountRouteMap a)
 
 fromRouteMapv4 :: Map.IntMap (BGPAttributes, IP4PrefixList) -> [(BGPAttributes, IP4PrefixList)]
 fromRouteMapv4 = Map.elems

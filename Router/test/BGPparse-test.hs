@@ -58,7 +58,7 @@ main = do
   identityCheck "BGPNotify" $ BGPNotify NotificationOPENMessageError (encode8 UnsupportedOptionalParameter) (capsEncode [CapAS4 65520, CapGracefulRestart False 0])
   -- identityCheck "BGPNotify" $ BGPNotify  NotificationOPENMessageError (encode8 UnsupportedOptionalParameter) [ CapAS4 65520,  CapGracefulRestart False 0]
   -- this version of BGPNotify does not explicitly support the multiple possible error data types....
-  -- hence uses a bytsring instaed
+  -- hence uses a bytsring instead
   identityCheck "BGPUpdate" $ BGPUpdate "Withdrawn routes" "Path Attributes" "nlri"
 
 identityCheck :: String -> BGPMessage -> IO ()

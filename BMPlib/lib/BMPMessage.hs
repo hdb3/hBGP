@@ -98,9 +98,7 @@ getIPv4IPv6 ip6Flag = if ip6Flag then ipIPv6 else Data.Attoparsec.ByteString.tak
 
 atto p s = (p' <|> return Nothing) <?> s
   where
-    p' = do
-      tmp <- p
-      return (Just tmp)
+    p' = do Just <$> p
 
 bmpMessageParser :: Parser (Maybe BMPMsg)
 bmpMessageParser = atto bmpMessageParser' "BMP payload parser"
@@ -124,10 +122,11 @@ bmpMessageParser' = do
 
 data RouteMonitoring = RouteMonitoring PerPeerHeader BGPByteString deriving (Show)
 
-getBMPRouteMonitoring = do
-  perPeerHeader <- getPerPeerHeader
-  bGPMessage <- getBGPByteString
-  return $ BMPRouteMonitoring $ RouteMonitoring perPeerHeader bGPMessage
+getBMPRouteMonitoring =
+  do perPeerHeader <- getPerPeerHeader
+    BMPRouteMonitoring
+    . RouteMonitoring perPeerHeader
+    <$> getBGPByteString
 
 -- -----------------------
 -- Initiation
@@ -280,10 +279,7 @@ getBGPByteString = do
 
 bmpParser :: Parser (Maybe BMPMsg)
 bmpParser =
-  ( do
-      msg <- bsParser
-      return $ parse' bmpMessageParser' msg
-  )
+  (do parse' bmpMessageParser' <$> bsParser)
     <|> return Nothing
   where
     -- NB without 'feed .. BS.empty' the parser will only return Partial
@@ -351,9 +347,7 @@ toHex = Data.ByteString.Char8.unpack . Data.ByteString.Base16.encode
 zIPv4 = zIPv4Parser
 
 zIPv4Parser :: Parser IP.IPv4
-zIPv4Parser = do
-  v4address <- anyWord32le
-  return $ IP.fromHostAddress v4address
+zIPv4Parser = do IP.fromHostAddress <$> anyWord32le
 
 ipIPv4 :: Parser IP.IP
 ipIPv4 = fmap IP.IPv4 zIPv4

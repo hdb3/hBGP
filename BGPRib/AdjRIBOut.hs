@@ -1,7 +1,7 @@
 module BGPRib.AdjRIBOut (module BGPRib.Fifo, module BGPRib.AdjRIBOut) where
 
 {-
- - AdjRIBTable provdes a list structure to support route dissemination
+ - AdjRIBTable provides a list structure to support route dissemination
  - every peer has its own AdjRIBTable in order to allow each peer to consume Updates at its own pace
  - an optimisation to suppress duplicate updates due to slow consumption can be implnented outside this API
  - using the route identity which is stored with the prefix set
@@ -19,8 +19,7 @@ import qualified Data.Tuple
 
 type AdjRIBEntry = ([Prefix], Int)
 
--- type AdjRIBTable = Fifo AdjRIBEntry
-data AdjRIBTable = AdjRIBTable {fifo :: Fifo AdjRIBEntry}
+newtype AdjRIBTable = AdjRIBTable {fifo :: Fifo AdjRIBEntry}
 
 showAdjRIBTable :: AdjRIBTable -> IO String
 showAdjRIBTable = showFifo . fifo

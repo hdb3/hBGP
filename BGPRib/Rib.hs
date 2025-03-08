@@ -95,8 +95,10 @@ lookupRoutes rib (prefixes, routeHash) = do
       -- which is essential for filters to work correctly
       myFilter = id
       unchangedPrefixes = myFilter $ myLookup prefixes
-      route = fst $ head unchangedPrefixes -- safe becuase only called after test for null
-  return $ if null unchangedPrefixes then Nothing else Just (route, map snd unchangedPrefixes)
+  -- TDOD - check that the second returned value should be the whole list, including the head
+  return $ case unchangedPrefixes of
+    [] -> Nothing
+    (prefix : _) -> Just (fst prefix, map snd unchangedPrefixes)
 
 getNextHops :: Rib -> [Prefix] -> IO [(Prefix, Maybe IPv4)]
 getNextHops rib prefixes = do
@@ -109,7 +111,7 @@ getNextHops rib prefixes = do
 pullAllUpdates :: PeerData -> Rib -> IO [AdjRIBEntry]
 pullAllUpdates peer rib = do
   (Rib' _ arot) <- readMVar rib
-  maybe (return []) dequeueAll (fmap fifo (arot Data.Map.!? peer))
+  maybe (return []) (dequeueAll . fifo) (arot Data.Map.!? peer)
 
 -- TODO write and use the function 'getAdjRibForPeer'
 

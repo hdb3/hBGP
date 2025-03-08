@@ -6,7 +6,7 @@ import BGPlib.BGPlib
 import qualified Data.ByteString.Lazy as L
 import Data.Maybe (fromJust, isJust)
 
--- parse/deparse the Open message, especially the optional parametes//capabilities
+-- parse/deparse the Open message, especially the optional parameters//capabilities
 -- the optional parameter field has a (8bit) length sub-field followed by 0 or more 'parameters
 -- parameters are coded as TLVs with 8bit T and L
 -- only one parameter is currently used - '2' == Capabilities Optional Parameter
@@ -14,7 +14,7 @@ import Data.Maybe (fromJust, isJust)
 -- within the 'Capabilities Optional Parameter' is another TLV encoding,
 -- although there is no length field to start
 --
--- open processing consists of a function useable within the FSM to process and generate Open messages including optional capabilities
+-- open processing consists of a function usable within the FSM to process and generate Open messages including optional capabilities
 -- this includes the logic to handle incompatible capability objectives
 -- it also includes processing of the Hold timer values, AS number and BGPID
 --
@@ -23,7 +23,7 @@ import Data.Maybe (fromJust, isJust)
 -- the application level builds an initial state object
 -- this is called by the FSM when it receives Open or wants to send Open (either ordering)
 -- the response after receiving Open can be +ve or -ve, which should result in either Keepalive or Notification message
--- the underlying logic uses a copy of the resepective 'offers'
+-- the underlying logic uses a copy of the respective 'offers'
 -- once keepalive or notification has been confirmed from remote side then the result is confirmed
 --
 -- the semanitics of the capabilities etc is transparent to this mechanism - i.e.
@@ -124,7 +124,7 @@ getResponse osm@OpenStateMachine {..} | isJust remoteOffer = firstMaybe [checkmy
     -- However, in practice the requirement differs for each specific case, and in fact is not
     -- clearly defined in some cases.  The minimal requirement appears to be a check for simple presence, with no comparison
     -- of value.  This is clearly true for two common cases; AS4/32-bit ASNs, and Graceful Restart.
-    -- Note - there is no negotiation concept for Optional capabilities, and the responsibility for rejecting a peering lies with the prposer of a capability
+    -- Note - there is no negotiation concept for Optional capabilities, and the responsibility for rejecting a peering lies with the proposer of a capability
     -- which should arise when the peer has not advertised a capability which is required.
     -- The present implementation consists simply of a check that the remote offer contains at least the capabilities in the required list.
     --

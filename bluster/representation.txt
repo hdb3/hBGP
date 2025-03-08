@@ -1,13 +1,13 @@
 bluster algorithms are independent of representation, as long as uniqueness is guaranteed.
 The only externally significant data type is the prefix itself.  For IPv4 this implies that 37 bits are required for complete applicability.  However, for both IPv4 and IPv6 practical applications would be possible as long as the incidence of highly specific prefixes is low, by utilising higher order side tables to contain prefixes > /27 or /59.
-In this implmentation we use 64 bits for simple IPv4 working and useful IPv6 capability.  The internal structure of the 64 bit prefix is never exploited.
+In this implementation we use 64 bits for simple IPv4 working and useful IPv6 capability.  The internal structure of the 64 bit prefix is never exploited.
 
-Prefix group hashes - 64 bit hashes are assumed, though the hash algorithm itself is opaque.  A mechanism to check for hash uniqueness integrity wouuld be useful.  This could be executed over the contrsucted RIB without risk of internal compromise by extracting every basic and composite group and running an unoverwriting Map insert.
+Prefix group hashes - 64 bit hashes are assumed, though the hash algorithm itself is opaque.  A mechanism to check for hash uniqueness integrity would be useful.  This could be executed over the contrsucted RIB without risk of internal compromise by extracting every basic and composite group and running an unoverwriting Map insert.
 
 Cluster hashes
 clusters may expand as additional prefixes are added
 this can be treated as creation of a new cluster, in which case the equivalence of a cluster with its prefix element members can be preserved, and the prefix hash becomes a reasonable proxy.  The downside if any is that the prefix rib must be updated for all cluster members
-the alternative is to consider every modifed clsuter as 'new'.  This has the merit of consistency.  It also ensures the transience/locality of clsuter identity
+the alternative is to consider every modified clsuter as 'new'.  This has the merit of consistency.  It also ensures the transience/locality of clsuter identity
 The solution adopted here is to treat modified clusters as 'new' ones.
 
 identity in data structures

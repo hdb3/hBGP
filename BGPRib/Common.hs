@@ -49,7 +49,7 @@ groupByFirst zx = g zx
   where
     f q = foldl' (\(ax, bx) (c, d) -> if q == c then (d : ax, bx) else (ax, (c, d) : bx)) ([], [])
     g [] = []
-    g ux@((v, _) : _) = let (sx, tx) = f v ux in (v, sx) : (g tx)
+    g ux@((v, _) : _) = let (sx, tx) = f v ux in (v, sx) : g tx
 
 groupBySecond :: (Eq b) => [(a, b)] -> [([a], b)]
 groupBySecond [] = []
@@ -57,4 +57,4 @@ groupBySecond zx = g zx
   where
     f q = foldl' (\(ax, bx) (c, d) -> if q == d then (c : ax, bx) else (ax, (c, d) : bx)) ([], [])
     g [] = []
-    g ux@((_, v) : _) = let (sx, tx) = f v ux in (sx, v) : (g tx)
+    g ux@((_, v) : _) = let (sx, tx) = f v ux in (sx, v) : g tx

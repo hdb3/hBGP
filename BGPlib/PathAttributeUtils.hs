@@ -1,5 +1,4 @@
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module BGPlib.PathAttributeUtils where
@@ -51,8 +50,10 @@ getASPathDetail :: [PathAttribute] -> (Int, Word32, Word32)
 getASPathDetail = detail . getASPathContent
   where
     detail [] = (0, 0, 0)
-    detail [ASSequence seq] = (length seq, last seq, head seq)
-    detail [ASSet set] = (length set, last set, head set)
+    detail [ASSequence []] = (0, 0, 0)
+    detail [ASSequence seq@(a : _)] = (length seq, last seq, a)
+    detail [ASSet []] = (0, 0, 0)
+    detail [ASSet set@(a : _)] = (length set, last set, a)
     detail _ = error "AS Set and multi Sequence detail not written yet"
 
 elemASPath :: Word32 -> [PathAttribute] -> Bool
@@ -85,7 +86,8 @@ getASPathOrigin = getLastASN . last . getASPathContent
 
 -- getLastASN :: ASSegment Word32 -> Word32
 getLastASN (ASSequence ax) = last ax
-getLastASN (ASSet ax) = head ax
+getLastASN (ASSet []) = 0
+getLastASN (ASSet (a : _)) = a
 
 setLocalPref :: Word32 -> [PathAttribute] -> [PathAttribute]
 setLocalPref = insertPathAttribute . PathAttributeLocalPref

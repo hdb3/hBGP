@@ -43,14 +43,13 @@ data CState = CState
 query :: CState -> [String] -> InputT IO ()
 query cs s = do
   prefixTable <- lift $ getLocRib (rib $ csGlobal cs)
-  if null $ head s
-    then
-      lift $ print prefixTable
-    else
+  case s of
+    [] -> lift $ print prefixTable
+    (s0 : _) ->
       maybe
         (outputStrLn "couldn't parse prefix")
         (\prefix -> outputStrLn $ "[" ++ show prefix ++ "] " ++ showRibAt prefixTable (fromAddrRange prefix))
-        (parsePrefix $ head s)
+        (parsePrefix s0)
   console cs
 
 updateFrom CState {..} = push $ iBGPUpdate csPath csNlri csNextHop csLocalPref

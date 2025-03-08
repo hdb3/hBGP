@@ -12,7 +12,7 @@ import PathAttributes
 -- NOTE - the test only supports either AS4 or AS2 at one time since test data is not managed smartly
 --      - manually substitute 'AS2' for 'AS4'
 --      - also note.... the null path test fails in AS2 mode since the decoder cannot tell an empty AS2 path from an AS4 path
--- TODO - update when there is an AS4 path convertor
+-- TODO - update when there is an AS4 path converter
 -- TODO2 add test for AS4Paths
 main'' = do
   main'

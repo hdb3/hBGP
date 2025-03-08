@@ -20,9 +20,7 @@ import Text.Read (readMaybe)
 type Dictionary = [(String, String)]
 
 buildDictionary :: IO Dictionary
-buildDictionary = do
-  args <- getArgs
-  return $ map f args
+buildDictionary = do map f <$> getArgs
   where
     f s = let (s1, s2) = break ('=' ==) s in (s1, dropWhile ('=' ==) s2)
 

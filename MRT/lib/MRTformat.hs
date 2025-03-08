@@ -116,7 +116,7 @@ getMRTTableDump =
   do
     args <- getArgs
     mrtParse
-      <$> if null args || "-" == (head args)
+      <$> if null args || "-" == head args
         then BS.getContents
         else
           if "gz" `isSuffixOf` head args

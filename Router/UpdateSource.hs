@@ -40,7 +40,7 @@ initSource peer startPrefix tableSize groupSize burstSize burstDelay oneShotMode
             putMVar mv 0
             return [endOfRib, BGPKeepalive]
           else do
-            ---let initDelay = 2000 -- mS  - arbitary one second delay to allow a BGP peer to settle after reeceiving inintial EoR
+            ---let initDelay = 2000 -- mS  - arbitrary one second delay to allow a BGP peer to settle after reeceiving inintial EoR
             ---                     -- this needs to be made configurable, too.... ;-)
             ---when (n == 0) (threadDelay $ 10^3 * initDelay)
             putMVar mv $ n + burstSize

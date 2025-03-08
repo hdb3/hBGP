@@ -70,7 +70,7 @@ group :: [(Route, a)] -> [(Route, [a])]
 group = Map.elems . Map.fromListWith combine . map xIn
   where
     combine :: (Route, [a]) -> (Route, [a]) -> (Route, [a])
-    combine (r1, ax1) (r2, ax2) = (r1, ax1 ++ ax2) -- (++ is faster than unpacking the sigleton using head.....
+    combine (r1, ax1) (r2, ax2) = (r1, ax1 ++ ax2) -- (++ is faster than unpacking the singleton using head.....
     xIn :: (Route, a) -> (Int, (Route, [a]))
     xIn (r, a) = (routeHash r, (r, [a]))
 

@@ -64,7 +64,7 @@ talker port peer local = do
   putStrLn $ "connecting to " ++ show peer ++ " from " ++ show local
   sock <- clientConnect port peer local
   putStrLn "active: connected"
-  ifM (common sock peer local) exitSuccess (die "unexpected transport addreses in active connect")
+  ifM (common sock peer local) exitSuccess (die "unexpected transport addresses in active connect")
   gracefulClose sock 100000
   putStrLn "disconnected"
 
@@ -97,7 +97,7 @@ common sock expectedPeerAddress expectedLocalAddress = do
         )
         msg
 
--- below and needed imports should be in a seprate module, which should be provided by BGPlib
+-- below and needed imports should be in a separate module, which should be provided by BGPlib
 hPutKeepalive :: Handle -> IO ()
 hPutKeepalive handle = hPutBuilder handle keepaliveBuilder
   where

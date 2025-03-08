@@ -97,7 +97,7 @@ getZRoute :: ZMsg -> Maybe (AddrRange IPv4, Maybe IPv4)
 getZRoute (ZMIPV4ServerRouteAdd ZServerRoute {..}) = Just (toIPv4Range zSrRPrefix, nextHop zSrRNextHops)
   where
     nextHop ((ZNHIPv4Ifindex ip _) : _) = Just ip
-    nextHop ([]) = Nothing
+    nextHop [] = Nothing
 getZRoute (ZMIPV4ServerRouteDelete ZServerRoute {..}) = Just (toIPv4Range zSrRPrefix, Nothing) where
 getZRoute (ZMInterfaceAddressAdd ZInterfaceAddressV4 {..}) = Just (makeAddrRange addressA (fromIntegral plen), Just "127.0.0.1")
 getZRoute _ = Nothing
