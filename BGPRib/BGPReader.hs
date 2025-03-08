@@ -35,9 +35,9 @@ updateRib rib parsedUpdate@ParsedUpdate {..} = BGPRib.ribPush rib BGPRib.dummyPe
 
 -- readRib: a convenience function for simple applications
 -- the returned structure masks only derived or artificial data
--- - it contains the full parsed list of path attributes, associated prefixes (unpacked), and a route identifer which is unique in all cases
+-- - it contains the full parsed list of path attributes, associated prefixes (unpacked), and a route identifier which is unique in all cases
 --   of path attribute sets, it is a hash of the original path attribute binary structure
---  However, it only contains the last version of the table, so earlier updates in the stream which were superceded are not returned
+--  However, it only contains the last version of the table, so earlier updates in the stream which were superseded are not returned
 
 readRib :: IO [((Int, [PathAttribute]), Prefix)]
 readRib = readUngroupedRib

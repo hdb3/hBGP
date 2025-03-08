@@ -78,7 +78,7 @@ addPeer rib peer = modifyMVar_ rib (addPeer' peer)
     redux -
 
     regrading filters - optimal correct behaviour requires either preserved state from last sent route or recalculated equivalent.
-    unsolicited withdraw would allow safe behaviour - but this is only needed in the context of export filter capability, and can easily be implmented
+    unsolicited withdraw would allow safe behaviour - but this is only needed in the context of export filter capability, and can easily be implemented
     when that capability is built.
 
     an alternate implementation might simply return the latest route, and mark that prefix/route combination as sent using a sequence number
@@ -176,7 +176,7 @@ updateRibOutWithPeerData triggerPeer updates adjRIB =
         applyExportFilter xf = map (\(pfx, rd) -> (pfx, xf triggerPeer targetPeer rd))
 
 -- ## TODO - consider whether WIthdraw constructor should carry PeerData at all....
--- (the use is for input to RIB, not export (RIB never exports Withdraw, ony NullRoute))
+-- (the use is for input to RIB, not export (RIB never exports Withdraw, only NullRoute))
 
 importFilter :: RouteData -> Bool
 importFilter route@RouteData {} = pathLoopCheck route

@@ -107,4 +107,4 @@ instance Ord RouteData where
       (localPref rd2, pathLength rd1, origin rd1, fromEBGP rd2, peerBGPid (peerData rd1), peerIPv4 (peerData rd1))
 
 -- rank as higher some parameters when lower - these are Origin, Path Length, peer BGPID, peer address
--- ## TODO ## MED comparison is slightly tricky - only applies when adjacent AS is equal, and needs to accomodate missing Meds in either or both routes
+-- ## TODO ## MED comparison is slightly tricky - only applies when adjacent AS is equal, and needs to accommodate missing Meds in either or both routes

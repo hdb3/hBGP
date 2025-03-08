@@ -8,7 +8,7 @@ module BGPRib.AdjRIBOut (module BGPRib.Fifo, module BGPRib.AdjRIBOut) where
  - the structure is a simple list which holds a set of prefixes
  - prefixes are grouped to maintain packing of prefixes within a single update message
  - fixing up fragmentation of prefixes over common routes is not attempted because it is unlikely to be useful
- - the exception is in the event of route reefersh or peer session initilisation,
+ - the exception is in the event of route reefersh or peer session initialisation,
  - when an entire route table must be exchanged
 -}
 
