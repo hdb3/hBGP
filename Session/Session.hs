@@ -39,7 +39,6 @@ data State = State
 {-# INLINE debug #-}
 debug :: String -> IO ()
 debug _ = return ()
-
 -- debug s = hPutStrLn stderr s >> hFlush stderr
 
 seconds :: Int
@@ -144,10 +143,12 @@ listener state@State {..} = do
       unblocked <- raceCheckNonBlock addressPair
       if unblocked
         then do
+          debug $ "listener - start client " ++ show addressPair
           wrap state defaultApp sock
           raceCheckUnblock addressPair
+          debug $ "listener - client exit " ++ show addressPair
         else do
-          debug "listener - connect reject due to race"
+          debug $ "listener - connect reject due to race " ++ show addressPair
           NS.close sock
 
 wrap :: State -> ((NS.Socket, NS.SockAddr) -> IO a) -> NS.Socket -> IO ()
@@ -181,6 +182,7 @@ run state@State {..} (src, dst) = do
         (wrap state defaultApp)
         sock
       raceCheckUnblock (src, dst)
+      debug $ "run: " ++ show (src, dst) ++ " finished"
     else debug $ "run blocked for " ++ show (src, dst)
   threadDelay respawnDelay
   run state (src, dst)

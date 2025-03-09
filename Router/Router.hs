@@ -32,7 +32,7 @@ import Text.Read (readEither)
 main :: IO ()
 main = do
   info banner
-  say $ "log level is " ++ (show logMode)
+  say $ "log level is " ++ show logMode
 
   getConfig
     >>= maybe

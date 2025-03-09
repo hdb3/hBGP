@@ -33,8 +33,11 @@ bgpRcv bgpHandle t = fromMaybe BGPTimeout <$> System.Timeout.timeout (1000000 * 
 bgpRcv' :: BGPHandle -> IO BGPMessage
 bgpRcv' (BGPHandle stream ioref) = do
   oldBuf <- readIORef ioref
+
+  -- blocking read in getBuf
   newBuf <- if B.null oldBuf then getBuf else return oldBuf
-  result <- complete (parse terminatingBGPParser newBuf)
+  -- probably can make it clearer by inlining 'complete'
+  result <- complete (parse bgpParser1 newBuf)
   case result of
     (Done i r) ->
       if B.null newBuf
@@ -44,17 +47,14 @@ bgpRcv' (BGPHandle stream ioref) = do
         else do
           writeIORef ioref i
           evaluate r
-    (Partial _) -> error "Partial has been removed already by `g`"
-    -- agressive debug version:
-    -- (Fail _ s sx) -> error $ "parse fail in getNext" ++ show (s, sx)
-
-    -- 'production' version in the event that parse fails actually occur
+    (Partial _) -> error "Partial is always removed already by 'complete'"
     (Fail _ s sx) -> do
       hPutStrLn stderr $ "parse fail in getNext" ++ show (s, sx)
       return $ BGPError $ show (s, sx)
   where
     getBuf = B.hGetSome stream 4096
     complete :: Result BGPMessage -> IO (Result BGPMessage)
+    -- 'Result' is the Attoparsec continuation type
     complete (Partial cont) = do
       bs <- getBuf
       complete (cont bs)
