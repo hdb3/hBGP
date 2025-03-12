@@ -10,9 +10,9 @@ import qualified Data.IntMap.Strict as IntMap
 import qualified Data.List
 import Data.Maybe (fromMaybe)
 
-type PrefixTableEntry = [RouteData]
+type PrefixTableType = [RouteData]
 
-type PrefixTable = IntMap PrefixTableEntry
+type PrefixTable = IntMap PrefixTableType
 
 instance {-# OVERLAPPING #-} Show PrefixTable where
   show = unlines . map showPTE . ptList
@@ -38,7 +38,7 @@ queryPrefixTable table pfx = PTE.pteBest $ ptQuery (fromPrefix pfx) table
 showRibAt :: PrefixTable -> Prefix -> String
 showRibAt table pfx = show (ptQuery (fromPrefix pfx) table)
 
-ptQuery :: Key -> PrefixTable -> PrefixTableEntry
+ptQuery :: Key -> PrefixTable -> PrefixTableType
 ptQuery k pt = fromMaybe PTE.pteEmpty (IntMap.lookup k pt)
 
 withdraw :: PrefixTable -> [Prefix] -> PeerData -> (PrefixTable, [(Prefix, RouteData)])
@@ -50,7 +50,7 @@ withdrawPeer pt = withdraw pt (map toPrefix $ ptKeys pt)
 newPrefixTable :: PrefixTable
 newPrefixTable = IntMap.empty
 
-ptList :: PrefixTable -> [(Key, PrefixTableEntry)]
+ptList :: PrefixTable -> [(Key, PrefixTableType)]
 ptList = IntMap.toList
 
 ptKeys :: PrefixTable -> [Key]
