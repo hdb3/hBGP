@@ -24,10 +24,9 @@ update pt pfxs route = Data.List.foldl' f (pt, []) pfxs
   where
     f (pt', acc) pfx = (pt'', acc')
       where
-        acc' = if new == old then acc else (pfx, new) : acc
-        (old, new, pt'') = ptUpdate (fromPrefix pfx) route pt'
+        acc' = if newBest == oldBest then acc else (pfx, newBest) : acc
+        (oldBest, newBest, pt'') = ptUpdate (fromPrefix pfx) route pt'
 
-    -- ptUpdate :: Key -> RouteData -> PrefixTable -> (PrefixTableEntry, PrefixTableEntry, PrefixTable)
     ptUpdate k r pt = (PTE.pteBest oldVal, PTE.pteBest newVal, IntMap.insert k newVal pt)
       where
         oldVal = fromMaybe PTE.pteEmpty (IntMap.lookup k pt)
