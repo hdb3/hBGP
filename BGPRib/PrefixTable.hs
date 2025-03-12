@@ -50,10 +50,5 @@ showRibAt table pfx = show (PT.ptQuery (fromPrefix pfx) table)
 withdraw :: PrefixTable -> [Prefix] -> PeerData -> (PrefixTable, [(Prefix, RouteData)])
 withdraw pt pfxs pd = update pt pfxs (Withdraw pd)
 
--- withdraw pt pfxs pd = Data.List.foldl' f (pt,[]) pfxs where
---     f (pt',acc) pfx = let acc' = if (PT.pteBest new) == (PT.pteBest old) then acc else (pfx,PT.pteBest new):acc
---                           (old,new,pt'') = PT.ptUpdate (fromPrefix pfx) (Withdraw pd) pt'
---                       in (pt'',acc')
-
 withdrawPeer :: PrefixTable -> PeerData -> (PrefixTable, [(Prefix, RouteData)])
 withdrawPeer pt = withdraw pt (map toPrefix $ PT.ptKeys pt)

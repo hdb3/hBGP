@@ -12,7 +12,6 @@ class PrefixTableEntry pte where
   pteUpdate :: (Route r) => r -> pte r -> pte r
   pteBest :: (Route r) => pte r -> r
 
----And the instance for List is:
 instance PrefixTableEntry [] where
   pteNull = Prelude.null
 
@@ -55,28 +54,6 @@ instance Route RouteData where
   isNull NullRoute = True
   isNull _ = False
   null = NullRoute
-
-{-
-  ### TODO - work out why this is not valid, i.e. define a class PrefixTable
-  of which IntMap [RouteData] is just an instance...
-
-class PrefixTable pt where
-  ptUpdate :: (Route r, PrefixTableEntry pte) =>
-    Key -> r -> pt -> (pte r, pte r, pt)
-  ptQuery :: (Route r, PrefixTableEntry pte) =>
-    Key -> pt -> pte r
-  ptNew :: pt
-
-instance PrefixTable ( IntMap [RouteData]) where
-  ptUpdate k r pt = ( oldVal, newVal, IntMap.insert k newVal pt) where
-    oldVal = fromMaybe pteEmpty (IntMap.lookup k pt)
-    newVal = pteUpdate r oldVal
-
-  ptQuery k pt = fromMaybe pteEmpty (IntMap.lookup k pt)
-  -- ptQuery k pt = fromMaybe pteEmpty  (_ (IntMap.lookup k pt))
-  ptNew = IntMap.empty
-
-  -}
 
 type PTE = [RouteData]
 
