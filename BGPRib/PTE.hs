@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 
-module BGPRib.PT where
+module BGPRib.PTE where
 
 import BGPRib.BGPData
 import Data.IntMap.Strict as IntMap
@@ -17,7 +17,7 @@ instance PrefixTableEntry [] where
 
   pteEmpty = []
 
-  pteBest [] = BGPRib.PT.null
+  pteBest [] = BGPRib.PTE.null
   pteBest (a : _) = a
 
   pteUpdate r0 rx = if isWithdraw r0 then f'' rx else f rx
@@ -36,7 +36,7 @@ instance PrefixTableEntry [] where
       f'' [] = []
       f'' (r : rx) = if eq r0 r then rx else r : f'' rx
 
--- This exposes the minimal requirements on Route - an ‘equality’ function (shared source peer in practice, or (peer,pathID) for ADD-PATH) - and a ranking function.
+-- This shows the minimal requirements on Route - an ‘equality’ function (shared source peer in practice, or (peer,pathID) for ADD-PATH) - and a ranking function.
 -- e.g.
 
 class (Show a) => Route a where
@@ -54,25 +54,3 @@ instance Route RouteData where
   isNull NullRoute = True
   isNull _ = False
   null = NullRoute
-
-type PTE = [RouteData]
-
-type PT = IntMap PTE
-
-ptUpdate :: Key -> RouteData -> PT -> (PTE, PTE, PT)
-ptUpdate k r pt = (oldVal, newVal, IntMap.insert k newVal pt)
-  where
-    oldVal = fromMaybe pteEmpty (IntMap.lookup k pt)
-    newVal = pteUpdate r oldVal
-
-ptQuery :: Key -> PT -> PTE
-ptQuery k pt = fromMaybe pteEmpty (IntMap.lookup k pt)
-
-ptNew :: PT
-ptNew = IntMap.empty
-
-ptList :: PT -> [(Key, PTE)]
-ptList = IntMap.toList
-
-ptKeys :: PT -> [Key]
-ptKeys = IntMap.keys
