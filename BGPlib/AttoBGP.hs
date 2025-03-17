@@ -5,7 +5,7 @@ import BGPlib.Capabilities (parseOptionalParameters)
 import BGPlib.LibCommon (decode8, fromHostAddress)
 import BGPlib.PathAttributeBuilder (attributesParser)
 import BGPlib.Prefixes
-import Control.Applicative (Alternative, liftA2, (<|>))
+import Control.Applicative (Alternative, (<|>))
 import Control.Monad (unless)
 import qualified Data.Attoparsec.Binary as A
 import Data.Attoparsec.ByteString (Parser)

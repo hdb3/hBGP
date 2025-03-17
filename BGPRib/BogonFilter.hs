@@ -3,7 +3,6 @@
 module BGPRib.BogonFilter where
 
 import BGPlib.BGPlib
-import Data.IP
 
 applyBogonFilter :: [(a, [Prefix])] -> [(a, [Prefix])]
 applyBogonFilter = filter p . map f

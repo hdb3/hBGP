@@ -10,7 +10,6 @@ import Control.Concurrent
 import Control.Exception
 import Control.Monad (void)
 import qualified Data.ByteString.Lazy as L
-import Data.IP
 import qualified Data.Map.Strict as Data.Map
 import Data.Maybe (fromJust, fromMaybe, isJust)
 import Data.Word

@@ -27,7 +27,6 @@ import qualified Session.Session as Session
 import System.Environment (getArgs)
 import System.Exit
 import System.FilePath.Posix (takeBaseName)
-import Text.Read (readEither)
 
 main :: IO ()
 main = do

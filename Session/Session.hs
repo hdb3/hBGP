@@ -39,6 +39,7 @@ data State = State
 {-# INLINE debug #-}
 debug :: String -> IO ()
 debug _ = return ()
+
 -- debug s = hPutStrLn stderr s >> hFlush stderr
 
 seconds :: Int

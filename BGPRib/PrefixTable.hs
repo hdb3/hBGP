@@ -17,7 +17,6 @@ module BGPRib.PrefixTable where
 -}
 
 import BGPRib.BGPData
--- import qualified BGPRib.PT as PT
 import BGPlib.BGPlib (Prefix, fromPrefix, toPrefix)
 import qualified Data.IntMap.Strict as IntMap
 import Data.List (foldl', (\\))
@@ -26,12 +25,6 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe)
 
 trace _ = id
-
--- trace = Debug.Trace.trace
-
--- type PrefixTableEntry = PT.PTE
-
--- type PrefixTable = PT.PT
 
 type PrefixTableEntry = [RouteData]
 

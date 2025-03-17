@@ -22,12 +22,10 @@ import BGPlib.BGPlib
 import Control.Applicative (Alternative (empty))
 import Control.Monad (unless)
 import Data.Aeson
-import Data.IP
 import Data.List (foldl', nub, (\\))
 import Data.Maybe (fromMaybe)
 import Data.Text (pack, unpack)
 import Data.Word
-import GHC.Generics
 import Router.Log
 import System.Exit (die)
 import Text.Read (readMaybe)

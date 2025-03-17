@@ -9,7 +9,6 @@ import Control.Concurrent
 import Control.Monad (void)
 import Control.Monad.Trans.Class
 import Data.Char (toLower)
-import Data.IP
 import Data.Maybe (fromMaybe)
 import Data.Word (Word32)
 import Router.Global
