@@ -14,6 +14,7 @@ common base
   other-extensions:   DataKinds, DuplicateRecordFields, RecordWildCards, MultiWayIf, OverloadedStrings, FlexibleInstances, TupleSections, Strict, MultiParamTypeClasses, FunctionalDependencies, ForeignFunctionInterface, TypeSynonymInstances, FlexibleContexts, DeriveGeneric, BangPatterns, ConstrainedClassMethods
   build-depends:      yaml, text, aeson, raw-strings-qq, filepath, gitrev, transformers, haskeline, base , bytestring , iproute , attoparsec , attoparsec-binary , base16-bytestring , pretty-hex , io-streams , network , binary , containers , time , unix , sorted-list , hashable , unordered-containers , sorted-list , murmur-hash , extra , deepseq
   default-language:   Haskell2010
+  ghc-options:        -Wno-x-partial
 
 common bgprib
   other-modules:      BGPRib.PTE, BGPRib.AdjRIBOut , BGPRib.BGPData , BGPRib.BGPReader , BGPRib.BGPRib , BGPRib.BogonFilter , BGPRib.Common , BGPRib.Fifo , BGPRib.PathFilter , BGPRib.PrefixTable , BGPRib.PrefixTableUtils , BGPRib.Rib
