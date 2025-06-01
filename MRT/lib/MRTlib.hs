@@ -28,7 +28,7 @@ import Data.Word
 import GHC.Generics (Generic)
 import MRTformat
 
-data IPPrefix = IP4Prefix IP4Prefix | IP6Prefix IP6Prefix deriving (Show, Generic)
+data IPPrefix = IP4Prefix IP4Prefix | IP6Prefix IP6Prefix deriving (Show, Generic, Eq)
 
 instance Data.Hashable.Hashable IPPrefix
 
