@@ -69,6 +69,7 @@ buildPathAttributes = foldMap buildPathAttribute
     buildPathAttribute (PathAttributeAS4Aggregator (a, b)) = buildAttributeAggregator TypeCodePathAttributeAS4Aggregator a b -- PathAttributeAS4Aggregator (Word32,Word32)
     buildPathAttribute (PathAttributeASPathlimit a) = buildExtended TypeCodePathAttributeASPathlimit (fromIntegral $ B.length a) <> bytes a
     buildPathAttribute (PathAttributeAttrSet a) = buildExtended TypeCodePathAttributeAttrSet (fromIntegral $ B.length a) <> bytes a
+    buildPathAttribute (PathAttributeConnector a) = trace ("PathAttributeConnector: " ++ BS8.unpack a) mempty where
     buildPathAttribute (PathAttributeUnknown a) = trace ("PathAttributeUnknown: " ++ BS8.unpack a) mempty where
     buildPathAttribute x = error $ "Unexpected type code: " ++ show x
 
