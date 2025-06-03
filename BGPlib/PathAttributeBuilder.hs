@@ -45,6 +45,8 @@ buildPathAttributes = foldMap buildPathAttribute
     buildAttributeWords32 code ws = trace ("unexpected format for buildAttributeWords32 " ++ show code) mempty
     buildAttributeWords64 :: PathAttributeTypeCode -> [Word64] -> Builder
     buildAttributeWords64 code ws | 31 > length ws = buildCommon code (fromIntegral $ 8 * length ws) <> foldMap word64BE ws
+    buildAttributeWords64 code ws = trace ("unexpected format for buildAttributeWords64 " ++ show code) mempty
+
     buildAttributeWord64 :: PathAttributeTypeCode -> Word64 -> Builder
     buildAttributeWord64 code v = buildCommon code 8 <> word64BE v
     buildAttributeAggregator :: PathAttributeTypeCode -> Word32 -> Word32 -> Builder
@@ -67,7 +69,7 @@ buildPathAttributes = foldMap buildPathAttribute
     buildPathAttribute (PathAttributeAS4Aggregator (a, b)) = buildAttributeAggregator TypeCodePathAttributeAS4Aggregator a b -- PathAttributeAS4Aggregator (Word32,Word32)
     buildPathAttribute (PathAttributeASPathlimit a) = buildExtended TypeCodePathAttributeASPathlimit (fromIntegral $ B.length a) <> bytes a
     buildPathAttribute (PathAttributeAttrSet a) = buildExtended TypeCodePathAttributeAttrSet (fromIntegral $ B.length a) <> bytes a
-    buildPathAttribute (PathAttributeUnknown a) = trace (BS8.unpack a) mempty where
+    buildPathAttribute (PathAttributeUnknown a) = trace ("PathAttributeUnknown: " ++ BS8.unpack a) mempty where
     buildPathAttribute x = error $ "Unexpected type code: " ++ show x
 
 attributesParser :: Word16 -> Parser [PathAttribute]
