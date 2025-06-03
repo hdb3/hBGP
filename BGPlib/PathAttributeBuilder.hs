@@ -71,7 +71,7 @@ buildPathAttributes = foldMap buildPathAttribute
     buildPathAttribute (PathAttributeASPathlimit a) = buildExtended TypeCodePathAttributeASPathlimit (fromIntegral $ B.length a) <> bytes a
     buildPathAttribute (PathAttributeAttrSet a) = buildExtended TypeCodePathAttributeAttrSet (fromIntegral $ B.length a) <> bytes a
     buildPathAttribute (PathAttributeConnector ax) = trace ("PathAttributeConnector: " ++ BS8.unpack (B16.encode ax)) mempty
-    buildPathAttribute (PathAttributeUnknown a ax) = trace ("PathAttributeUnknown: " ++ BS8.unpack (B16.encode ax)) mempty
+    buildPathAttribute (PathAttributeUnknown a ax) = trace ("PathAttributeUnknown: " ++ show a ++ " [" ++ BS8.unpack (B16.encode ax) ++ "]") mempty
     buildPathAttribute x = error $ "Unexpected type code: " ++ show x
 
 attributesParser :: Word16 -> Parser [PathAttribute]
