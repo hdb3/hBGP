@@ -15,7 +15,10 @@ import qualified Data.Attoparsec.Binary as A
 import Data.Attoparsec.ByteString (Parser)
 import qualified Data.Attoparsec.ByteString as A
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BS8
 import Data.Word
+import Debug.Trace
+import Data.Monoid (mempty)
 
 decodePathAttributes :: B.ByteString -> [PathAttribute]
 decodePathAttributes bs = let Right msgs = A.parseOnly (attributesParser (fromIntegral $ B.length bs)) bs in msgs
@@ -63,6 +66,7 @@ buildPathAttributes = foldMap buildPathAttribute
     buildPathAttribute (PathAttributeAS4Aggregator (a, b)) = buildAttributeAggregator TypeCodePathAttributeAS4Aggregator a b -- PathAttributeAS4Aggregator (Word32,Word32)
     buildPathAttribute (PathAttributeASPathlimit a) = buildExtended TypeCodePathAttributeASPathlimit (fromIntegral $ B.length a) <> bytes a
     buildPathAttribute (PathAttributeAttrSet a) = buildExtended TypeCodePathAttributeAttrSet (fromIntegral $ B.length a) <> bytes a
+    buildPathAttribute (PathAttributeUnknown a) = trace (BS8.unpack a) mempty where
     buildPathAttribute x = error $ "Unexpected type code: " ++ show x
 
 attributesParser :: Word16 -> Parser [PathAttribute]
