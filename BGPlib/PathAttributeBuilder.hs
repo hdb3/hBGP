@@ -16,9 +16,9 @@ import Data.Attoparsec.ByteString (Parser)
 import qualified Data.Attoparsec.ByteString as A
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BS8
+import Data.Monoid (mempty)
 import Data.Word
 import Debug.Trace
-import Data.Monoid (mempty)
 
 decodePathAttributes :: B.ByteString -> [PathAttribute]
 decodePathAttributes bs = let Right msgs = A.parseOnly (attributesParser (fromIntegral $ B.length bs)) bs in msgs
@@ -42,6 +42,7 @@ buildPathAttributes = foldMap buildPathAttribute
     buildAttributeWord32 code v = buildCommon code 4 <> word32BE v
     buildAttributeWords32 :: PathAttributeTypeCode -> [Word32] -> Builder
     buildAttributeWords32 code ws | 63 > length ws = buildCommon code (fromIntegral $ 4 * length ws) <> foldMap word32BE ws
+    buildAttributeWords32 code ws = trace ("unexpected format for buildAttributeWords32 " ++ show code) mempty
     buildAttributeWords64 :: PathAttributeTypeCode -> [Word64] -> Builder
     buildAttributeWords64 code ws | 31 > length ws = buildCommon code (fromIntegral $ 8 * length ws) <> foldMap word64BE ws
     buildAttributeWord64 :: PathAttributeTypeCode -> Word64 -> Builder
