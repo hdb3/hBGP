@@ -68,7 +68,7 @@ data PathAttribute
   | PathAttributeASPathlimit B.ByteString
   | PathAttributeLargeCommunity [LargeCommunity]
   | PathAttributeAttrSet B.ByteString
-  | PathAttributeUnknown B.ByteString
+  | PathAttributeUnknown Word8 B.ByteString
   deriving (Show, Eq, Generic)
 
 instance Hashable PathAttribute

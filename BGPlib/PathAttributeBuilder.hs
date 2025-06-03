@@ -15,6 +15,7 @@ import qualified Data.Attoparsec.Binary as A
 import Data.Attoparsec.ByteString (Parser)
 import qualified Data.Attoparsec.ByteString as A
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BS8
 import Data.Monoid (mempty)
 import Data.Word
@@ -69,8 +70,8 @@ buildPathAttributes = foldMap buildPathAttribute
     buildPathAttribute (PathAttributeAS4Aggregator (a, b)) = buildAttributeAggregator TypeCodePathAttributeAS4Aggregator a b -- PathAttributeAS4Aggregator (Word32,Word32)
     buildPathAttribute (PathAttributeASPathlimit a) = buildExtended TypeCodePathAttributeASPathlimit (fromIntegral $ B.length a) <> bytes a
     buildPathAttribute (PathAttributeAttrSet a) = buildExtended TypeCodePathAttributeAttrSet (fromIntegral $ B.length a) <> bytes a
-    buildPathAttribute (PathAttributeConnector a) = trace ("PathAttributeConnector: " ++ BS8.unpack a) mempty where
-    buildPathAttribute (PathAttributeUnknown a) = trace ("PathAttributeUnknown: " ++ BS8.unpack a) mempty where
+    buildPathAttribute (PathAttributeConnector ax) = trace ("PathAttributeConnector: " ++ BS8.unpack (B16.encode ax)) mempty
+    buildPathAttribute (PathAttributeUnknown a ax) = trace ("PathAttributeUnknown: " ++ BS8.unpack (B16.encode ax)) mempty
     buildPathAttribute x = error $ "Unexpected type code: " ++ show x
 
 attributesParser :: Word16 -> Parser [PathAttribute]
@@ -89,13 +90,13 @@ attributesParser n
       if n < len + hdrLen
         then error $ "attributesParser: invalid length n=" ++ show n ++ " len=" ++ show len ++ " code=" ++ show code
         else do
-          attr <- attributeParser len code
+          attr <- attributeParser len code code'
           attrs <- attributesParser (n - hdrLen - len)
           return $ attr : attrs
   where
     {-# INLINE attributeParser #-}
-    attributeParser :: Word16 -> PathAttributeTypeCode -> Parser PathAttribute
-    attributeParser len code =
+    attributeParser :: Word16 -> PathAttributeTypeCode -> Word8 -> Parser PathAttribute
+    attributeParser len code code' =
       if
         | TypeCodePathAttributeOrigin == code -> do
             unless (len == 1) (error "Bad Length")
@@ -131,7 +132,7 @@ attributesParser n
         | TypeCodePathAttributeASPathlimit == code -> PathAttributeASPathlimit <$> A.take (fromIntegral len)
         | TypeCodePathAttributeLargeCommunity == code -> PathAttributeLargeCommunity <$> A.count (fromIntegral $ len `div` 12) get3word32be
         | TypeCodePathAttributeAttrSet == code -> PathAttributeAttrSet <$> A.take (fromIntegral len)
-        | TypeCodePathAttributeUnknown == code -> PathAttributeUnknown <$> A.take (fromIntegral len)
+        | TypeCodePathAttributeUnknown == code -> PathAttributeUnknown code' <$> A.take (fromIntegral len)
     get3word32be = do
       w0 <- A.anyWord32be
       w1 <- A.anyWord32be
